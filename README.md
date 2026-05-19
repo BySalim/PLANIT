@@ -78,3 +78,8 @@ pnpm format      # Prettier
 - [ADR-0001 : Monolithe modulaire Turborepo](docs/architecture/adr/0001-monolithe-modulaire-turborepo.md)
 - [Runbook deploiement](docs/runbooks/deploy.md)
 - [Tech Debt](docs/tech-debt.md)
+
+## Licence
+
+Copyright (c) 2026 Salim Ouedraogo. Tous droits reserves.
+Ce logiciel est proprietaire -- voir le fichier [LICENSE](./LICENSE).
