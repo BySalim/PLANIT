@@ -1,0 +1,6 @@
+{
+  "extends": "@planit/config/typescript/nest",
+  "compilerOptions": {
+    "strictPropertyInitialization": false
+  }
+}
