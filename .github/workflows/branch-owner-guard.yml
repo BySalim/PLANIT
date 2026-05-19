@@ -1,0 +1,35 @@
+name: Branch Owner Guard
+
+on:
+  push:
+    branches:
+      - 'feat/**'
+
+jobs:
+  check-owner:
+    name: branch-owner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch owner matches pusher
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          PUSHER="${{ github.actor }}"
+
+          case "$BRANCH" in
+            feat/salim)   EXPECTED="BySalim" ;;
+            feat/oumy)    EXPECTED="oumy-code" ;;
+            feat/libasse) EXPECTED="cheelee08" ;;
+            feat/oumar)   EXPECTED="papiuzumaki" ;;
+            feat/djibril) EXPECTED="pape-djibrilbousso" ;;
+            *)
+              echo "❌ Branch '$BRANCH' is not a known feat/* branch."
+              exit 1
+              ;;
+          esac
+
+          if [ "$PUSHER" != "$EXPECTED" ]; then
+            echo "❌ '$PUSHER' cannot push to '$BRANCH' — owner is '$EXPECTED'."
+            exit 1
+          fi
+
+          echo "✅ $PUSHER is the owner of $BRANCH"
