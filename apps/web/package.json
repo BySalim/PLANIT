@@ -23,6 +23,8 @@
   },
   "devDependencies": {
     "@planit/config": "workspace:*",
+    "eslint": "^9.28.0",
+    "eslint-config-next": "15.3.2",
     "@types/node": "^22.15.21",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.3",
