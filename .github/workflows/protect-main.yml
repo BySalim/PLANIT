@@ -1,0 +1,23 @@
+name: Protect Main
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-source:
+    name: require-develop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure PR comes from develop
+        run: |
+          HEAD="${{ github.head_ref }}"
+
+          if [ "$HEAD" != "develop" ]; then
+            echo "❌ PRs to main must come from 'develop', not '$HEAD'."
+            echo "Strategy: feat/* → develop → main"
+            exit 1
+          fi
+
+          echo "✅ PR source is 'develop' — OK"

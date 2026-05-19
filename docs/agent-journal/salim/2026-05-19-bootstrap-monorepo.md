@@ -227,3 +227,34 @@ CI globale      ✅ tous les jobs verts après commit 617f97a
 - [ ] `docs/tech-debt.md` : TD-006 (zéro test backend — vitest --passWithNoTests est un placeholder)
 - [x] `.github/CODEOWNERS` créé
 - [x] `LICENSE` créé
+
+---
+
+## Reprise ~18h00 — Workflows de protection des branches
+
+### Directives reçues
+
+- Déclencher une erreur si push sur une branche qui n'est pas la sienne.
+- Déclencher une erreur si une PR vers `main` ne vient pas de `develop`.
+- Synchroniser `develop` avec `main` (était resté au commit initial).
+- Passer `develop` en default branch GitHub.
+
+### Décisions techniques (autonome)
+
+| #   | Décision                                                             | Pourquoi                                                                                                               | Réversible ? |
+| --- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------ |
+| 1   | `branch-owner-guard.yml` via `case` shell                            | Associative array bash non dispo sur tous les runners — `case` est portable                                            | Oui          |
+| 2   | Check nommé `branch-owner` (pas bloquant au push, bloquant au merge) | GitHub ne peut pas bloquer un push natif sur feat/\* sans Enterprise — le check échoue et bloque le merge vers develop | Oui          |
+| 3   | `protect-main.yml` check nommé `require-develop`                     | Bloquant 100% si ajouté comme status check requis sur main                                                             | Oui          |
+| 4   | `git push origin main:develop` pour synchroniser develop             | develop était resté à 1 commit (init) — main avait reçu PR #1 directement                                              | Oui          |
+
+### Fichiers créés
+
+- `.github/workflows/branch-owner-guard.yml`
+- `.github/workflows/protect-main.yml`
+
+### Actions manuelles restantes (GitHub UI)
+
+- Ajouter `branch-owner` comme status check requis sur `develop`
+- Ajouter `require-develop` comme status check requis sur `main`
+- Ces checks apparaîtront dans la liste après la première CI sur une PR ciblant chaque branche
