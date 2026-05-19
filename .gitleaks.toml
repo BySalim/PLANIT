@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "PLANIT allowlist"
+paths = [
+  ".env.example",
+  "docs/",
+  "*.md",
+]
