@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+
+@theme {
+  /* PLANIT brand colors — ported from @planit/design-tokens */
+  --color-primary: #6b2d0e;
+  --color-primary-hover: #8b3a12;
+  --color-primary-50: #fcf7f4;
+  --color-primary-100: #f5e6dc;
+  --color-primary-200: #e8c9b0;
+
+  --color-accent: #e8620a;
+  --color-accent-100: #fde8d0;
+  --color-accent-600: #c44e07;
+  --color-accent-800: #742e04;
+
+  --color-surface: #ffffff;
+  --color-bg: #fafaf9;
+  --color-bg-warm: #fcf7f4;
+
+  --color-border: #e7e5e4;
+  --color-border-soft: #f0edeb;
+  --color-divider: #efecea;
+
+  --color-text: #1c1917;
+  --color-text-sec: #57534e;
+  --color-text-muted: #78716c;
+  --color-text-faint: #a8a29e;
+
+  --color-ok: #16a34a;
+  --color-ok-100: #dcfce7;
+  --color-err: #dc2626;
+  --color-err-100: #fee2e2;
+  --color-info: #2563eb;
+  --color-info-100: #dbeafe;
+  --color-warn: #fde8d0;
+  --color-warn-text: #742e04;
+
+  --color-event: #7c3aed;
+  --color-event-100: #ede9fe;
+  --color-event-border: #c4b5fd;
+  --color-event-text: #5b21b6;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Poppins', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
