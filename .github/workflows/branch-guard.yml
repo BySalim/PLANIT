@@ -2,15 +2,17 @@ name: Branch Guard
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   guard:
-    name: Block direct push to main
+    name: Block direct push to protected branches
     runs-on: ubuntu-latest
     steps:
-      - name: Fail on direct push to main
+      - name: Fail on direct push to main or develop
         run: |
-          echo "ERROR: Direct push to 'main' is not allowed."
-          echo "Please open a Pull Request from your feat/* branch."
+          echo "ERROR: Direct push to '${{ github.ref_name }}' is not allowed."
+          echo "Workflow:"
+          echo "  feat/* → develop (PR)"
+          echo "  develop → main (PR, release only)"
           exit 1

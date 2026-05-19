@@ -8,18 +8,28 @@ PROBE → SPEC → PLAN → CODE → CHECK → JOURNAL
 
 Détail : [01-VIBECODE-WORKFLOW.md](../PLANIT-Strategie-VibeCode/strategies/01-VIBECODE-WORKFLOW.md)
 
-## Branches
+## Stratégie de branches
 
-| Branche        | Propriétaire              |
-| -------------- | ------------------------- |
-| `main`         | Protégé — PR uniquement   |
-| `feat/salim`   | Salim — Tech Lead         |
-| `feat/oumy`    | Oumy — Frontend           |
-| `feat/libasse` | Libasse — Mobile + Design |
-| `feat/oumar`   | Oumar — Backend           |
-| `feat/djibril` | Djibril — DevOps          |
+```
+main ← develop ← feat/*
+```
 
-**Règle absolue** : on ne commit jamais sur `main` ni sur la branche d'un autre.
+| Branche        | Rôle                                          | Cible PR                         |
+| -------------- | --------------------------------------------- | -------------------------------- |
+| `main`         | Production stable — démontrable à tout moment | ← `develop` uniquement (release) |
+| `develop`      | Intégration — reçoit les features validées    | ← `feat/*`                       |
+| `feat/salim`   | Salim — Tech Lead                             | → `develop`                      |
+| `feat/oumy`    | Oumy — Frontend                               | → `develop`                      |
+| `feat/libasse` | Libasse — Mobile + Design                     | → `develop`                      |
+| `feat/oumar`   | Oumar — Backend                               | → `develop`                      |
+| `feat/djibril` | Djibril — DevOps                              | → `develop`                      |
+
+**Règles absolues** :
+
+- Jamais de commit direct sur `main` ou `develop` — toujours via PR
+- Les PRs de features ciblent `develop`, pas `main`
+- `main` ne reçoit que des merges depuis `develop` (releases stables)
+- On ne touche jamais la branche d'un autre membre
 
 ## Commits
 
@@ -36,10 +46,11 @@ Types autorisés : `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `perf`, `
 
 ## Pull Requests
 
-1. Remplir le template PR (`.github/pull_request_template.md`)
-2. Tous les checks CI doivent être verts
-3. Au moins 1 review avant merge
-4. Lier le journal d'agent correspondant
+1. Cible toujours `develop` (jamais `main` directement)
+2. Remplir le template PR (`.github/pull_request_template.md`)
+3. Tous les checks CI doivent être verts
+4. Au moins 1 review avant merge
+5. Lier le journal d'agent correspondant
 
 ## Quality gates (avant tout commit)
 

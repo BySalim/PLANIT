@@ -17,6 +17,10 @@ Feature :
 
 `docs/agent-journal/<membre>/<date>-<slug>.md`
 
+## Cible
+
+- [ ] PR vers `develop` (jamais vers `main` directement)
+
 ## Checklist
 
 - [ ] `pnpm lint` — 0 erreurs
