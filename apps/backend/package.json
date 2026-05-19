@@ -1,0 +1,43 @@
+{
+  "name": "@planit/backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "prisma generate && nest build",
+    "start": "node dist/main",
+    "lint": "eslint \"{src,test}/**/*.ts\" --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:seed": "ts-node prisma/seed.ts",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@planit/contracts": "workspace:*",
+    "@planit/utils": "workspace:*",
+    "@nestjs/common": "^11.1.1",
+    "@nestjs/core": "^11.1.1",
+    "@nestjs/platform-express": "^11.1.1",
+    "@nestjs/swagger": "^11.2.0",
+    "@nestjs/websockets": "^11.1.1",
+    "@nestjs/platform-socket.io": "^11.1.1",
+    "@prisma/client": "^6.9.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^3.25.56",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@planit/config": "workspace:*",
+    "eslint": "^9.28.0",
+    "@types/node": "^22.15.21",
+    "@nestjs/cli": "^11.0.7",
+    "@nestjs/schematics": "^11.0.5",
+    "@nestjs/testing": "^11.1.1",
+    "typescript": "^5.8.3",
+    "prisma": "^6.9.0",
+    "ts-node": "^10.9.2",
+    "vitest": "^3.2.1"
+  }
+}

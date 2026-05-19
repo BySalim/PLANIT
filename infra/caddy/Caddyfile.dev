@@ -1,0 +1,16 @@
+# Caddyfile.dev — placeholder, non actif en développement local.
+# En dev, le frontend tourne sur :3000 et le backend sur :3001 directement.
+# Caddy sera activé en staging/production (Hetzner CX22).
+
+:80 {
+  # frontend
+  handle /api/* {
+    reverse_proxy localhost:3001
+  }
+  handle /docs* {
+    reverse_proxy localhost:3001
+  }
+  handle {
+    reverse_proxy localhost:3000
+  }
+}

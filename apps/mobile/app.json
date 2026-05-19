@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "PLANIT",
+    "slug": "planit",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "planit",
+    "platforms": ["ios", "android"]
+  }
+}
