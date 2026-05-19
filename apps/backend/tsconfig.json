@@ -1,6 +1,10 @@
 {
   "extends": "@planit/config/typescript/nest",
   "compilerOptions": {
-    "strictPropertyInitialization": false
-  }
+    "strictPropertyInitialization": false,
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
 }
