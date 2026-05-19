@@ -1,0 +1,16 @@
+name: Branch Guard
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  guard:
+    name: Block direct push to main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail on direct push to main
+        run: |
+          echo "ERROR: Direct push to 'main' is not allowed."
+          echo "Please open a Pull Request from your feat/* branch."
+          exit 1
