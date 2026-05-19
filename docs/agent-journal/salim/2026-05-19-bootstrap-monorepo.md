@@ -148,3 +148,82 @@ GET /docs              ⏳ À vérifier après pnpm dev
 - [x] `docs/tech-debt.md` : TD-001 à TD-005 listés
 - [x] `docs/shared-resources-lock.md` initialisé (aucun lock actif)
 - [x] `docs/shared-resources-lock.md` : liste des ressources sensibles documentée
+
+---
+
+## Reprise ~17h00 — Licence, co-reviewer & corrections CI en cascade
+
+### Directives reçues
+
+- Ajouter une licence propriétaire (ALL RIGHTS RESERVED — ISM Dakar, Salim Ouedraogo).
+- Ajouter `@ShadowHaku54` (second compte Salim) comme co-reviewer avec auto-assign intelligent (PR de BySalim → assign ShadowHaku54, autres PRs → assign BySalim).
+- Corriger les échecs CI successifs jusqu'à passer entièrement vert.
+
+### Décisions techniques (autonome)
+
+| #   | Décision                                                                                                  | Pourquoi                                                                                                                        | Réversible ? |
+| --- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| 1   | `eslint` ajouté en devDep de `@planit/backend` et `apps/web`                                              | pnpm strict — chaque package doit déclarer ses propres binaires                                                                 | Oui          |
+| 2   | `"type": "module"` ajouté dans `packages/config/package.json`                                             | `eslint/index.js` utilise ESM `import/export` — sans ce flag pnpm ne peut pas résoudre le CJS wrapper                           | Oui          |
+| 3   | `apps/backend/eslint.config.mjs` créé                                                                     | NestJS n'a pas de config ESLint par défaut ; le CI `lint` en cherchait une                                                      | Oui          |
+| 4   | `apps/web/.eslintrc.json` créé                                                                            | `next lint` sans config ouvre un prompt interactif bloquant en CI                                                               | Oui          |
+| 5   | `include`/`exclude`/`outDir`/`rootDir` retirés de `packages/config/typescript/nest.json`                  | Ces chemins sont résolus relativement au fichier _déclarant_ (packages/config/typescript/), pas au fichier _étendant_ → TS18003 | Oui          |
+| 6   | Ces options remises dans `apps/backend/tsconfig.json`                                                     | Seul le consommateur connaît son propre `src/`                                                                                  | Oui          |
+| 7   | `vitest run --passWithNoTests` dans le script `test` backend                                              | Aucun fichier test en phase bootstrap — vitest quittait avec code 1                                                             | Oui          |
+| 8   | Script `build` mobile supprimé                                                                            | `expo export` + pnpm strict = chemins relatifs cassés depuis node_modules/.pnpm ; prod via EAS Build                            | Oui          |
+| 9   | `"db:generate"` ajouté dans `dependsOn` de toutes les tâches turbo (`build`, `lint`, `typecheck`, `test`) | **Fix réel** : Turbo lançait lint/typecheck/test sans jamais exécuter `prisma generate` → PrismaClient vide                     | Oui          |
+| 10  | `import type` pour interfaces NestJS (`OnModuleInit`, `PipeTransform`, `OnGatewayConnection`…)            | ESLint `consistent-type-imports` : les interfaces ne sont que des types, pas des valeurs runtime                                | Oui          |
+
+### Décisions soumises à validation
+
+- Aucune (tout dans le scope « corrections CI »).
+
+### Fichiers modifiés
+
+- `LICENSE` (créé — propriétaire ISM)
+- `package.json` racine : `author`, `license: UNLICENSED`
+- `README.md` : section Licence ajoutée
+- `.github/CODEOWNERS` (créé)
+- `.github/workflows/auto-assign-reviewer.yml` (créé)
+- `packages/config/package.json` : `"type": "module"`
+- `packages/config/typescript/nest.json` : retrait `include`/`exclude`/`outDir`/`rootDir`
+- `packages/config/typescript/next.json` : retrait `include`/`exclude` (même bug latent)
+- `apps/backend/tsconfig.json` : ajout `outDir`, `rootDir`, `include`, `exclude`
+- `apps/backend/package.json` : `eslint` devDep, `vitest --passWithNoTests`, `prisma generate &&` dans build
+- `apps/backend/eslint.config.mjs` (créé)
+- `apps/backend/src/common/prisma.service.ts` : `import type` pour interfaces
+- `apps/backend/src/common/zod-validation.pipe.ts` : `import type` pour interfaces
+- `apps/backend/src/ws/ws.gateway.ts` : `import type` pour interfaces
+- `apps/web/package.json` : `eslint`, `eslint-config-next` devDeps
+- `apps/web/.eslintrc.json` (créé)
+- `apps/mobile/package.json` : script `build` supprimé
+- `turbo.json` : `"db:generate"` dans `dependsOn` de build/lint/typecheck/test
+
+### Phase CHECK
+
+```
+Commits poussés : b70a5eb → 617f97a (5 commits de fix CI)
+pnpm lint       ✅ vert en CI (job quality)
+pnpm typecheck  ✅ vert en CI (TS18003 résolu)
+pnpm test       ✅ vert en CI (passWithNoTests)
+pnpm build      ✅ vert en CI (prisma generate via turbo dependsOn)
+CI globale      ✅ tous les jobs verts après commit 617f97a
+```
+
+### Surprises / blocages
+
+- ⚠️ **Diagnostic difficile** : le vrai problème (Prisma absent du graphe Turbo) était masqué par des erreurs en cascade (TS, lint, test). Chaque fix révélait le suivant.
+- ⚠️ **`include` dans tsconfig partagé** : anti-pattern TypeScript classique mais non documenté dans les guides courants — règle ajoutée mentalement.
+- ⚠️ **`"type": "module"` absent de `@planit/config`** : ESM sans le flag → pnpm ne peut pas résoudre l'entrée du package.
+
+### Suite
+
+- PR `feat/salim → develop` à ouvrir (la branche a 22 commits devant main).
+- Configurer branch protection rules sur `main` et `develop` (action manuelle GitHub, expliquée à Salim).
+- Vague 01 peut démarrer après merge.
+
+### Mises à jour annexes
+
+- [ ] `docs/tech-debt.md` : TD-006 (zéro test backend — vitest --passWithNoTests est un placeholder)
+- [x] `.github/CODEOWNERS` créé
+- [x] `LICENSE` créé
