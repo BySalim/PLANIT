@@ -1,3 +1,4 @@
 # PLANIT — Code Owners
-# @BySalim est reviewer obligatoire sur tous les fichiers.
-* @BySalim
+# @BySalim et @ShadowHaku54 sont tous deux CODEOWNERS.
+# L'un OU l'autre suffit a satisfaire la regle CODEOWNER sur une PR.
+* @BySalim @ShadowHaku54

@@ -7,7 +7,7 @@ on:
 
 jobs:
   assign:
-    name: Assign @BySalim as reviewer
+    name: Assign reviewer
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -18,17 +18,14 @@ jobs:
             const pr = context.payload.pull_request;
             const author = pr.user.login;
 
-            // GitHub interdit d'assigner l'auteur comme reviewer de sa propre PR
-            if (author === 'BySalim') {
-              console.log(`PR ouverte par @BySalim — assignation ignorée (auto-review interdit)`);
-              return;
-            }
+            // BySalim ne peut pas se reviewer — on assigne ShadowHaku54 a la place
+            const reviewer = author === 'BySalim' ? 'ShadowHaku54' : 'BySalim';
 
             await github.rest.pulls.requestReviewers({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: pr.number,
-              reviewers: ['BySalim'],
+              reviewers: [reviewer],
             });
 
-            console.log(`@BySalim assigné comme reviewer sur PR #${pr.number}`);
+            console.log(`@${reviewer} assigne comme reviewer sur PR #${pr.number} (auteur : @${author})`);
