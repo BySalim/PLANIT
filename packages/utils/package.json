@@ -1,0 +1,22 @@
+{
+  "name": "@planit/utils",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./date": {
+      "types": "./src/date/index.ts",
+      "default": "./src/date/index.ts"
+    },
+    "./result": {
+      "types": "./src/result/index.ts",
+      "default": "./src/result/index.ts"
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

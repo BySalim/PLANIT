@@ -1,0 +1,29 @@
+{
+  "name": "@planit/contracts",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./auth": {
+      "types": "./src/auth/index.ts",
+      "default": "./src/auth/index.ts"
+    },
+    "./planning": {
+      "types": "./src/planning/index.ts",
+      "default": "./src/planning/index.ts"
+    },
+    "./notifications": {
+      "types": "./src/notifications/index.ts",
+      "default": "./src/notifications/index.ts"
+    }
+  },
+  "dependencies": {
+    "zod": "^3.25.56"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
