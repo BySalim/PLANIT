@@ -71,7 +71,7 @@ export function SessionCard({ session, onClick, style }: SessionCardProps) {
       type="button"
       onClick={onClick ? () => onClick(session) : undefined}
       style={style}
-      aria-label={`Séance ${session.module.code} ${session.type} de ${startLabel} à ${endLabel}`}
+      aria-label={`Séance ${session.module.code} ${session.type} de ${startLabel} à ${endLabel}${unpublished ? ' (non publiée)' : ''}`}
       className={cn(
         'group relative w-full overflow-hidden rounded-md border bg-surface text-left shadow-sm transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
         unpublished ? 'border-dashed border-warn-text' : 'border-border',
