@@ -17,6 +17,8 @@
     "test": "turbo test",
     "db:migrate": "pnpm --filter @planit/backend db:migrate",
     "db:seed": "pnpm --filter @planit/backend db:seed",
+    "db:reset": "pnpm --filter @planit/backend db:reset",
+    "test:e2e": "playwright test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore",
     "prepare": "husky"
   },
@@ -27,7 +29,8 @@
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "lint-staged": "^16.1.0",
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "@playwright/test": "^1.49.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

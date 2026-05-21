@@ -11,19 +11,23 @@ export const colors = {
   textMuted: '#78716C',
   textFaint: '#A8A29E',
 
-  primary: '#6B2D0E',
-  primaryHover: '#8B3A12',
-  primary50: '#FCF7F4',
-  primary100: '#F5E6DC',
-  primary200: '#E8C9B0',
+  // ── Brand colors (source: Illustrator) ───────────────────
+  // These two are the definitive PLANIT brand values.
+  // PlanitLogo, globals.css @theme and every UI token that
+  // derives from them must stay in sync with these constants.
+  primary: '#593114', // PLANIT marron
+  primaryHover: '#6F3E1E',
+  primary50: '#FBF5F1',
+  primary100: '#F0DDD0',
+  primary200: '#D8B79A',
 
-  accent: '#E8620A',
-  accent100: '#FDE8D0',
-  accent600: '#C44E07',
-  accent800: '#742E04',
+  accent: '#EE7023', // PLANIT orange
+  accent100: '#FDE9D5',
+  accent600: '#C85A16',
+  accent800: '#743108',
 
-  warn: '#FDE8D0',
-  warnText: '#742E04',
+  warn: '#FDE9D5',
+  warnText: '#743108',
 
   ok: '#16A34A',
   ok100: '#DCFCE7',
