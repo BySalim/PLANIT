@@ -1,17 +1,18 @@
 @import 'tailwindcss';
 
 @theme {
-  /* PLANIT brand colors — ported from @planit/design-tokens */
-  --color-primary: #6b2d0e;
-  --color-primary-hover: #8b3a12;
-  --color-primary-50: #fcf7f4;
-  --color-primary-100: #f5e6dc;
-  --color-primary-200: #e8c9b0;
+  /* PLANIT brand colors — source: Illustrator (see packages/design-tokens/src/colors.ts)
+     Modifier ici ET dans colors.ts en même temps pour rester synchronisé. */
+  --color-primary: #593114; /* PLANIT marron */
+  --color-primary-hover: #6f3e1e;
+  --color-primary-50: #fbf5f1;
+  --color-primary-100: #f0ddd0;
+  --color-primary-200: #d8b79a;
 
-  --color-accent: #e8620a;
-  --color-accent-100: #fde8d0;
-  --color-accent-600: #c44e07;
-  --color-accent-800: #742e04;
+  --color-accent: #ee7023; /* PLANIT orange */
+  --color-accent-100: #fde9d5;
+  --color-accent-600: #c85a16;
+  --color-accent-800: #743108;
 
   --color-surface: #ffffff;
   --color-bg: #fafaf9;

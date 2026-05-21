@@ -2,6 +2,18 @@
 // Lucide-style stroke icons (24x24 viewBox) as named React components.
 // Usage: import { CalendarIcon } from '@planit/ui';
 
+// ── PLANIT brand colors (source: Illustrator) ──────────────────────────────
+// Must stay in sync with packages/design-tokens/src/colors.ts (primary/accent)
+// and apps/web/src/app/globals.css (--color-primary / --color-accent).
+const BRAND_MARRON = '#593114'; // colors.primary
+const BRAND_ORANGE = '#EE7023'; // colors.accent
+// Derived shades used inside PlanitLogo only
+const BRAND_MARRON_DARK = '#3A1D09'; // very dark, for cap shadow
+const BRAND_MARRON_MID = '#6F3E1E'; // colors.primaryHover, body mid-tone
+const BRAND_ORANGE_LIGHT = '#F0892B'; // gradient highlight on tassel ball
+const BRAND_ORANGE_DARK = '#C85A16'; // colors.accent600
+// ──────────────────────────────────────────────────────────────────────────
+
 import { useId } from 'react';
 import type { ReactNode } from 'react';
 
@@ -248,42 +260,52 @@ export function PlanitLogo({ size = 34 }: PlanitLogoProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">
       <defs>
+        {/* Orange gradient — tassel ball + accent cells */}
         <linearGradient id={og} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FF8C1A" />
-          <stop offset="100%" stopColor="#D84E00" />
+          <stop offset="0%" stopColor={BRAND_ORANGE_LIGHT} />
+          <stop offset="100%" stopColor={BRAND_ORANGE_DARK} />
         </linearGradient>
+        {/* Cap gradient — graduation cap body */}
         <linearGradient id={cap} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#8B3A12" />
-          <stop offset="100%" stopColor="#3D1504" />
+          <stop offset="0%" stopColor={BRAND_MARRON_MID} />
+          <stop offset="100%" stopColor={BRAND_MARRON_DARK} />
         </linearGradient>
+        {/* Brim gradient — cap brim */}
         <linearGradient id={brd} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#9B4416" />
-          <stop offset="100%" stopColor="#5A2008" />
+          <stop offset="0%" stopColor={BRAND_MARRON_MID} />
+          <stop offset="100%" stopColor={BRAND_MARRON} />
         </linearGradient>
       </defs>
-      <rect x="4" y="24" width="70" height="78" rx="14" fill="#6B2D0E" />
-      <rect x="18" y="12" width="13" height="26" rx="6.5" fill="#6B2D0E" />
-      <rect x="46" y="12" width="13" height="22" rx="6.5" fill="#6B2D0E" />
+      {/* Calendar body */}
+      <rect x="4" y="24" width="70" height="78" rx="14" fill={BRAND_MARRON} />
+      {/* Calendar pegs */}
+      <rect x="18" y="12" width="13" height="26" rx="6.5" fill={BRAND_MARRON} />
+      <rect x="46" y="12" width="13" height="22" rx="6.5" fill={BRAND_MARRON} />
+      {/* Calendar white area */}
       <rect x="11" y="48" width="56" height="47" rx="9" fill="white" />
-      <rect x="15" y="53" width="15" height="15" rx="3.5" fill="#6B2D0E" />
-      <rect x="34" y="53" width="15" height="15" rx="3.5" fill="#6B2D0E" />
+      {/* Calendar cells — row 1 */}
+      <rect x="15" y="53" width="15" height="15" rx="3.5" fill={BRAND_MARRON} />
+      <rect x="34" y="53" width="15" height="15" rx="3.5" fill={BRAND_MARRON} />
       <rect x="53" y="53" width="11" height="15" rx="3.5" fill={`url(#${og})`} />
-      <rect x="15" y="72" width="15" height="14" rx="3.5" fill="#6B2D0E" />
-      <rect x="34" y="72" width="15" height="14" rx="3.5" fill="#6B2D0E" />
-      <rect x="53" y="72" width="11" height="14" rx="3.5" fill="#6B2D0E" />
+      {/* Calendar cells — row 2 */}
+      <rect x="15" y="72" width="15" height="14" rx="3.5" fill={BRAND_MARRON} />
+      <rect x="34" y="72" width="15" height="14" rx="3.5" fill={BRAND_MARRON} />
+      <rect x="53" y="72" width="11" height="14" rx="3.5" fill={BRAND_MARRON} />
+      {/* Graduation cap */}
       <rect x="50" y="33" width="53" height="20" rx="5" fill={`url(#${cap})`} />
       <polygon points="44,26 98,12 102,24 48,38" fill={`url(#${brd})`} />
-      <polygon points="44,22 98,8 98,12 44,26" fill="#C05020" />
+      <polygon points="44,22 98,8 98,12 44,26" fill={BRAND_ORANGE_DARK} />
+      {/* Tassel */}
       <circle cx="85" cy="17" r="5.5" fill={`url(#${og})`} />
       <path
         d="M90.5 17 Q100 34 98 62"
-        stroke="#E8620A"
+        stroke={BRAND_ORANGE}
         strokeWidth="3.5"
         fill="none"
         strokeLinecap="round"
       />
       <ellipse cx="98" cy="66" rx="6" ry="9" fill={`url(#${og})`} />
-      <rect x="94" y="64" width="8" height="4" rx="2" fill="#FF8C1A" />
+      <rect x="94" y="64" width="8" height="4" rx="2" fill={BRAND_ORANGE_LIGHT} />
     </svg>
   );
 }
