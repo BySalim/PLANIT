@@ -67,6 +67,14 @@ export const weekPlanningQuerySchema = z.object({
   studentId: z.string().min(1).optional(),
 });
 
+// ── Week planning statistics (RP planning header counters) ──────────
+export const sessionStatsSchema = z.object({
+  total: z.number().int().nonnegative(),
+  published: z.number().int().nonnegative(),
+  pending: z.number().int().nonnegative(),
+  byType: z.record(sessionTypeSchema, z.number().int().nonnegative()),
+});
+
 export type ClasseRef = z.infer<typeof classeRefSchema>;
 export type ModuleRef = z.infer<typeof moduleRefSchema>;
 export type SalleRef = z.infer<typeof salleRefSchema>;
@@ -75,3 +83,4 @@ export type SessionDto = z.infer<typeof sessionSchema>;
 export type CreateSessionDto = z.infer<typeof createSessionSchema>;
 export type UpdateSessionDto = z.infer<typeof updateSessionSchema>;
 export type WeekPlanningQueryDto = z.infer<typeof weekPlanningQuerySchema>;
+export type SessionStatsDto = z.infer<typeof sessionStatsSchema>;
