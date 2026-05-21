@@ -10,6 +10,20 @@ jobs:
   quality:
     name: Lint · Typecheck · Test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: planit
+          POSTGRES_PASSWORD: planit
+          POSTGRES_DB: planit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U planit -d planit_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +45,8 @@ jobs:
 
       - name: Test
         run: pnpm test
+        env:
+          DATABASE_URL: postgresql://planit:planit@localhost:5432/planit_test
 
   build:
     name: Build
