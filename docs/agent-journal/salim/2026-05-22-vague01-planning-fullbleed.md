@@ -155,8 +155,10 @@ page` vers `develop`.
   et le CTA peut être partiellement masqué (scroll horizontal, comme le proto).
   Acceptable pour V1 ; à tracer si gênant.
 - **Déplacement de séance livré** : le drag&drop de base (TD-009) entre dans V1
-  sur demande du Tech Lead — glisser une carte vers un nouveau créneau. Le
-  redimensionnement, le copier/coller, l'undo/redo et les panneaux restent V2.
+  sur demande du Tech Lead — glisser une carte vers un nouveau créneau. À la
+  rédaction du journal, resize / copier-coller / undo-redo étaient V2 — le
+  **LOT 08** (2026-05-22) a livré resize et copier-coller ; undo/redo reste V2
+  (voir `docs/specs/VAGUE-01-08-planning-grid-interactions.md`).
 - **Reste hors périmètre** (V2) : vues classe/salle/prof (TD-011), vue Jour
   (TD-017), panneaux glissants, modale de publication, gestion des conflits.
 - Données seed altérées par le test de drag (1 séance déplacée) — `db:seed`
