@@ -11,6 +11,6 @@ function renderWithQueryProvider(ui: React.ReactElement) {
 describe('smoke', () => {
   it('renders the RP planning page header without crashing', () => {
     renderWithQueryProvider(<RpPage />);
-    expect(screen.getByRole('heading', { name: 'Planning — RP' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Planning hebdomadaire' })).toBeInTheDocument();
   });
 });
