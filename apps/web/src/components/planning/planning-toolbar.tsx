@@ -1,7 +1,6 @@
 'use client';
 
 import { ChevronDownIcon, DownloadIcon, LayersIcon, PlusIcon } from '@planit/ui';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ViewModeTabs, type ViewMode } from './view-mode-tabs';
 import { WeekNavigator } from './week-navigator';
@@ -15,7 +14,11 @@ interface PlanningToolbarProps {
   selectedClassLabel?: string | undefined;
 }
 
-// V2: undo/redo + sélecteur classe + exporter dropdown — V1 affichés disabled
+function ToolbarSeparator() {
+  return <div className="h-6 w-px flex-shrink-0 bg-border-soft" aria-hidden />;
+}
+
+// V2: undo/redo affichés disabled — annuler/refaire arrive en Vague 02 (TD-019).
 function UndoRedoButton({ direction }: { direction: 'undo' | 'redo' }) {
   const path =
     direction === 'undo'
@@ -27,7 +30,7 @@ function UndoRedoButton({ direction }: { direction: 'undo' | 'redo' }) {
       disabled
       title={direction === 'undo' ? 'Annuler (V2)' : 'Refaire (V2)'}
       aria-label={direction === 'undo' ? 'Annuler' : 'Refaire'}
-      className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg border border-border bg-surface text-text-faint"
+      className="inline-flex h-8 w-8 flex-shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-border-soft bg-surface text-text-faint"
     >
       <svg
         width="14"
@@ -52,9 +55,9 @@ function ClassSelector({ label = 'M1 IA' }: { label?: string | undefined }) {
       disabled
       title="Sélecteur de classe (V2)"
       aria-label="Sélectionner une classe"
-      className="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-lg border border-border bg-surface px-3 text-[12.5px] font-semibold text-text"
+      className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border-soft bg-surface px-2.5 text-[12.5px] font-semibold text-text"
     >
-      <span className="text-[10.5px] font-medium uppercase tracking-wider text-text-muted">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-text-muted">
         Classe
       </span>
       <span className="text-text-muted">
@@ -74,7 +77,7 @@ function ExportButton() {
       type="button"
       disabled
       title="Exporter (V2)"
-      className="inline-flex h-9 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12.5px] font-medium text-text-muted"
+      className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border-soft bg-surface px-2.5 text-[12px] font-medium text-text-muted"
     >
       <DownloadIcon size={13} color="currentColor" />
       <span>Exporter</span>
@@ -89,13 +92,16 @@ function NewSessionButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-[12.5px] font-bold text-white shadow-sm transition-all',
+        'inline-flex h-8 flex-shrink-0 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-bold text-white shadow-sm transition-all',
         'hover:brightness-110 active:brightness-95',
       )}
+      // CTA principal : orange vif saturé (PLANIT-IA ORANGE), plus saturé que --color-accent.
       style={{ background: '#EA580C' }}
     >
       <PlusIcon size={14} color="currentColor" />
-      <span>Nouvelle séance</span>
+      {/* Label responsive : « Nouvelle séance » en large, « Séance » plus étroit. */}
+      <span className="hidden xl:inline">Nouvelle séance</span>
+      <span className="xl:hidden">Séance</span>
     </button>
   );
 }
@@ -109,23 +115,25 @@ export function PlanningToolbar({
   selectedClassLabel,
 }: PlanningToolbarProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      {/* Left group: undo/redo + week nav + class selector */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1">
-          <UndoRedoButton direction="undo" />
-          <UndoRedoButton direction="redo" />
-        </div>
-        <WeekNavigator weekStart={weekStart} onChange={onWeekChange} />
-        <ClassSelector label={selectedClassLabel} />
+    <div className="flex h-[52px] flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-border-soft bg-surface px-3">
+      {/* Left : undo/redo + week nav + class selector */}
+      <div className="flex flex-shrink-0 items-center gap-1">
+        <UndoRedoButton direction="undo" />
+        <UndoRedoButton direction="redo" />
       </div>
+      <ToolbarSeparator />
+      <WeekNavigator weekStart={weekStart} onChange={onWeekChange} />
+      <ToolbarSeparator />
+      <ClassSelector label={selectedClassLabel} />
 
-      {/* Right group: view modes + export + new session */}
-      <div className="flex flex-wrap items-center gap-2">
-        <ViewModeTabs active={viewMode} onChange={onViewModeChange} />
-        <ExportButton />
-        <NewSessionButton onClick={onCreateSession} />
-      </div>
+      {/* Spacer pushes the right cluster to the edge */}
+      <div className="min-w-2 flex-1" />
+
+      {/* Right : view modes + export + new session */}
+      <ViewModeTabs active={viewMode} onChange={onViewModeChange} />
+      <ExportButton />
+      <ToolbarSeparator />
+      <NewSessionButton onClick={onCreateSession} />
     </div>
   );
 }

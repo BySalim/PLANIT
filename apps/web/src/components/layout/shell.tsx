@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 import { Sidebar } from './sidebar';
 import { Topbar, type BreadcrumbItem } from './topbar';
 
@@ -10,6 +11,12 @@ interface ShellProps {
   conflicts?: number | undefined;
   pendingDemands?: number | undefined;
   unreadNotifs?: number | undefined;
+  /**
+   * Pleine page : le shell occupe exactement la hauteur du viewport et la zone
+   * de contenu ne scrolle pas elle-même — la page enfant gère son propre layout
+   * (toolbar/footer figés, grille scrollable). Calqué sur PLANIT-IA/rp.
+   */
+  fullBleed?: boolean | undefined;
   children: ReactNode;
 }
 
@@ -21,10 +28,11 @@ export function Shell({
   conflicts,
   pendingDemands,
   unreadNotifs,
+  fullBleed = false,
   children,
 }: ShellProps) {
   return (
-    <div className="flex min-h-screen bg-bg">
+    <div className={cn('flex bg-bg', fullBleed ? 'h-screen overflow-hidden' : 'min-h-screen')}>
       <Sidebar activeId={activeNavId} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
@@ -35,7 +43,13 @@ export function Shell({
           pendingDemands={pendingDemands}
           unreadNotifs={unreadNotifs}
         />
-        <main className="flex-1 overflow-auto px-6 py-6">{children}</main>
+        <main
+          className={cn(
+            fullBleed ? 'min-h-0 flex-1 overflow-hidden' : 'flex-1 overflow-auto px-6 py-6',
+          )}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

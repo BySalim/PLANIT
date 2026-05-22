@@ -25,18 +25,20 @@ const DEMO_UNREAD_NOTIFS = 3;
 export default function RpPlanningPage() {
   const [weekStart, setWeekStart] = useState<Date>(() => getCurrentWeekStart());
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('classique');
   const [scope, setScope] = useState<ViewScope>('week');
   const sessionsQuery = useWeekSessionsQuery(weekStart);
   const sessions = sessionsQuery.data ?? [];
 
-  const handleSessionClick = (session: SessionDto) => {
-    setSelectedSessionId(session.id);
+  // Double-clic sur une séance → ouverture du drawer de détail.
+  const handleSessionOpen = (session: SessionDto) => {
+    setDetailSessionId(session.id);
   };
 
   return (
     <Shell
+      fullBleed
       title="Planning hebdomadaire"
       breadcrumb={[{ label: 'Espace RP', href: '/rp' }, { label: 'Planning' }]}
       activeNavId="planning"
@@ -44,7 +46,8 @@ export default function RpPlanningPage() {
       pendingDemands={DEMO_PENDING_DEMANDS}
       unreadNotifs={DEMO_UNREAD_NOTIFS}
     >
-      <div className="flex flex-col gap-3">
+      {/* Pleine page : barres figées, grille scrollable au centre (calqué PLANIT-IA/rp). */}
+      <div className="flex h-full flex-col">
         {/* Toolbar : undo/redo + week nav + class selector | view modes + export + new */}
         <PlanningToolbar
           weekStart={weekStart}
@@ -60,15 +63,17 @@ export default function RpPlanningPage() {
         {/* Day/Week toggle + session counter */}
         <ViewScopeToggle scope={scope} onChange={setScope} sessionCount={sessions.length} />
 
-        {/* Planning grid */}
-        <PlanningGrid
-          weekStart={weekStart}
-          sessions={sessions}
-          isLoading={sessionsQuery.isLoading}
-          error={sessionsQuery.error}
-          onSessionClick={handleSessionClick}
-          onRetry={() => sessionsQuery.refetch()}
-        />
+        {/* Planning grid — fills remaining height, scrolls internally */}
+        <div className="min-h-0 flex-1">
+          <PlanningGrid
+            weekStart={weekStart}
+            sessions={sessions}
+            isLoading={sessionsQuery.isLoading}
+            error={sessionsQuery.error}
+            onSessionOpen={handleSessionOpen}
+            onRetry={() => sessionsQuery.refetch()}
+          />
+        </div>
 
         {/* Footer with stats + actions */}
         <PlanningFooter
@@ -79,10 +84,7 @@ export default function RpPlanningPage() {
       </div>
 
       <CreateSessionModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />
-      <SessionDetailDrawer
-        sessionId={selectedSessionId}
-        onClose={() => setSelectedSessionId(null)}
-      />
+      <SessionDetailDrawer sessionId={detailSessionId} onClose={() => setDetailSessionId(null)} />
     </Shell>
   );
 }

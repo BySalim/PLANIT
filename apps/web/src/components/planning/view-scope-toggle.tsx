@@ -24,11 +24,11 @@ const TABS: TabConfig[] = [
 
 export function ViewScopeToggle({ scope, onChange, sessionCount }: ViewScopeToggleProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex h-9 flex-shrink-0 items-center justify-between border-b border-border-soft bg-surface px-3">
       <div
         role="tablist"
         aria-label="Étendue planning"
-        className="inline-flex items-center gap-1 rounded-lg bg-surface p-0.5"
+        className="inline-flex items-center gap-0.5 rounded-lg border border-border-soft bg-bg p-0.5"
       >
         {TABS.map((tab) => {
           const isActive = scope === tab.id;
@@ -42,9 +42,9 @@ export function ViewScopeToggle({ scope, onChange, sessionCount }: ViewScopeTogg
               title={tab.enabled ? undefined : 'Disponible Vague 02'}
               onClick={tab.enabled && onChange ? () => onChange(tab.id) : undefined}
               className={cn(
-                'rounded-md px-4 py-1.5 text-[13px] font-semibold transition-colors',
+                'rounded-md px-3.5 py-1 text-[12.5px] font-semibold transition-colors',
                 isActive && 'bg-primary text-white',
-                !isActive && tab.enabled && 'text-text-sec hover:bg-primary-50 hover:text-primary',
+                !isActive && tab.enabled && 'text-text-sec hover:text-primary',
                 !tab.enabled && 'cursor-not-allowed text-text-faint',
               )}
             >
