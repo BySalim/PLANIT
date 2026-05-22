@@ -106,7 +106,8 @@ const SB_DEF = 248;
 const SB_COLLAPSE_THRESHOLD = 100;
 
 export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefined }) {
-  const pathname = usePathname();
+  // Vitest / premier paint : usePathname() peut être null hors Next router.
+  const pathname = usePathname() ?? '';
   const [width, setWidth] = useState<number>(SB_DEF);
   const draggingRef = useRef(false);
   const collapsed = width < SB_COLLAPSE_THRESHOLD;
@@ -141,7 +142,9 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
   }, []);
 
   const isActive = (item: NavItem): boolean => {
-    if (item.href !== '#' && pathname.startsWith(item.href)) return true;
+    if (item.href !== '#' && pathname.length > 0 && pathname.startsWith(item.href)) {
+      return true;
+    }
     if (item.href === '#' && item.id === activeId) return true;
     return false;
   };
