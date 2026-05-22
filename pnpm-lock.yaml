@@ -283,6 +283,9 @@ importers:
         specifier: workspace:*
         version: link:../design-tokens
     devDependencies:
+      '@planit/config':
+        specifier: workspace:*
+        version: link:../config
       '@types/react':
         specifier: ^19.1.0
         version: 19.2.14
