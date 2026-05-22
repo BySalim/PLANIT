@@ -1,61 +1,68 @@
+'use client';
+
+import type { SessionDto } from '@planit/contracts';
+import { Button } from '@/components/ui/button';
 import { useWeekStatsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { PublishButton } from './publish-button';
 
-interface StatsBarProps {
+interface PlanningFooterProps {
   weekStart: Date;
+  sessions: SessionDto[];
 }
 
-export function StatsBar({ weekStart }: StatsBarProps) {
+export function PlanningFooter({ weekStart, sessions }: PlanningFooterProps) {
   const { data, isLoading, isError } = useWeekStatsQuery(weekStart);
-
-  if (isError) {
-    return (
-      <div className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-sec">
-        Statistiques indisponibles.
-      </div>
-    );
-  }
 
   const total = data?.total ?? 0;
   const published = data?.published ?? 0;
   const pending = data?.pending ?? 0;
-  const cm = data?.byType.CM ?? 0;
-  const td = data?.byType.TD ?? 0;
-  const tp = data?.byType.TP ?? 0;
 
   return (
-    <div
+    <footer
       className={cn(
-        'flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border bg-surface px-4 py-3 text-sm',
-        isLoading && 'opacity-60',
+        'flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3',
+        isLoading && 'opacity-70',
       )}
     >
-      <Stat label="Total" value={total} accent="text-text" />
-      <Stat label="Publiées" value={published} accent="text-ok" />
-      <Stat label="En attente" value={pending} accent="text-warn-text" />
-      <div className="ml-auto flex items-center gap-3 text-xs text-text-muted">
-        <TypePill type="CM" count={cm} />
-        <TypePill type="TD" count={td} />
-        <TypePill type="TP" count={tp} />
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-text-sec">
+        {isError ? (
+          <span className="text-text-muted">
+            Backend indisponible. Démarre Docker puis recharge.
+          </span>
+        ) : (
+          <>
+            <span>
+              <strong className="font-semibold text-text">{total}</strong> séances
+            </span>
+            <span className="text-text-faint">·</span>
+            <span>
+              <strong className="font-semibold text-ok">{published}</strong> publiées
+            </span>
+            <span className="text-text-faint">·</span>
+            <span>
+              <strong className="font-semibold text-warn-text">{pending}</strong> provisoires
+            </span>
+          </>
+        )}
       </div>
-    </div>
-  );
-}
 
-function Stat({ label, value, accent }: { label: string; value: number; accent: string }) {
-  return (
-    <div className="flex items-baseline gap-2">
-      <span className={cn('text-xl font-bold leading-none', accent)}>{value}</span>
-      <span className="text-xs uppercase tracking-wide text-text-muted">{label}</span>
-    </div>
-  );
-}
-
-function TypePill({ type, count }: { type: string; count: number }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-bg-warm px-2 py-1">
-      <span className="font-semibold text-text">{type}</span>
-      <span className="text-text-sec">{count}</span>
-    </span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="hidden text-[11.5px] text-text-muted md:inline">
+          Auto-publication vendredi 22:00
+        </span>
+        {/* V2: Historique / Exporter / Aperçu étudiant — visibles mais disabled */}
+        <Button variant="ghost" size="sm" disabled title="Disponible Vague 02">
+          Historique
+        </Button>
+        <Button variant="ghost" size="sm" disabled title="Disponible Vague 02">
+          Exporter
+        </Button>
+        <Button variant="ghost" size="sm" disabled title="Disponible Vague 02">
+          Aperçu étudiant
+        </Button>
+        <PublishButton sessions={sessions} />
+      </div>
+    </footer>
   );
 }

@@ -17,7 +17,7 @@ export function PublishButton({ sessions }: PublishButtonProps) {
     ? 'Publication…'
     : pendingCount === 0
       ? 'Tout est publié'
-      : `Publier les modifications (${pendingCount})`;
+      : `Publier la semaine (${pendingCount})`;
 
   return (
     <Button

@@ -2,16 +2,16 @@
 // Lucide-style stroke icons (24x24 viewBox) as named React components.
 // Usage: import { CalendarIcon } from '@planit/ui';
 
-// ── PLANIT brand colors (source: Illustrator) ──────────────────────────────
+// ── PLANIT brand colors (source: PLANIT-IA/shared/tokens.js) ───────────────
 // Must stay in sync with packages/design-tokens/src/colors.ts (primary/accent)
 // and apps/web/src/app/globals.css (--color-primary / --color-accent).
-const BRAND_MARRON = '#593114'; // colors.primary
-const BRAND_ORANGE = '#EE7023'; // colors.accent
+const BRAND_MARRON = '#6B2D0E'; // colors.primary
+const BRAND_ORANGE = '#E8620A'; // colors.accent
 // Derived shades used inside PlanitLogo only
-const BRAND_MARRON_DARK = '#3A1D09'; // very dark, for cap shadow
-const BRAND_MARRON_MID = '#6F3E1E'; // colors.primaryHover, body mid-tone
-const BRAND_ORANGE_LIGHT = '#F0892B'; // gradient highlight on tassel ball
-const BRAND_ORANGE_DARK = '#C85A16'; // colors.accent600
+const BRAND_MARRON_DARK = '#4A1F08'; // very dark, for cap shadow
+const BRAND_MARRON_MID = '#8B3A12'; // colors.primaryHover, body mid-tone
+const BRAND_ORANGE_LIGHT = '#F08230'; // gradient highlight on tassel ball
+const BRAND_ORANGE_DARK = '#C44E07'; // colors.accent600
 // ──────────────────────────────────────────────────────────────────────────
 
 import { useId } from 'react';
@@ -242,6 +242,131 @@ export function ClockIcon(props: IconProps) {
     <StrokeIcon {...props} defaultSize={18}>
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
+    </StrokeIcon>
+  );
+}
+
+export function InboxIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={20}>
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </StrokeIcon>
+  );
+}
+
+export function AlertTriangleIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={20}>
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </StrokeIcon>
+  );
+}
+
+export function LayersIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={20}>
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
+    </StrokeIcon>
+  );
+}
+
+export function UserCogIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={20}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <circle cx="19" cy="11" r="2" />
+      <path d="M19 8v1" />
+      <path d="M19 13v1" />
+      <path d="M22 11h-1" />
+      <path d="M17 11h-1" />
+    </StrokeIcon>
+  );
+}
+
+export function DoorIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={20}>
+      <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16" />
+      <path d="M2 21h20" />
+      <path d="M14 12v.01" />
+    </StrokeIcon>
+  );
+}
+
+export function UsersIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={20}>
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </StrokeIcon>
+  );
+}
+
+export function GraduationCapIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={20}>
+      <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+      <path d="M6 12v5c3 3 9 3 12 0v-5" />
+    </StrokeIcon>
+  );
+}
+
+export function BookStackIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={20}>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </StrokeIcon>
+  );
+}
+
+export function MessageCircleIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={20}>
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </StrokeIcon>
+  );
+}
+
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={16} strokeWidth="2.5">
+      <polyline points="6 9 12 15 18 9" />
+    </StrokeIcon>
+  );
+}
+
+export function SearchIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={18}>
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </StrokeIcon>
+  );
+}
+
+export function PlusIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={18} strokeWidth="2.5">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </StrokeIcon>
+  );
+}
+
+export function CheckSquareIcon(props: IconProps) {
+  return (
+    <StrokeIcon {...props} defaultSize={20}>
+      <polyline points="9 11 12 14 22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
     </StrokeIcon>
   );
 }
