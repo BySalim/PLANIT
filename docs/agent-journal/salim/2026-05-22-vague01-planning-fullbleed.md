@@ -78,9 +78,9 @@ sur `http://localhost:3000/rp` (1440×900 et 1120×820).
 ### Grille
 
 - `planning-grid.tsx` : conteneur `h-full overflow-auto`, en-têtes jours +
-  colonne heures `sticky`, `HOUR_HEIGHT` 78, `min-w` 964, en-têtes jours
-  alignés à gauche, icône `BarChartIcon` dans le coin, retrait de la carte
-  bordée externe.
+  colonne heures `sticky` et **blanches** (`bg-surface`), en-têtes jours
+  **centrés**, `HOUR_HEIGHT` 78, `min-w` 964, icône `BarChartIcon` dans le
+  coin, retrait de la carte bordée externe.
 
 ### SessionCard
 
