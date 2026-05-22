@@ -23,7 +23,7 @@ interface PlanningGridProps {
 const DAY_START = 8;
 const DAY_END = 20;
 const HOUR_HEIGHT = 78; // px/heure — calqué sur PLANIT-IA/rp (HOUR_H)
-const DAY_COUNT = 6; // Lundi → Samedi
+const DAY_COUNT = 7; // Lundi → Dimanche
 const SNAP_HOURS = 0.5; // pas de calage du drag = 30 min
 const GRID_HEIGHT = (DAY_END - DAY_START) * HOUR_HEIGHT;
 const HOURS = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => DAY_START + i);
@@ -157,7 +157,7 @@ export function PlanningGrid({
 
   return (
     <div className="h-full overflow-auto bg-surface">
-      <div className="grid min-w-[964px] grid-cols-[64px_repeat(6,minmax(0,1fr))]">
+      <div className="grid min-w-[1114px] grid-cols-[64px_repeat(7,minmax(0,1fr))]">
         {/* Header row : sticky corner + day labels (fond blanc, calqué PLANIT-IA) */}
         <div className="sticky left-0 top-0 z-30 flex items-center justify-center border-b border-r border-border bg-surface text-text-faint">
           <BarChartIcon size={15} color="currentColor" />
