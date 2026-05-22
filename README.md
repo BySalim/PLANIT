@@ -38,10 +38,15 @@ cp .env.example .env
 # 3. Lancer l infra (postgres + redis + minio)
 docker compose -f infra/docker-compose.dev.yml up -d
 
-# 4. Migrer la base de donnees
-pnpm db:migrate
+# 4. Migrer + seeder la base de donnees (1 RP, 3 enseignants, 1 etudiant, 6 seances)
+pnpm db:reset
 
-# 5. Lancer le dev
+# 5. (Optionnel) Creer la base de test pour les tests d'integration backend
+#    Automatique sur volume Postgres neuf ; sinon :
+docker compose -f infra/docker-compose.dev.yml exec postgres \
+  psql -U planit -c 'CREATE DATABASE planit_test;'
+
+# 6. Lancer le dev
 pnpm dev
 ```
 
@@ -57,7 +62,7 @@ L application est accessible sur :
 ```bash
 pnpm lint        # ESLint sur tous les packages
 pnpm typecheck   # TypeScript strict sur tous les packages
-pnpm test        # Vitest sur tous les packages
+pnpm test        # Vitest — backend integration (16 tests) + web smoke
 pnpm build       # Build de production
 pnpm format      # Prettier
 ```
@@ -74,10 +79,11 @@ pnpm format      # Prettier
 
 ## Documentation
 
-- [Architecture](docs/architecture/README.md)
-- [ADR-0001 : Monolithe modulaire Turborepo](docs/architecture/adr/0001-monolithe-modulaire-turborepo.md)
+- [Architecture + ADR](docs/architecture/README.md)
 - [Runbook deploiement](docs/runbooks/deploy.md)
 - [Tech Debt](docs/tech-debt.md)
+- [Specs vague en cours](docs/specs/)
+- [Journaux d'agent](docs/agent-journal/)
 
 ## Licence
 
