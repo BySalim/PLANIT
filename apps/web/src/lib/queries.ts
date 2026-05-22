@@ -11,17 +11,27 @@ import { toWeekStartParam } from './week';
 export const planningKeys = {
   all: ['planning'] as const,
   sessions: (weekStart: string) => [...planningKeys.all, 'sessions', weekStart] as const,
+  sessionsByTeacher: (weekStart: string, teacherId: string) =>
+    [...planningKeys.all, 'sessions', weekStart, 'teacher', teacherId] as const,
   stats: (weekStart: string) => [...planningKeys.all, 'stats', weekStart] as const,
   session: (id: string) => [...planningKeys.all, 'session', id] as const,
 };
 
 const sessionListSchema = sessionSchema.array();
 
-export function useWeekSessionsQuery(weekStart: Date) {
+export function useWeekSessionsQuery(weekStart: Date, options?: { teacherId?: string }) {
   const weekStartParam = toWeekStartParam(weekStart);
+  const teacherId = options?.teacherId;
+  const params = new URLSearchParams({ weekStart: weekStartParam });
+  if (teacherId !== undefined) {
+    params.set('teacherId', teacherId);
+  }
   return useQuery<SessionDto[]>({
-    queryKey: planningKeys.sessions(weekStartParam),
-    queryFn: () => apiGet(`/api/sessions?weekStart=${weekStartParam}`, sessionListSchema),
+    queryKey:
+      teacherId !== undefined
+        ? planningKeys.sessionsByTeacher(weekStartParam, teacherId)
+        : planningKeys.sessions(weekStartParam),
+    queryFn: () => apiGet(`/api/sessions?${params.toString()}`, sessionListSchema),
   });
 }
 
