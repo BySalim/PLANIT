@@ -68,6 +68,7 @@ PROBE → SPEC → PLAN → CODE → CHECK → JOURNAL
 - **PLAN** : en Plan Mode AVANT d'écrire
 - **CHECK** : feature testée dans navigateur, lint+typecheck+tests verts AVANT commit
 - **JOURNAL** : entrée écrite dans `docs/agent-journal/<membre>/`
+- **COMMITS** : commits réguliers aux jalons logiques — un commit dès qu'une feature ou sous-tâche passe le CHECK au vert. Jamais un seul gros commit en fin de session ; jamais un commit par micro-édition.
 
 Slash commands : `/feat-start`, `/feat-check`, `/vague-status`, `/adr`, `/journal`, `/onboard`.
 
