@@ -1,4 +1,4 @@
-# Journal d'agent — Vague 01 · LOT 05 (Shell + Planning RP realignment)
+# Journal d'agent — Vague 01 · LOT 2 — itération A (Shell + planning RP)
 
 **Date :** 2026-05-22
 **Membre :** Salim Ouedraogo (`feat/salim`)
@@ -129,7 +129,7 @@ pas de touche `prisma/schema.prisma`, pas de modif `packages/contracts/`).
 
 ### Specs / TD / annexes
 
-- [docs/specs/VAGUE-01-05-shell-realignment.md](../../specs/VAGUE-01-05-shell-realignment.md) :
+- [docs/specs/VAGUE-01-01-a-shell-realignment.md](../../specs/VAGUE-01-01-a-shell-realignment.md) :
   nouvelle spec.
 - [docs/tech-debt.md](../../tech-debt.md) : 6 nouvelles entrées TD-011 à TD-016.
 
@@ -187,7 +187,7 @@ broadcast. Ces flows sont **non régressés** (les composants `<CreateSessionMod
 
 ## Suite
 
-- **Avant merge** : créer la PR `feat(web): vague 01 LOT 05 - shell + planning realignment` vers `develop`.
+- **Avant merge** : PR `feat(web): vague-01 LOT 2 — shell + planning realignment` vers `develop`.
 - **À noter dans la PR** : changement des tokens de couleur — si Libasse a
   des screenshots locaux avec l'ancienne palette `#593114`, ils seront à
   refaire.
@@ -204,7 +204,7 @@ broadcast. Ces flows sont **non régressés** (les composants `<CreateSessionMod
 ## Mises à jour annexes
 
 - `PLANIT-Strategie-VibeCode/vagues/vague-01-mvp-planning.md` : à mettre à
-  jour avec une ligne LOT 05 pointant vers la spec. **Non fait** dans cette
+  jour avec une ligne LOT 2 iter. A. **Non fait** dans cette
   session (fichier hors repo, à coordonner avec un commit séparé sur le repo
   stratégie).
 - README.md (root et `apps/backend/`) : pas de modif requise (la stack et

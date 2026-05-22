@@ -1,4 +1,4 @@
-# Journal d'agent — Vague 01 · LOT 06 (Fidélité Planning RP)
+# Journal d'agent — Vague 01 · LOT 2 — itération B (Fidélité planning RP)
 
 **Date :** 2026-05-22
 **Membre :** Salim Ouedraogo (`feat/salim`)
@@ -11,7 +11,7 @@ sur `http://localhost:3000/rp` (1440×900).
 
 ## Directives reçues
 
-- Après le LOT 05, revue côte-à-côte du rendu `/rp` avec les screenshots
+- Après l'itération A (shell), revue côte-à-côte du rendu `/rp` avec les screenshots
   `localhost:5500/rp/` du prototype PLANIT-IA (5 captures fournies par
   l'utilisateur).
 - Identification de 8 écarts visuels et d'interaction :
@@ -111,7 +111,7 @@ décisions tiennent dans la zone "autonomie" du workflow.
 
 ### Specs / TD
 
-- [docs/specs/VAGUE-01-06-planning-fidelity.md](../../specs/VAGUE-01-06-planning-fidelity.md) :
+- [docs/specs/VAGUE-01-01-b-planning-fidelity.md](../../specs/VAGUE-01-01-b-planning-fidelity.md) :
   nouvelle spec.
 - [docs/tech-debt.md](../../tech-debt.md) : TD-017 à TD-020.
 
@@ -149,7 +149,7 @@ vue Jour (TD-017).
 
 ## Surprises
 
-1. **Le screenshot LOT 05** était trompeur : le shell paraissait OK mais la
+1. **Le screenshot itération A** était trompeur : le shell paraissait OK mais la
    palette + le format card s'écartaient nettement du proto. La revue
    visuelle côte-à-côte avec les screenshots utilisateur a déclenché ce LOT.
 2. **`#EA580C` ≠ `--color-accent` `#E8620A`** : 2 oranges très proches mais
@@ -166,7 +166,7 @@ vue Jour (TD-017).
 
 ## Suite
 
-- **Avant merge** : créer la PR `feat(web): vague 01 LOT 06 - planning fidelity`
+- **Avant merge** : PR `feat(web): vague-01 LOT 2 — planning fidelity` (itération B)
   vers `develop`.
 - **TD ouverts** : TD-017 (vue Jour), TD-018 (module.color contract),
   TD-019 (undo/redo/classe/export stubs), TD-020 (compteurs topbar hardcodés).
@@ -182,6 +182,6 @@ vue Jour (TD-017).
 ## Mises à jour annexes
 
 - `PLANIT-Strategie-VibeCode/vagues/vague-01-mvp-planning.md` : à mettre à
-  jour avec une ligne LOT 06 pointant vers la spec. **Non fait** dans cette
+  jour avec une ligne LOT 2 iter. B. **Non fait** dans cette
   session (fichier hors repo).
 - ADR : pas de nouvel ADR — choix faits compatibles avec les ADR existants.

@@ -1,6 +1,8 @@
-# SPEC — VAGUE-01-05 · Réalignement Shell + Planning RP sur PLANIT-IA
+# SPEC — VAGUE-01-01-a · LOT 2 — Réalignement shell + planning RP (PLANIT-IA)
 
-**Auteur :** Salim · **Date :** 2026-05-22 · **Statut :** Approuvée · **Branche cible :** `feat/salim`
+**Vague :** 01 · **Lot officiel :** 2 (Frontend RP) · **Itération :** A (shell)  
+**Auteur :** Salim · **Date :** 2026-05-22 · **Statut :** Approuvée · **Branche :** `feat/salim`  
+**Spec parente :** [`VAGUE-01-01-planning-rp.md`](VAGUE-01-01-planning-rp.md)
 
 ## Objectif
 

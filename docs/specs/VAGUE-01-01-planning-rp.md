@@ -1,6 +1,22 @@
 # SPEC — VAGUE-01-01 · Planning RP (LOT 2)
 
-**Auteur :** Salim · **Date :** 2026-05-21 · **Statut :** Approuvée · **Branche cible :** `feat/oumy`
+**Vague :** 01 · **Lot officiel :** 2 (Frontend RP, tâches R.1–R.12)  
+**Auteur :** Salim · **Date :** 2026-05-21 · **Statut :** Approuvée · **Branche initiale :** `feat/oumy` (base Libasse) · **Poursuite :** `feat/salim`
+
+## Itérations LOT 2 (Salim, 2026-05-22)
+
+> Numérotation officielle de la vague : **LOT 2** uniquement. Les anciens libellés
+> « LOT 05–08 » ou specs `VAGUE-01-05`…`08` étaient erronés (réservés aux futurs
+> LOT 3 Enseignant, etc.). Itérations documentées :
+
+| Itération | Spec                                                 | Sujet                                       |
+| --------- | ---------------------------------------------------- | ------------------------------------------- |
+| A         | [VAGUE-01-01-a](VAGUE-01-01-a-shell-realignment.md)  | Shell PLANIT-IA, tokens, sidebar            |
+| B         | [VAGUE-01-01-b](VAGUE-01-01-b-planning-fidelity.md)  | Fidélité visuelle toolbar / cartes / footer |
+| C         | [VAGUE-01-01-c](VAGUE-01-01-c-planning-fullbleed.md) | Pleine page, drag (R.12 partiel)            |
+| D         | [VAGUE-01-01-d](VAGUE-01-01-d-grid-interactions.md)  | 7 jours, resize, copier-coller (R.12)       |
+
+Référence planning : `PLANIT-Strategie-VibeCode/vagues/vague-01-mvp-planning.md` (LOT 2, tâches R.1–R.12).
 
 ## Objectif
 
