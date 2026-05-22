@@ -53,9 +53,9 @@ export function Topbar({
         {subtitle ? <div className="mt-0.5 text-[12.5px] text-text-muted">{subtitle}</div> : null}
       </div>
 
-      {/* Center: search */}
+      {/* Center: search with ⌘K shortcut */}
       <div className="flex-shrink-0">
-        <label className="relative flex h-9 w-[300px] items-center rounded-lg border border-border bg-bg pl-3 pr-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+        <label className="relative flex h-9 w-[320px] items-center rounded-lg border border-border bg-bg pl-3 pr-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
           <span className="mr-2 flex-shrink-0 text-text-muted">
             <SearchIcon size={16} color="currentColor" />
           </span>
@@ -67,6 +67,13 @@ export function Topbar({
             className="h-full w-full bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
             aria-label="Rechercher"
           />
+          <kbd
+            className="ml-2 hidden flex-shrink-0 items-center gap-0.5 rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-text-muted md:inline-flex"
+            aria-hidden
+          >
+            <span className="font-sans">⌘</span>
+            <span>K</span>
+          </kbd>
         </label>
       </div>
 

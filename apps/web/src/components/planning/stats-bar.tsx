@@ -1,31 +1,50 @@
 'use client';
 
+import { ClockIcon, DownloadIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
-import { Button } from '@/components/ui/button';
-import { useWeekStatsQuery } from '@/lib/queries';
-import { cn } from '@/lib/utils';
 import { PublishButton } from './publish-button';
 
 interface PlanningFooterProps {
-  weekStart: Date;
   sessions: SessionDto[];
+  isLoading?: boolean;
+  isError?: boolean;
 }
 
-export function PlanningFooter({ weekStart, sessions }: PlanningFooterProps) {
-  const { data, isLoading, isError } = useWeekStatsQuery(weekStart);
+function EyeIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
 
-  const total = data?.total ?? 0;
-  const published = data?.published ?? 0;
-  const pending = data?.pending ?? 0;
+export function PlanningFooter({
+  sessions,
+  isLoading = false,
+  isError = false,
+}: PlanningFooterProps) {
+  // Compute counters from local sessions (synced with grid display).
+  const total = sessions.length;
+  const published = sessions.filter((s) => s.status === 'PUBLIE').length;
+  const validated = sessions.filter((s) => s.status === 'VALIDE').length;
+  const provisoires = sessions.filter((s) => s.status === 'PROVISOIRE').length;
 
   return (
     <footer
-      className={cn(
-        'flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3',
-        isLoading && 'opacity-70',
-      )}
+      className="flex flex-wrap items-center justify-between gap-3 border-t border-border-soft bg-surface px-4 py-2.5"
+      style={{ opacity: isLoading ? 0.7 : 1 }}
     >
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-text-sec">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-text-sec">
         {isError ? (
           <span className="text-text-muted">
             Backend indisponible. Démarre Docker puis recharge.
@@ -37,11 +56,24 @@ export function PlanningFooter({ weekStart, sessions }: PlanningFooterProps) {
             </span>
             <span className="text-text-faint">·</span>
             <span>
-              <strong className="font-semibold text-ok">{published}</strong> publiées
+              <strong className="font-semibold" style={{ color: '#15803D' }}>
+                {published}
+              </strong>{' '}
+              publiées
             </span>
             <span className="text-text-faint">·</span>
             <span>
-              <strong className="font-semibold text-warn-text">{pending}</strong> provisoires
+              <strong className="font-semibold" style={{ color: '#1E40AF' }}>
+                {validated}
+              </strong>{' '}
+              validées
+            </span>
+            <span className="text-text-faint">·</span>
+            <span>
+              <strong className="font-semibold" style={{ color: '#92400E' }}>
+                {provisoires}
+              </strong>{' '}
+              provisoires
             </span>
           </>
         )}
@@ -52,15 +84,33 @@ export function PlanningFooter({ weekStart, sessions }: PlanningFooterProps) {
           Auto-publication vendredi 22:00
         </span>
         {/* V2: Historique / Exporter / Aperçu étudiant — visibles mais disabled */}
-        <Button variant="ghost" size="sm" disabled title="Disponible Vague 02">
-          Historique
-        </Button>
-        <Button variant="ghost" size="sm" disabled title="Disponible Vague 02">
-          Exporter
-        </Button>
-        <Button variant="ghost" size="sm" disabled title="Disponible Vague 02">
-          Aperçu étudiant
-        </Button>
+        <button
+          type="button"
+          disabled
+          title="Disponible Vague 02"
+          className="inline-flex h-9 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text-muted"
+        >
+          <ClockIcon size={13} color="currentColor" />
+          <span>Historique</span>
+        </button>
+        <button
+          type="button"
+          disabled
+          title="Disponible Vague 02"
+          className="inline-flex h-9 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text-muted"
+        >
+          <DownloadIcon size={13} color="currentColor" />
+          <span>Exporter</span>
+        </button>
+        <button
+          type="button"
+          disabled
+          title="Disponible Vague 02"
+          className="inline-flex h-9 cursor-not-allowed items-center gap-1.5 rounded-lg border border-primary-200 bg-surface px-3 text-[12px] font-semibold text-primary"
+        >
+          <EyeIcon />
+          <span>Aperçu étudiant</span>
+        </button>
         <PublishButton sessions={sessions} />
       </div>
     </footer>
