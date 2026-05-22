@@ -1,4 +1,3 @@
-import { InfoIcon } from '@planit/ui';
 import { getWeekHolidays } from '@/lib/holidays';
 
 interface HolidayBannerProps {
@@ -10,18 +9,22 @@ export function HolidayBanner({ weekStart }: HolidayBannerProps) {
   if (holidays.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warn bg-warn px-4 py-2.5 text-[12.5px] text-warn-text">
+    <div
+      className="flex flex-wrap items-center gap-3 rounded-lg border px-4 py-2.5 text-[12.5px]"
+      style={{ background: '#FEF3C7', borderColor: '#FDE68A', color: '#92400E' }}
+    >
       <span className="flex flex-shrink-0 items-center gap-2 font-semibold">
-        <InfoIcon size={14} color="currentColor" />
+        <span aria-hidden>🗓</span>
         Jour(s) fermé(s) cette semaine :
       </span>
       <div className="flex flex-wrap items-center gap-2">
         {holidays.map((h) => (
           <span
             key={h.date.toISOString()}
-            className="inline-flex items-center rounded-md border border-accent-100 bg-surface px-2 py-1 font-medium capitalize text-warn-text"
+            className="inline-flex items-center rounded px-2 py-0.5 text-[12px] font-semibold capitalize"
+            style={{ background: '#FCD34D', color: '#78350F' }}
           >
-            {h.dayLabel} — {h.name}
+            {h.dayLabel} — {h.name} — jour férié
           </span>
         ))}
       </div>
