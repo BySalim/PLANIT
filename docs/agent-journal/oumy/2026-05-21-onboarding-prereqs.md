@@ -152,3 +152,50 @@ Découvert pendant l'investigation WSL2. Probablement la cause indirecte de lent
 
 - `docs/tech-debt.md` → ajout TD-011 et TD-012
 - `docs/shared-resources-lock.md` → aucun lock posé (pas de modif sur ressources partagées)
+
+---
+
+## Phase 2 — Migration WSL2 (après libération de disque, J+1)
+
+**Contexte** : disque passé de 2.7 GB → 12.8 GB libres ; option WSL2 redevenue viable. Choix retenu pour résoudre TD-011 proprement plutôt que rester sur le mock-first.
+
+### Modifications
+
+- `wsl --install -d Ubuntu-24.04` → Ubuntu 24.04.4 LTS installé
+- Compte Linux `oumy` créé
+- nvm 0.40.1 + Node 22.22.3 installés via curl
+- pnpm 10.33.4 activé via corepack
+- Symlinks `/usr/local/bin/{node,pnpm,npm,npx,corepack}` créés pour rendre Node accessible dans toutes les sessions WSL (sans dépendre de `source ~/.nvm/nvm.sh`)
+- Repo cloné dans `/home/oumy/PLANIT` (filesystem Linux natif, performance optimale)
+- Branche `feat/oumy` recréée avec les 3 fichiers (gitignore + journal + tech-debt) en 1 commit
+- Docker Desktop WSL Integration activée pour Ubuntu-24.04
+- `pnpm install` → 4m22s, OK
+- `pnpm --filter @planit/contracts build` → packages/contracts/dist/ généré (requis par ADR-0003)
+
+### Résultats CHECK Phase 2
+
+| Vérification                                   | Statut | Notes                                                                                                                                                                            |
+| ---------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter @planit/backend db:generate`    | ✅     | Generated Prisma Client v6.19.3                                                                                                                                                  |
+| **`pnpm --filter @planit/backend db:migrate`** | ✅     | **Plus aucun P1000.** "Already in sync" car le schéma existait déjà depuis l'application SQL brute (Windows phase 1) ; Prisma a re-tracké la migration dans `_prisma_migrations` |
+| `pnpm --filter @planit/backend db:seed`        | ✅     | 1 RP, 3 enseignants, 1 étudiant, 1 classe, 3 modules, 3 salles, 6 séances                                                                                                        |
+| Counts par table (psql)                        | ✅     | users=5, classes=1, modules=3, salles=3, seances=6                                                                                                                               |
+| `pnpm --filter @planit/web dev`                | ✅     | Ready en 7s sur port 3000                                                                                                                                                        |
+| HTTP `localhost:3000/`                         | ✅     | 307 → /rp (depuis Windows, via WSL2 port forwarding)                                                                                                                             |
+| HTTP `localhost:3000/rp`                       | ✅     | 200 OK, 40 KB, contient "Planning" + "RP"                                                                                                                                        |
+
+### Surprises Phase 2
+
+- **WSL2 inherit Windows PATH** : la PATH par défaut dans Ubuntu WSL contient `/mnt/c/nvm4w/nodejs/pnpm` (le pnpm Windows). Si Node Linux n'est pas dans PATH avant, `pnpm` essaie de lancer `node` Windows et échoue. Fix appliqué : symlinks dans `/usr/local/bin/`. Alternative documentée : sourcer `~/.nvm/nvm.sh` à chaque session.
+- **`@planit/contracts` doit être buildé avant `pnpm --filter @planit/web dev`** sinon erreur "Module not found". Lié à ADR-0003. À documenter dans le README ou rajouter dans `dev` script en pré-step.
+- **`127.0.0.1:3000` ne forward pas depuis Windows vers WSL** mais `localhost:3000` oui. Comportement de WSL2 networking. Utiliser `localhost` ou l'IP WSL (visible dans le output de `pnpm dev`).
+
+### TD-011 statut
+
+**Contourné** pour Oumy via WSL2. La doc dans `docs/tech-debt.md` reste valable pour les autres devs Windows qui rencontreraient le bug avant de migrer eux-mêmes.
+
+### Suite révisée
+
+- R.2 (`<PlanningGrid>`) peut démarrer **avec backend local fonctionnel** dans WSL — pas besoin de MSW
+- Workflow quotidien : ouvrir Ubuntu → `cd ~/PLANIT` → `docker compose -f infra/docker-compose.dev.yml up -d` → `pnpm dev` → travailler dans VS Code (extension Remote WSL recommandée)
+- Ouvrir une PR vers `develop` quand Salim ajoute `oumy-code` comme collaborateur (push actuellement bloqué par 403)
