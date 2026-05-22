@@ -7,6 +7,7 @@ import { BarChartIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
 import { Button } from '@/components/ui/button';
 import { useCreateSessionMutation, useUpdateSessionMutation } from '@/lib/mutations';
+import { paletteForSession } from '@/lib/module-palette';
 import { cn } from '@/lib/utils';
 import { SessionCard } from './session-card';
 
@@ -46,6 +47,23 @@ interface DropPreview {
   startHour: number;
 }
 
+interface ResizeState {
+  sessionId: string;
+  edge: 'top' | 'bottom';
+  baseY: number;
+  baseStartHour: number;
+  baseEndHour: number;
+  startDate: Date;
+  dayIndex: number;
+}
+
+interface ResizePreview {
+  sessionId: string;
+  dayIndex: number;
+  startHour: number;
+  endHour: number;
+}
+
 function sessionDurationHours(session: SessionDto): number {
   return differenceInMinutes(new Date(session.endAt), new Date(session.startAt)) / 60;
 }
@@ -56,6 +74,13 @@ function clamp(value: number, lo: number, hi: number): number {
 
 function snap(hour: number): number {
   return Math.round(hour / SNAP_HOURS) * SNAP_HOURS;
+}
+
+// Heure décimale → "HH:mm" (8.5 → "08:30").
+function fmtHour(hour: number): string {
+  const h = Math.floor(hour);
+  const m = Math.round((hour - h) * 60);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function positionSession(session: SessionDto): PositionedSession | null {
@@ -90,10 +115,13 @@ export function PlanningGrid({
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
   const [copiedSession, setCopiedSession] = useState<SessionDto | null>(null);
-  const updateSession = useUpdateSessionMutation();
+  const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
+  const { mutate: updateSession } = useUpdateSessionMutation();
   const { mutate: pasteSession } = useCreateSessionMutation();
   // Dernière position du curseur sur la grille — base du collage Ctrl+V.
   const lastMousePosRef = useRef<{ dayIndex: number; y: number } | null>(null);
+  const resizeRef = useRef<ResizeState | null>(null);
+  const resizePreviewRef = useRef<ResizePreview | null>(null);
 
   // Calcule l'heure de début calée à partir d'un événement de drag sur une colonne.
   function startHourFromEvent(
@@ -130,7 +158,7 @@ export function PlanningGrid({
     // Pas de mutation si la séance est relâchée exactement à sa place initiale.
     if (newStart.getTime() === oldStart.getTime()) return;
 
-    updateSession.mutate({
+    updateSession({
       id: session.id,
       body: { startAt: newStart.toISOString(), endAt: newEnd.toISOString() },
     });
@@ -139,6 +167,106 @@ export function PlanningGrid({
   function endDrag() {
     setDrag(null);
     setDropPreview(null);
+  }
+
+  // Démarre un redimensionnement depuis une poignée haut/bas d'une séance.
+  function startResize(
+    session: SessionDto,
+    edge: 'top' | 'bottom',
+    dayIndex: number,
+    event: React.MouseEvent,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    const start = new Date(session.startAt);
+    const end = new Date(session.endAt);
+    const baseStartHour = getHours(start) + getMinutes(start) / 60;
+    const baseEndHour = getHours(end) + getMinutes(end) / 60;
+    resizeRef.current = {
+      sessionId: session.id,
+      edge,
+      baseY: event.clientY,
+      baseStartHour,
+      baseEndHour,
+      startDate: start,
+      dayIndex,
+    };
+    const preview: ResizePreview = {
+      sessionId: session.id,
+      dayIndex,
+      startHour: baseStartHour,
+      endHour: baseEndHour,
+    };
+    resizePreviewRef.current = preview;
+    setResizePreview(preview);
+  }
+
+  // Resize en cours : suit la souris au niveau document, calage 30 min,
+  // applique la modification (PUT) au relâchement.
+  useEffect(() => {
+    function onMove(event: MouseEvent) {
+      const r = resizeRef.current;
+      if (!r) return;
+      const deltaH = (event.clientY - r.baseY) / HOUR_HEIGHT;
+      let startHour = r.baseStartHour;
+      let endHour = r.baseEndHour;
+      if (r.edge === 'top') {
+        startHour = clamp(snap(r.baseStartHour + deltaH), DAY_START, r.baseEndHour - SNAP_HOURS);
+      } else {
+        endHour = clamp(snap(r.baseEndHour + deltaH), r.baseStartHour + SNAP_HOURS, DAY_END);
+      }
+      const preview: ResizePreview = {
+        sessionId: r.sessionId,
+        dayIndex: r.dayIndex,
+        startHour,
+        endHour,
+      };
+      resizePreviewRef.current = preview;
+      setResizePreview(preview);
+    }
+    function onUp() {
+      const r = resizeRef.current;
+      const preview = resizePreviewRef.current;
+      resizeRef.current = null;
+      resizePreviewRef.current = null;
+      setResizePreview(null);
+      if (!r || !preview) return;
+      if (preview.startHour === r.baseStartHour && preview.endHour === r.baseEndHour) return;
+      const newStart = new Date(r.startDate);
+      newStart.setHours(
+        Math.floor(preview.startHour),
+        Math.round((preview.startHour % 1) * 60),
+        0,
+        0,
+      );
+      const newEnd = new Date(r.startDate);
+      newEnd.setHours(Math.floor(preview.endHour), Math.round((preview.endHour % 1) * 60), 0, 0);
+      updateSession({
+        id: r.sessionId,
+        body: { startAt: newStart.toISOString(), endAt: newEnd.toISOString() },
+      });
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, [updateSession]);
+
+  // Lignes-guides d'une colonne : positions calées pendant resize ET déplacement.
+  function columnGuideLines(dayIndex: number): { key: string; hour: number }[] {
+    const lines: { key: string; hour: number }[] = [];
+    if (resizePreview && resizePreview.dayIndex === dayIndex) {
+      lines.push({ key: 'resize-start', hour: resizePreview.startHour });
+      lines.push({ key: 'resize-end', hour: resizePreview.endHour });
+    }
+    if (drag && dropPreview && dropPreview.dayIndex === dayIndex) {
+      const durationH = sessionDurationHours(drag.session);
+      lines.push({ key: 'move-start', hour: dropPreview.startHour });
+      lines.push({ key: 'move-end', hour: dropPreview.startHour + durationH });
+    }
+    return lines;
   }
 
   // Raccourcis copier/coller : Ctrl/Cmd+C copie la séance sélectionnée,
@@ -283,32 +411,59 @@ export function PlanningGrid({
                 />
               ) : null}
 
+              {/* Lignes-guides en pointillés (resize + déplacement) avec l'heure */}
+              {columnGuideLines(dayIndex).map((g) => (
+                <GuideLine key={g.key} hour={g.hour} />
+              ))}
+
               {isLoading ? (
                 <SkeletonColumn dayIndex={dayIndex} />
               ) : (
                 positioned
                   .filter((p) => p.dayIndex === dayIndex)
-                  .map((p) => (
-                    <div
-                      key={p.session.id}
-                      className="absolute inset-x-1"
-                      style={{ top: p.top, height: p.height }}
-                      onDragEnd={endDrag}
-                    >
-                      <SessionCard
-                        session={p.session}
-                        selected={selectedId === p.session.id}
-                        isDragging={drag?.session.id === p.session.id}
-                        onSelect={(s) => setSelectedId(s.id)}
-                        onOpen={onSessionOpen}
-                        onDragStart={(s, event) => {
-                          const rect = event.currentTarget.getBoundingClientRect();
-                          setDrag({ session: s, grabOffsetY: event.clientY - rect.top });
-                          event.dataTransfer.effectAllowed = 'move';
-                        }}
-                      />
-                    </div>
-                  ))
+                  .map((p) => {
+                    // Pendant un resize, la carte adopte les dimensions de l'aperçu.
+                    const rp =
+                      resizePreview && resizePreview.sessionId === p.session.id
+                        ? resizePreview
+                        : null;
+                    const top = rp ? (rp.startHour - DAY_START) * HOUR_HEIGHT : p.top;
+                    const height = rp
+                      ? Math.max(28, (rp.endHour - rp.startHour) * HOUR_HEIGHT - 4)
+                      : p.height;
+                    const barColor = paletteForSession(p.session.module.id, p.session.type).bar;
+                    return (
+                      <div
+                        key={p.session.id}
+                        className="group/wrap absolute inset-x-1"
+                        style={{ top, height }}
+                        onDragEnd={endDrag}
+                      >
+                        <SessionCard
+                          session={p.session}
+                          selected={selectedId === p.session.id}
+                          isDragging={drag?.session.id === p.session.id}
+                          onSelect={(s) => setSelectedId(s.id)}
+                          onOpen={onSessionOpen}
+                          onDragStart={(s, event) => {
+                            const rect = event.currentTarget.getBoundingClientRect();
+                            setDrag({ session: s, grabOffsetY: event.clientY - rect.top });
+                            event.dataTransfer.effectAllowed = 'move';
+                          }}
+                        />
+                        <ResizeHandle
+                          edge="top"
+                          color={barColor}
+                          onMouseDown={(event) => startResize(p.session, 'top', dayIndex, event)}
+                        />
+                        <ResizeHandle
+                          edge="bottom"
+                          color={barColor}
+                          onMouseDown={(event) => startResize(p.session, 'bottom', dayIndex, event)}
+                        />
+                      </div>
+                    );
+                  })
               )}
             </div>
           );
@@ -332,5 +487,49 @@ function SkeletonColumn({ dayIndex }: { dayIndex: number }) {
         />
       ))}
     </>
+  );
+}
+
+// Ligne-guide horizontale en pointillés + libellé d'heure, affichée pendant
+// un redimensionnement ou un déplacement (prévisualisation du créneau cible).
+function GuideLine({ hour }: { hour: number }) {
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-0 z-20"
+      style={{ top: (hour - DAY_START) * HOUR_HEIGHT }}
+      aria-hidden
+    >
+      <div className="border-t-[1.5px] border-dashed border-primary opacity-80" />
+      <span className="absolute -top-2 left-1 rounded bg-surface px-1 text-[9px] font-bold tabular-nums text-primary">
+        {fmtHour(hour)}
+      </span>
+    </div>
+  );
+}
+
+// Poignée de redimensionnement (bord haut ou bas d'une séance).
+function ResizeHandle({
+  edge,
+  color,
+  onMouseDown,
+}: {
+  edge: 'top' | 'bottom';
+  color: string;
+  onMouseDown: (event: React.MouseEvent) => void;
+}) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      className={cn(
+        'absolute inset-x-2 z-10 flex h-2.5 cursor-ns-resize items-center justify-center',
+        edge === 'top' ? 'top-0' : 'bottom-0',
+      )}
+      aria-hidden
+    >
+      <div
+        className="h-[3px] w-7 rounded-full opacity-0 transition-opacity group-hover/wrap:opacity-70"
+        style={{ background: color }}
+      />
+    </div>
   );
 }
