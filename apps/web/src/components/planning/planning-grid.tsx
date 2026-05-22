@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { addDays, differenceInMinutes, format, getHours, getMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { BarChartIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
 import { Button } from '@/components/ui/button';
-import { useUpdateSessionMutation } from '@/lib/mutations';
+import { useCreateSessionMutation, useUpdateSessionMutation } from '@/lib/mutations';
 import { cn } from '@/lib/utils';
 import { SessionCard } from './session-card';
 
@@ -89,7 +89,11 @@ export function PlanningGrid({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
+  const [copiedSession, setCopiedSession] = useState<SessionDto | null>(null);
   const updateSession = useUpdateSessionMutation();
+  const { mutate: pasteSession } = useCreateSessionMutation();
+  // Dernière position du curseur sur la grille — base du collage Ctrl+V.
+  const lastMousePosRef = useRef<{ dayIndex: number; y: number } | null>(null);
 
   // Calcule l'heure de début calée à partir d'un événement de drag sur une colonne.
   function startHourFromEvent(
@@ -137,6 +141,48 @@ export function PlanningGrid({
     setDropPreview(null);
   }
 
+  // Raccourcis copier/coller : Ctrl/Cmd+C copie la séance sélectionnée,
+  // Ctrl/Cmd+V crée une copie au créneau situé sous le curseur.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === 'c') {
+        const found = sessions.find((s) => s.id === selectedId);
+        if (found) setCopiedSession(found);
+        return;
+      }
+      if (key !== 'v') return;
+      const pos = lastMousePosRef.current;
+      if (!copiedSession || !pos) return;
+      event.preventDefault();
+      const startMs = new Date(copiedSession.startAt).getTime();
+      const durationMs = new Date(copiedSession.endAt).getTime() - startMs;
+      const durationH = durationMs / 3600000;
+      const startHour = clamp(
+        snap(DAY_START + pos.y / HOUR_HEIGHT),
+        DAY_START,
+        DAY_END - durationH,
+      );
+      const start = addDays(weekStart, pos.dayIndex);
+      start.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
+      const end = new Date(start.getTime() + durationMs);
+      pasteSession({
+        type: copiedSession.type,
+        classeId: copiedSession.classe.id,
+        moduleId: copiedSession.module.id,
+        salleId: copiedSession.salle.id,
+        teacherId: copiedSession.teacher.id,
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+      });
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sessions, selectedId, copiedSession, weekStart, pasteSession]);
+
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-surface px-6 text-center">
@@ -156,7 +202,8 @@ export function PlanningGrid({
     : sessions.map((s) => positionSession(s)).filter((p): p is PositionedSession => p !== null);
 
   return (
-    <div className="h-full overflow-auto bg-surface">
+    // Clic hors d'une séance → désélection (les cartes stoppent la propagation).
+    <div className="h-full overflow-auto bg-surface" onClick={() => setSelectedId(null)}>
       <div className="grid min-w-[1114px] grid-cols-[64px_repeat(7,minmax(0,1fr))]">
         {/* Header row : sticky corner + day labels (fond blanc, calqué PLANIT-IA) */}
         <div className="sticky left-0 top-0 z-30 flex items-center justify-center border-b border-r border-border bg-surface text-text-faint">
@@ -207,6 +254,10 @@ export function PlanningGrid({
               style={{ height: GRID_HEIGHT }}
               onDragOver={(event) => handleDragOver(event, dayIndex)}
               onDrop={(event) => handleDrop(event, dayIndex)}
+              onMouseMove={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                lastMousePosRef.current = { dayIndex, y: event.clientY - rect.top };
+              }}
             >
               {HOURS.slice(0, -1).map((hour) => (
                 <div
