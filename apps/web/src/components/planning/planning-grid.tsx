@@ -30,7 +30,7 @@ const SNAP_HOURS = 0.5; // pas de calage du drag = 30 min
 const BOTTOM_PAD = HOUR_HEIGHT / 2;
 const GRID_HEIGHT = (DAY_END - DAY_START) * HOUR_HEIGHT + BOTTOM_PAD;
 // Largeur min d'une colonne jour — voir `grid-cols-[64px_repeat(7,minmax(250px,2fr))]`.
-// Proto COL_MIN_W = 150 ; 250 px retenu en LOT 08 pour la lisibilité des cartes.
+// Proto COL_MIN_W = 150 ; 250 px retenu en LOT 2 iter. D pour la lisibilité des cartes.
 const HOURS = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => DAY_START + i);
 
 interface PositionedSession {

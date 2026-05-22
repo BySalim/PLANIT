@@ -1,13 +1,14 @@
-# SPEC — VAGUE-01-08 · Grille planning — 7 jours, resize, copier-coller
+# SPEC — VAGUE-01-01-d · LOT 2 — Grille 7 jours, resize, copier-coller (R.12)
 
-**Auteur :** Salim · **Date :** 2026-05-22 · **Statut :** Approuvée (rétro) · **Branche cible :** `feat/salim`
+**Vague :** 01 · **Lot officiel :** 2 (Frontend RP) · **Itération :** D (grille & interactions)  
+**Auteur :** Salim · **Date :** 2026-05-22 · **Statut :** Approuvée (rétro) · **Branche :** `feat/salim`  
+**Spec parente :** [`VAGUE-01-01-planning-rp.md`](VAGUE-01-01-planning-rp.md) · **Précédent :** [01-c](VAGUE-01-01-c-planning-fullbleed.md)
 
 ## Objectif
 
-Compléter `<PlanningGrid>` après le LOT 07 : aligner la semaine sur **7 jours**
-(lundi → dimanche), améliorer la lisibilité des colonnes, et livrer les
-interactions clavier / souris encore listées comme V2 dans TD-009 (copier-coller,
-resize). Le drag & drop reste celui du LOT 07.
+Compléter `<PlanningGrid>` après l'itération C : aligner la semaine sur **7 jours**
+(lundi → dimanche), améliorer la lisibilité des colonnes, et livrer le reste de
+**R.12** (copier-coller, resize). Le drag & drop reste celui de l'itération C.
 
 ## Périmètre IN
 
@@ -33,7 +34,7 @@ resize). Le drag & drop reste celui du LOT 07.
   sélection.
 - **Resize document-level** : `mousemove` / `mouseup` sur `document` pour ne
   pas perdre le geste si le curseur sort de la carte (même pattern que la
-  sidebar LOT 06).
+  sidebar itération B).
 - **Lignes-guides** : affichage `fmtHour` sur les créneaux de début/fin
   pendant drag et resize pour feedback visuel (proto timeline).
 - **Largeur colonnes 250 px** : compromis lisibilité (horaire + prof sur une
@@ -50,6 +51,6 @@ resize). Le drag & drop reste celui du LOT 07.
 
 ## Références
 
-- Journal : `docs/agent-journal/salim/2026-05-22-vague01-planning-lot08.md`
-- Précédent : `docs/specs/VAGUE-01-07-planning-fullbleed.md`
+- Journal : `docs/agent-journal/salim/2026-05-22-vague01-lot2-grid-interactions.md`
+- Précédent : `docs/specs/VAGUE-01-01-c-planning-fullbleed.md`
 - Dette : `docs/tech-debt.md` (TD-009 mis à jour, TD-021 ajouté)

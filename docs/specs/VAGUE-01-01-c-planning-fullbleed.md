@@ -1,17 +1,16 @@
-# SPEC — VAGUE-01-07 · Planning RP pleine page + interactions de base
+# SPEC — VAGUE-01-01-c · LOT 2 — Planning RP pleine page + drag (R.12)
 
-**Auteur :** Salim · **Date :** 2026-05-22 · **Statut :** Approuvée (rétro) · **Branche cible :** `feat/salim`
-
-> Spec rédigée après implémentation pour boucler la chaîne documentaire
-> VAGUE-01-05 → 06 → **07** → 08. Référence : journal
-> `docs/agent-journal/salim/2026-05-22-vague01-planning-fullbleed.md`.
+**Vague :** 01 · **Lot officiel :** 2 (Frontend RP) · **Itération :** C (pleine page + drag)  
+**Auteur :** Salim · **Date :** 2026-05-22 · **Statut :** Approuvée (rétro) · **Branche :** `feat/salim`  
+**Spec parente :** [`VAGUE-01-01-planning-rp.md`](VAGUE-01-01-planning-rp.md) · **Précédent :** [01-b](VAGUE-01-01-b-planning-fidelity.md)  
+**Journal :** `docs/agent-journal/salim/2026-05-22-vague01-planning-fullbleed.md`
 
 ## Objectif
 
 Appliquer le layout pleine page du prototype PLANIT-IA (`RPPlannerTimeline`) à
 la page `/rp` : toolbar et footer figés, grille à scroll interne, en-têtes
 sticky, cartes fidèles au proto. Ajouter la **sélection** et le **drag & drop**
-des séances (hors périmètre initial du LOT 06, demandé en cours de session).
+des séances (hors périmètre initial de l'itération B, demandé en cours de session — **R.12**).
 
 ## Périmètre IN
 
@@ -24,11 +23,11 @@ des séances (hors périmètre initial du LOT 06, demandé en cours de session).
 | Cartes : badge catégorie, chip classe translucide, bordure non publiée | `<SessionCard>`  | `session-card.tsx`                                                 |
 | Sélection (clic), drawer (double-clic), drag & drop (PUT)              | grille + carte   | `planning-grid.tsx`, `session-card.tsx`                            |
 
-## Périmètre OUT (reportés — voir LOT 08 et TD-009)
+## Périmètre OUT (reportés — voir itération D et TD-009)
 
-- Grille **7 jours** (dimanche) — LOT 08.
-- **Copier-coller** clavier — LOT 08.
-- **Resize** poignées haut/bas — LOT 08.
+- Grille **7 jours** (dimanche) — itération D ([01-d](VAGUE-01-01-d-grid-interactions.md)).
+- **Copier-coller** clavier — itération D.
+- **Resize** poignées haut/bas — itération D.
 - Undo/redo, vues Classe/Salle/Prof, vue Jour, panneaux — TD-009 (partiel),
   TD-011, TD-017, TD-019.
 
@@ -42,5 +41,5 @@ des séances (hors périmètre initial du LOT 06, demandé en cours de session).
 ## Références
 
 - Journal : `docs/agent-journal/salim/2026-05-22-vague01-planning-fullbleed.md`
-- Précédent : `docs/specs/VAGUE-01-06-planning-fidelity.md`
-- Suivant : `docs/specs/VAGUE-01-08-planning-grid-interactions.md`
+- Itération précédente : [`VAGUE-01-01-b`](VAGUE-01-01-b-planning-fidelity.md)
+- Itération suivante : [`VAGUE-01-01-d`](VAGUE-01-01-d-grid-interactions.md)

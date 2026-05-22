@@ -1,13 +1,15 @@
-# SPEC — VAGUE-01-06 · Fidélité Planning RP au prototype PLANIT-IA
+# SPEC — VAGUE-01-01-b · LOT 2 — Fidélité planning RP au prototype PLANIT-IA
 
-**Auteur :** Salim · **Date :** 2026-05-22 · **Statut :** Approuvée · **Branche cible :** `feat/salim`
+**Vague :** 01 · **Lot officiel :** 2 (Frontend RP) · **Itération :** B (fidélité visuelle)  
+**Auteur :** Salim · **Date :** 2026-05-22 · **Statut :** Approuvée · **Branche :** `feat/salim`  
+**Spec parente :** [`VAGUE-01-01-planning-rp.md`](VAGUE-01-01-planning-rp.md) · **Précédent :** [01-a](VAGUE-01-01-a-shell-realignment.md)
 
 ## Objectif
 
-Après le LOT 05 (shell + premier passage planning), revue côte-à-côte du
+Après l'itération A (shell + premier passage planning), revue côte-à-côte du
 rendu `/rp` avec les screenshots `localhost:5500/rp/` du prototype
-`PLANIT-IA`. Plusieurs écarts visuels et d'interaction subsistent. Ce LOT 06
-les corrige sans toucher au backend (LOT 1) ni aux contrats.
+`PLANIT-IA`. Plusieurs écarts visuels et d'interaction subsistent. Cette
+itération les corrige sans toucher au backend (**LOT 1**) ni aux contrats.
 
 ## Périmètre IN
 
