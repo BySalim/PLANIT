@@ -26,7 +26,7 @@ export function PublishButton({ sessions }: PublishButtonProps) {
       onClick={() => mutation.mutate(undefined)}
       aria-disabled={disabled}
       className={cn(
-        'inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-[12.5px] font-bold text-white transition-all',
+        'inline-flex h-8 flex-shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-[12.5px] font-bold text-white transition-all',
         'disabled:cursor-not-allowed disabled:opacity-50',
         !disabled && 'hover:brightness-110 active:brightness-95',
       )}

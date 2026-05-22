@@ -29,7 +29,7 @@ export function ViewModeTabs({ active, onChange }: ViewModeTabsProps) {
     <div
       role="tablist"
       aria-label="Mode de vue planning"
-      className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface p-1"
+      className="inline-flex flex-shrink-0 items-center gap-0.5 rounded-md border border-border-soft bg-bg p-0.5"
     >
       {TABS.map((tab) => {
         const isActive = active === tab.id;
@@ -44,10 +44,10 @@ export function ViewModeTabs({ active, onChange }: ViewModeTabsProps) {
             title={tab.hint}
             onClick={tab.enabled && onChange ? () => onChange(tab.id) : undefined}
             className={cn(
-              'rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors',
-              isActive && 'bg-primary text-white',
-              !isActive && tab.enabled && 'text-text-sec hover:bg-primary-50 hover:text-primary',
-              !tab.enabled && 'cursor-not-allowed text-text-faint',
+              'rounded px-2.5 py-1 text-[12px] transition-colors',
+              isActive && 'bg-surface font-medium text-text shadow-sm',
+              !isActive && tab.enabled && 'font-normal text-text-sec hover:text-text',
+              !tab.enabled && 'cursor-not-allowed font-normal text-text-faint',
             )}
           >
             {tab.label}

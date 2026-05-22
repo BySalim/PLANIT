@@ -41,10 +41,10 @@ export function PlanningFooter({
 
   return (
     <footer
-      className="flex flex-wrap items-center justify-between gap-3 border-t border-border-soft bg-surface px-4 py-2.5"
+      className="flex flex-shrink-0 items-center justify-between gap-3 overflow-x-auto border-t border-border-soft bg-surface px-4 py-2"
       style={{ opacity: isLoading ? 0.7 : 1 }}
     >
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-text-sec">
+      <div className="flex flex-shrink-0 items-center gap-x-2 text-[11.5px] text-text-sec">
         {isError ? (
           <span className="text-text-muted">
             Backend indisponible. Démarre Docker puis recharge.
@@ -79,8 +79,8 @@ export function PlanningFooter({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="hidden text-[11.5px] text-text-muted md:inline">
+      <div className="flex flex-shrink-0 items-center gap-2">
+        <span className="hidden text-[11.5px] text-text-muted lg:inline">
           Auto-publication vendredi 22:00
         </span>
         {/* V2: Historique / Exporter / Aperçu étudiant — visibles mais disabled */}
@@ -88,7 +88,7 @@ export function PlanningFooter({
           type="button"
           disabled
           title="Disponible Vague 02"
-          className="inline-flex h-9 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text-muted"
+          className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text-muted"
         >
           <ClockIcon size={13} color="currentColor" />
           <span>Historique</span>
@@ -97,7 +97,7 @@ export function PlanningFooter({
           type="button"
           disabled
           title="Disponible Vague 02"
-          className="inline-flex h-9 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text-muted"
+          className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text-muted"
         >
           <DownloadIcon size={13} color="currentColor" />
           <span>Exporter</span>
@@ -106,7 +106,7 @@ export function PlanningFooter({
           type="button"
           disabled
           title="Disponible Vague 02"
-          className="inline-flex h-9 cursor-not-allowed items-center gap-1.5 rounded-lg border border-primary-200 bg-surface px-3 text-[12px] font-semibold text-primary"
+          className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-primary-200 bg-surface px-3 text-[12px] font-semibold text-primary"
         >
           <EyeIcon />
           <span>Aperçu étudiant</span>
