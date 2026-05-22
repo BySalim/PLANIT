@@ -1,7 +1,13 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
 import { addDays, differenceInMinutes, format, getHours, getMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { BarChartIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
 import { Button } from '@/components/ui/button';
+import { useCreateSessionMutation, useUpdateSessionMutation } from '@/lib/mutations';
+import { paletteForSession } from '@/lib/module-palette';
 import { cn } from '@/lib/utils';
 import { SessionCard } from './session-card';
 
@@ -10,15 +16,21 @@ interface PlanningGridProps {
   sessions: SessionDto[];
   isLoading: boolean;
   error: Error | null;
-  onSessionClick?: ((session: SessionDto) => void) | undefined;
+  /** Ouverture du détail d'une séance (double-clic). */
+  onSessionOpen?: ((session: SessionDto) => void) | undefined;
   onRetry?: (() => void) | undefined;
 }
 
 const DAY_START = 8;
 const DAY_END = 20;
-const HOUR_HEIGHT = 64;
-const DAY_COUNT = 6; // Lundi → Samedi
-const GRID_HEIGHT = (DAY_END - DAY_START) * HOUR_HEIGHT;
+const HOUR_HEIGHT = 78; // px/heure — calqué sur PLANIT-IA/rp (HOUR_H)
+const DAY_COUNT = 7; // Lundi → Dimanche
+const SNAP_HOURS = 0.5; // pas de calage du drag = 30 min
+// 30 min de "gouffre" sous le dernier créneau pour la respiration visuelle.
+const BOTTOM_PAD = HOUR_HEIGHT / 2;
+const GRID_HEIGHT = (DAY_END - DAY_START) * HOUR_HEIGHT + BOTTOM_PAD;
+// Largeur min d'une colonne jour — voir `grid-cols-[64px_repeat(7,minmax(250px,2fr))]`.
+// Proto COL_MIN_W = 150 ; 250 px retenu en LOT 2 iter. D pour la lisibilité des cartes.
 const HOURS = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => DAY_START + i);
 
 interface PositionedSession {
@@ -26,6 +38,53 @@ interface PositionedSession {
   dayIndex: number;
   top: number;
   height: number;
+}
+
+interface DragState {
+  session: SessionDto;
+  /** Décalage vertical (px) entre le curseur et le haut de la carte saisie. */
+  grabOffsetY: number;
+}
+
+interface DropPreview {
+  dayIndex: number;
+  startHour: number;
+}
+
+interface ResizeState {
+  sessionId: string;
+  edge: 'top' | 'bottom';
+  baseY: number;
+  baseStartHour: number;
+  baseEndHour: number;
+  startDate: Date;
+  dayIndex: number;
+}
+
+interface ResizePreview {
+  sessionId: string;
+  dayIndex: number;
+  startHour: number;
+  endHour: number;
+}
+
+function sessionDurationHours(session: SessionDto): number {
+  return differenceInMinutes(new Date(session.endAt), new Date(session.startAt)) / 60;
+}
+
+function clamp(value: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, value));
+}
+
+function snap(hour: number): number {
+  return Math.round(hour / SNAP_HOURS) * SNAP_HOURS;
+}
+
+// Heure décimale → "HH:mm" (8.5 → "08:30").
+function fmtHour(hour: number): string {
+  const h = Math.floor(hour);
+  const m = Math.round((hour - h) * 60);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function positionSession(session: SessionDto): PositionedSession | null {
@@ -53,12 +112,212 @@ export function PlanningGrid({
   sessions,
   isLoading,
   error,
-  onSessionClick,
+  onSessionOpen,
   onRetry,
 }: PlanningGridProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
+  const [copiedSession, setCopiedSession] = useState<SessionDto | null>(null);
+  const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
+  const { mutate: updateSession } = useUpdateSessionMutation();
+  const { mutate: pasteSession } = useCreateSessionMutation();
+  // Dernière position du curseur sur la grille — base du collage Ctrl+V.
+  const lastMousePosRef = useRef<{ dayIndex: number; y: number } | null>(null);
+  const resizeRef = useRef<ResizeState | null>(null);
+  const resizePreviewRef = useRef<ResizePreview | null>(null);
+
+  // Calcule l'heure de début calée à partir d'un événement de drag sur une colonne.
+  function startHourFromEvent(
+    event: React.DragEvent<HTMLDivElement>,
+    dragState: DragState,
+  ): number {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const topPx = event.clientY - rect.top - dragState.grabOffsetY;
+    const durationH = sessionDurationHours(dragState.session);
+    return clamp(snap(DAY_START + topPx / HOUR_HEIGHT), DAY_START, DAY_END - durationH);
+  }
+
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>, dayIndex: number) {
+    if (!drag) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setDropPreview({ dayIndex, startHour: startHourFromEvent(event, drag) });
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>, dayIndex: number) {
+    if (!drag) return;
+    event.preventDefault();
+    const startHour = startHourFromEvent(event, drag);
+    const { session } = drag;
+    const oldStart = new Date(session.startAt);
+    const durationMs = new Date(session.endAt).getTime() - oldStart.getTime();
+
+    const newStart = addDays(weekStart, dayIndex);
+    newStart.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
+    const newEnd = new Date(newStart.getTime() + durationMs);
+
+    setDrag(null);
+    setDropPreview(null);
+    // Pas de mutation si la séance est relâchée exactement à sa place initiale.
+    if (newStart.getTime() === oldStart.getTime()) return;
+
+    updateSession({
+      id: session.id,
+      body: { startAt: newStart.toISOString(), endAt: newEnd.toISOString() },
+    });
+  }
+
+  function endDrag() {
+    setDrag(null);
+    setDropPreview(null);
+  }
+
+  // Démarre un redimensionnement depuis une poignée haut/bas d'une séance.
+  function startResize(
+    session: SessionDto,
+    edge: 'top' | 'bottom',
+    dayIndex: number,
+    event: React.MouseEvent,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    const start = new Date(session.startAt);
+    const end = new Date(session.endAt);
+    const baseStartHour = getHours(start) + getMinutes(start) / 60;
+    const baseEndHour = getHours(end) + getMinutes(end) / 60;
+    resizeRef.current = {
+      sessionId: session.id,
+      edge,
+      baseY: event.clientY,
+      baseStartHour,
+      baseEndHour,
+      startDate: start,
+      dayIndex,
+    };
+    const preview: ResizePreview = {
+      sessionId: session.id,
+      dayIndex,
+      startHour: baseStartHour,
+      endHour: baseEndHour,
+    };
+    resizePreviewRef.current = preview;
+    setResizePreview(preview);
+  }
+
+  // Resize en cours : suit la souris au niveau document, calage 30 min,
+  // applique la modification (PUT) au relâchement.
+  useEffect(() => {
+    function onMove(event: MouseEvent) {
+      const r = resizeRef.current;
+      if (!r) return;
+      const deltaH = (event.clientY - r.baseY) / HOUR_HEIGHT;
+      let startHour = r.baseStartHour;
+      let endHour = r.baseEndHour;
+      if (r.edge === 'top') {
+        startHour = clamp(snap(r.baseStartHour + deltaH), DAY_START, r.baseEndHour - SNAP_HOURS);
+      } else {
+        endHour = clamp(snap(r.baseEndHour + deltaH), r.baseStartHour + SNAP_HOURS, DAY_END);
+      }
+      const preview: ResizePreview = {
+        sessionId: r.sessionId,
+        dayIndex: r.dayIndex,
+        startHour,
+        endHour,
+      };
+      resizePreviewRef.current = preview;
+      setResizePreview(preview);
+    }
+    function onUp() {
+      const r = resizeRef.current;
+      const preview = resizePreviewRef.current;
+      resizeRef.current = null;
+      resizePreviewRef.current = null;
+      setResizePreview(null);
+      if (!r || !preview) return;
+      if (preview.startHour === r.baseStartHour && preview.endHour === r.baseEndHour) return;
+      const newStart = new Date(r.startDate);
+      newStart.setHours(
+        Math.floor(preview.startHour),
+        Math.round((preview.startHour % 1) * 60),
+        0,
+        0,
+      );
+      const newEnd = new Date(r.startDate);
+      newEnd.setHours(Math.floor(preview.endHour), Math.round((preview.endHour % 1) * 60), 0, 0);
+      updateSession({
+        id: r.sessionId,
+        body: { startAt: newStart.toISOString(), endAt: newEnd.toISOString() },
+      });
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, [updateSession]);
+
+  // Lignes-guides d'une colonne : positions calées pendant resize ET déplacement.
+  function columnGuideLines(dayIndex: number): { key: string; hour: number }[] {
+    const lines: { key: string; hour: number }[] = [];
+    if (resizePreview && resizePreview.dayIndex === dayIndex) {
+      lines.push({ key: 'resize-start', hour: resizePreview.startHour });
+      lines.push({ key: 'resize-end', hour: resizePreview.endHour });
+    }
+    if (drag && dropPreview && dropPreview.dayIndex === dayIndex) {
+      const durationH = sessionDurationHours(drag.session);
+      lines.push({ key: 'move-start', hour: dropPreview.startHour });
+      lines.push({ key: 'move-end', hour: dropPreview.startHour + durationH });
+    }
+    return lines;
+  }
+
+  // Raccourcis copier/coller : Ctrl/Cmd+C copie la séance sélectionnée,
+  // Ctrl/Cmd+V crée une copie au créneau situé sous le curseur.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === 'c') {
+        const found = sessions.find((s) => s.id === selectedId);
+        if (found) setCopiedSession(found);
+        return;
+      }
+      if (key !== 'v') return;
+      const pos = lastMousePosRef.current;
+      if (!copiedSession || !pos) return;
+      event.preventDefault();
+      const startMs = new Date(copiedSession.startAt).getTime();
+      const durationMs = new Date(copiedSession.endAt).getTime() - startMs;
+      const durationH = durationMs / 3600000;
+      const startHour = clamp(
+        snap(DAY_START + pos.y / HOUR_HEIGHT),
+        DAY_START,
+        DAY_END - durationH,
+      );
+      const start = addDays(weekStart, pos.dayIndex);
+      start.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
+      const end = new Date(start.getTime() + durationMs);
+      pasteSession({
+        type: copiedSession.type,
+        classeId: copiedSession.classe.id,
+        moduleId: copiedSession.module.id,
+        salleId: copiedSession.salle.id,
+        teacherId: copiedSession.teacher.id,
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+      });
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sessions, selectedId, copiedSession, weekStart, pasteSession]);
+
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-err bg-err-100 px-6 py-10 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-surface px-6 text-center">
         <p className="font-medium text-err">Impossible de charger le planning.</p>
         <p className="text-sm text-text-sec">{error.message}</p>
         {onRetry ? (
@@ -75,75 +334,149 @@ export function PlanningGrid({
     : sessions.map((s) => positionSession(s)).filter((p): p is PositionedSession => p !== null);
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-      <div className="grid min-w-[720px] grid-cols-[64px_repeat(6,minmax(0,1fr))]">
-        {/* Header row : empty cell + day labels */}
-        <div className="border-b border-r border-border bg-bg-warm" />
+    // Clic hors d'une séance → désélection (les cartes stoppent la propagation).
+    <div className="h-full overflow-auto bg-surface" onClick={() => setSelectedId(null)}>
+      {/* Colonnes : 64 px de rail heures + 7 jours min-250 / max-1fr.
+          Sous ~1114 px utiles, la grille déborde et le scroll horizontal
+          apparaît automatiquement sur le conteneur parent (overflow-auto). */}
+      <div className="grid grid-cols-[64px_repeat(7,minmax(250px,2fr))]">
+        {/* Header row : sticky corner + day labels (fond blanc, calqué PLANIT-IA) */}
+        <div className="sticky left-0 top-0 z-30 flex items-center justify-center border-b border-r border-border bg-surface text-text-faint">
+          <BarChartIcon size={15} color="currentColor" />
+        </div>
         {Array.from({ length: DAY_COUNT }, (_, dayIndex) => {
           const dayDate = addDays(weekStart, dayIndex);
           return (
             <div
               key={dayIndex}
-              className="border-b border-r border-border bg-bg-warm px-3 py-2 text-center"
+              className="sticky top-0 z-20 border-b border-r border-border bg-surface px-3 py-2.5 text-center"
             >
               <div className="text-xs font-semibold uppercase tracking-wide text-text-sec">
                 {format(dayDate, 'EEEE', { locale: fr })}
               </div>
-              <div className="text-xs text-text-muted">
+              <div className="text-[11px] text-text-muted">
                 {format(dayDate, 'd MMM', { locale: fr })}
               </div>
             </div>
           );
         })}
 
-        {/* Body : hour column + day columns with absolute-positioned sessions */}
-        <div className="relative border-r border-border bg-bg-warm" style={{ height: GRID_HEIGHT }}>
+        {/* Body : sticky hour column + day columns with absolute-positioned sessions */}
+        <div
+          className="sticky left-0 z-10 border-r border-border bg-surface"
+          style={{ height: GRID_HEIGHT }}
+        >
           {HOURS.map((hour) => (
+            // Label positionné JUSTE SOUS la ligne horaire correspondante
+            // (sinon l'étiquette 8h est masquée par l'en-tête sticky).
             <div
               key={hour}
-              className="absolute right-1 -translate-y-1/2 text-[10px] font-medium text-text-muted"
-              style={{ top: (hour - DAY_START) * HOUR_HEIGHT }}
+              className="absolute right-1 text-[10px] font-medium text-text-muted"
+              style={{ top: (hour - DAY_START) * HOUR_HEIGHT + 2 }}
             >
               {hour}h
             </div>
           ))}
         </div>
 
-        {Array.from({ length: DAY_COUNT }, (_, dayIndex) => (
-          <div
-            key={dayIndex}
-            className="relative border-r border-border"
-            style={{ height: GRID_HEIGHT }}
-          >
-            {HOURS.slice(0, -1).map((hour) => (
-              <div
-                key={hour}
-                className={cn(
-                  'absolute inset-x-0 h-px',
-                  hour % 2 === 0 ? 'bg-border' : 'bg-border-soft',
-                )}
-                style={{ top: (hour - DAY_START) * HOUR_HEIGHT }}
-                aria-hidden
-              />
-            ))}
+        {Array.from({ length: DAY_COUNT }, (_, dayIndex) => {
+          const isDropColumn = dropPreview?.dayIndex === dayIndex;
+          return (
+            <div
+              key={dayIndex}
+              className={cn(
+                'relative border-r border-border transition-colors',
+                isDropColumn && 'bg-primary-50/60',
+              )}
+              style={{ height: GRID_HEIGHT }}
+              onDragOver={(event) => handleDragOver(event, dayIndex)}
+              onDrop={(event) => handleDrop(event, dayIndex)}
+              onMouseMove={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                lastMousePosRef.current = { dayIndex, y: event.clientY - rect.top };
+              }}
+            >
+              {HOURS.slice(0, -1).map((hour) => (
+                <div
+                  key={hour}
+                  className={cn(
+                    'absolute inset-x-0 h-px',
+                    hour % 2 === 0 ? 'bg-border' : 'bg-border-soft',
+                  )}
+                  style={{ top: (hour - DAY_START) * HOUR_HEIGHT }}
+                  aria-hidden
+                />
+              ))}
 
-            {isLoading ? (
-              <SkeletonColumn dayIndex={dayIndex} />
-            ) : (
-              positioned
-                .filter((p) => p.dayIndex === dayIndex)
-                .map((p) => (
-                  <div
-                    key={p.session.id}
-                    className="absolute inset-x-1"
-                    style={{ top: p.top, height: p.height }}
-                  >
-                    <SessionCard session={p.session} onClick={onSessionClick} />
-                  </div>
-                ))
-            )}
-          </div>
-        ))}
+              {/* Aperçu de la position de dépôt pendant le drag */}
+              {drag && dropPreview && dropPreview.dayIndex === dayIndex ? (
+                <div
+                  className="pointer-events-none absolute inset-x-1 rounded-[10px] border-2 border-dashed border-primary bg-primary-50"
+                  style={{
+                    top: (dropPreview.startHour - DAY_START) * HOUR_HEIGHT,
+                    height: sessionDurationHours(drag.session) * HOUR_HEIGHT - 4,
+                  }}
+                  aria-hidden
+                />
+              ) : null}
+
+              {/* Lignes-guides en pointillés (resize + déplacement) avec l'heure */}
+              {columnGuideLines(dayIndex).map((g) => (
+                <GuideLine key={g.key} hour={g.hour} />
+              ))}
+
+              {isLoading ? (
+                <SkeletonColumn dayIndex={dayIndex} />
+              ) : (
+                positioned
+                  .filter((p) => p.dayIndex === dayIndex)
+                  .map((p) => {
+                    // Pendant un resize, la carte adopte les dimensions de l'aperçu.
+                    const rp =
+                      resizePreview && resizePreview.sessionId === p.session.id
+                        ? resizePreview
+                        : null;
+                    const top = rp ? (rp.startHour - DAY_START) * HOUR_HEIGHT : p.top;
+                    const height = rp
+                      ? Math.max(28, (rp.endHour - rp.startHour) * HOUR_HEIGHT - 4)
+                      : p.height;
+                    const barColor = paletteForSession(p.session.module.id, p.session.type).bar;
+                    return (
+                      <div
+                        key={p.session.id}
+                        className="group/wrap absolute inset-x-1"
+                        style={{ top, height }}
+                        onDragEnd={endDrag}
+                      >
+                        <SessionCard
+                          session={p.session}
+                          selected={selectedId === p.session.id}
+                          isDragging={drag?.session.id === p.session.id}
+                          onSelect={(s) => setSelectedId(s.id)}
+                          onOpen={onSessionOpen}
+                          onDragStart={(s, event) => {
+                            const rect = event.currentTarget.getBoundingClientRect();
+                            setDrag({ session: s, grabOffsetY: event.clientY - rect.top });
+                            event.dataTransfer.effectAllowed = 'move';
+                          }}
+                        />
+                        <ResizeHandle
+                          edge="top"
+                          color={barColor}
+                          onMouseDown={(event) => startResize(p.session, 'top', dayIndex, event)}
+                        />
+                        <ResizeHandle
+                          edge="bottom"
+                          color={barColor}
+                          onMouseDown={(event) => startResize(p.session, 'bottom', dayIndex, event)}
+                        />
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -163,5 +496,49 @@ function SkeletonColumn({ dayIndex }: { dayIndex: number }) {
         />
       ))}
     </>
+  );
+}
+
+// Ligne-guide horizontale en pointillés + libellé d'heure, affichée pendant
+// un redimensionnement ou un déplacement (prévisualisation du créneau cible).
+function GuideLine({ hour }: { hour: number }) {
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-0 z-20"
+      style={{ top: (hour - DAY_START) * HOUR_HEIGHT }}
+      aria-hidden
+    >
+      <div className="border-t-[1.5px] border-dashed border-primary opacity-80" />
+      <span className="absolute -top-2 left-1 rounded bg-surface px-1 text-[9px] font-bold tabular-nums text-primary">
+        {fmtHour(hour)}
+      </span>
+    </div>
+  );
+}
+
+// Poignée de redimensionnement (bord haut ou bas d'une séance).
+function ResizeHandle({
+  edge,
+  color,
+  onMouseDown,
+}: {
+  edge: 'top' | 'bottom';
+  color: string;
+  onMouseDown: (event: React.MouseEvent) => void;
+}) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      className={cn(
+        'absolute inset-x-2 z-10 flex h-2.5 cursor-ns-resize items-center justify-center',
+        edge === 'top' ? 'top-0' : 'bottom-0',
+      )}
+      aria-hidden
+    >
+      <div
+        className="h-[3px] w-7 rounded-full opacity-0 transition-opacity group-hover/wrap:opacity-70"
+        style={{ background: color }}
+      />
+    </div>
   );
 }

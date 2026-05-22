@@ -1,7 +1,12 @@
-import { addDays, format, startOfWeek } from 'date-fns';
+import { addDays, format, getISOWeek, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 const WEEK_LENGTH_DAYS = 7;
+
+/** ISO week number (1–53) for the given week. */
+export function getWeekNumber(weekStart: Date): number {
+  return getISOWeek(weekStart);
+}
 
 /**
  * Africa/Dakar runs on UTC+0 year-round (no DST), so plain Date math is safe
