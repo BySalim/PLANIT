@@ -57,7 +57,15 @@ export function SessionCard({
     <button
       type="button"
       draggable={onDragStart !== undefined}
-      onClick={onSelect ? () => onSelect(session) : undefined}
+      onClick={
+        onSelect
+          ? (event) => {
+              // Empêche le clic de remonter au fond de grille (qui désélectionne).
+              event.stopPropagation();
+              onSelect(session);
+            }
+          : undefined
+      }
       onDoubleClick={onOpen ? () => onOpen(session) : undefined}
       onDragStart={onDragStart ? (event) => onDragStart(session, event) : undefined}
       style={{
