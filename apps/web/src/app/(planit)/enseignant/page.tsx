@@ -1,11 +1,14 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SessionDto } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
+import { Greeting } from '@/components/enseignant/greeting';
 import { HeroCurrentSession } from '@/components/enseignant/hero-current-session';
 import { SessionsTodayList } from '@/components/enseignant/sessions-today-list';
+import { WeekStrip } from '@/components/enseignant/week-strip';
 import { useCurrentTeacher } from '@/hooks/use-current-teacher';
 import { useRealtimeSessions } from '@/hooks/use-realtime-sessions';
 import { useWeekSessionsQuery } from '@/lib/queries';
@@ -37,7 +40,8 @@ export default function EnseignantHomePage() {
     teacherId: teacher.id,
   });
 
-  const todaySessions = useMemo(() => filterTodaySessions(data ?? [], now), [data, now]);
+  const weekSessions = useMemo<readonly SessionDto[]>(() => data ?? [], [data]);
+  const todaySessions = useMemo(() => filterTodaySessions(weekSessions, now), [weekSessions, now]);
 
   const handleSessionClick = (session: SessionDto) => {
     router.push(`/enseignant/seance/${session.id}`);
@@ -51,6 +55,9 @@ export default function EnseignantHomePage() {
       activeNavId="home"
     >
       <div className="mx-auto flex max-w-3xl flex-col gap-5">
+        {/* Greeting — date + nom (calqué proto enseignant/home.jsx) */}
+        <Greeting fullName={teacher.fullName} now={now} />
+
         {isLoading ? (
           <div className="rounded-2xl border border-border bg-surface px-6 py-8 text-center text-sm text-text-sec">
             Chargement de votre planning…
@@ -64,12 +71,35 @@ export default function EnseignantHomePage() {
           </div>
         ) : (
           <>
+            {/* Hero : séance en cours ou message d'attente */}
             <HeroCurrentSession sessions={todaySessions} now={now} />
+
+            {/* Section : séances du jour */}
             <SessionsTodayList
               sessions={todaySessions}
               now={now}
               onSessionClick={handleSessionClick}
             />
+
+            {/* Section : aperçu de la semaine */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-baseline justify-between px-1">
+                <h3 className="text-[10.5px] font-bold uppercase tracking-wider text-text-faint">
+                  Dans la semaine
+                </h3>
+                <Link
+                  href="/enseignant/planning"
+                  className="text-[12px] font-semibold text-accent-600 transition-colors hover:text-accent-800"
+                >
+                  Vue complète →
+                </Link>
+              </div>
+              <WeekStrip
+                sessions={weekSessions}
+                now={now}
+                onDayClick={() => router.push('/enseignant/planning')}
+              />
+            </div>
           </>
         )}
       </div>
