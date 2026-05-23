@@ -24,7 +24,7 @@ For each category, give a verdict: PASS / FAIL / N/A with a 1-2 line justificati
 - All acceptance criteria addressed
 - No scope creep (changes outside the spec)
 
-**B. Code conventions** (`strategies/05-CONVENTIONS-CODE.md`)
+**B. Code conventions** (see CLAUDE.md — "Conventions code")
 
 - No `any`, `as`, `// @ts-ignore` without justification
 - Naming respected (camelCase / PascalCase / kebab-case)
@@ -33,7 +33,7 @@ For each category, give a verdict: PASS / FAIL / N/A with a 1-2 line justificati
 - No useless comments
 - Vocabulary: "AC" not "AP", PROVISOIRE/VALIDE/PUBLIE
 
-**C. Security** (`strategies/07-SECURITE-DIFFEREE.md`)
+**C. Security** (see CLAUDE.md — "Sécurité")
 
 - No hardcoded secrets
 - Zod validation on all external inputs
@@ -48,10 +48,10 @@ For each category, give a verdict: PASS / FAIL / N/A with a 1-2 line justificati
 - Tests independent
 - Clear naming
 
-**E. Architecture coherence** (`strategies/08-PIVOT-ADAPTATION.md`)
+**E. Architecture coherence**
 
-- If touching a port (MailService, NotificationGateway) → consistent
-- If new arch decision → ADR created
+- If touching a port (MailService, NotificationGateway) → consistent across the codebase
+- If new arch decision → ADR created (`docs/architecture/adr/`)
 - Prisma migrations: clean, reversible, named
 
 **F. UI fidelity** (if frontend)
