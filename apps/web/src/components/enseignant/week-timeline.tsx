@@ -297,10 +297,11 @@ export function WeekTimeline({
   // Scroll horizontal de la grille — l'en-tête suit via transform pour rester aligné.
   const gridRef = useRef<HTMLDivElement>(null);
   const [scrollX, setScrollX] = useState(0);
+  const weekStartTs = weekStart.getTime();
   useEffect(() => {
     if (gridRef.current) gridRef.current.scrollLeft = 0;
     setScrollX(0);
-  }, [weekStart.getTime()]);
+  }, [weekStartTs]);
 
   return (
     <div className="flex flex-col">
