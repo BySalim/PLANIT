@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ChevronLeftIcon } from '@planit/ui';
-import { Shell } from '@/components/layout/shell';
+import { MobileShell } from '@/components/enseignant/mobile-shell';
 import { SessionDetailView } from '@/components/enseignant/session-detail-view';
 import { useCurrentTeacher } from '@/hooks/use-current-teacher';
 import { useRealtimeSessions } from '@/hooks/use-realtime-sessions';
@@ -21,17 +21,8 @@ export default function EnseignantSeanceDetailPage() {
   const { data, isLoading, isError, refetch } = useSessionDetailQuery(sessionId);
 
   return (
-    <Shell
-      title="Détail de la séance"
-      subtitle={teacher.fullName}
-      breadcrumb={[
-        { label: 'Espace Enseignant', href: '/enseignant' },
-        { label: 'Planning', href: '/enseignant/planning' },
-        { label: 'Détail séance' },
-      ]}
-      activeNavId="planning"
-    >
-      <div className="mx-auto flex max-w-3xl flex-col gap-4">
+    <MobileShell>
+      <div className="flex flex-col gap-4 px-4 py-4">
         <div className="flex items-center gap-2">
           <Link
             href="/enseignant/planning"
@@ -69,6 +60,6 @@ export default function EnseignantSeanceDetailPage() {
           </div>
         )}
       </div>
-    </Shell>
+    </MobileShell>
   );
 }

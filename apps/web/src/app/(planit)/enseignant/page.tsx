@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SessionDto } from '@planit/contracts';
-import { Shell } from '@/components/layout/shell';
 import { Greeting } from '@/components/enseignant/greeting';
 import { HeroCurrentSession } from '@/components/enseignant/hero-current-session';
+import { MobileShell } from '@/components/enseignant/mobile-shell';
 import { PlanningUpdateModal } from '@/components/enseignant/planning-update-modal';
 import { SessionsTodayList } from '@/components/enseignant/sessions-today-list';
 import { WeekStrip } from '@/components/enseignant/week-strip';
@@ -66,13 +66,8 @@ export default function EnseignantHomePage() {
   };
 
   return (
-    <Shell
-      title="Espace Enseignant"
-      subtitle={teacher.fullName}
-      breadcrumb={[{ label: 'Espace Enseignant' }]}
-      activeNavId="home"
-    >
-      <div className="mx-auto flex max-w-3xl flex-col gap-5">
+    <MobileShell>
+      <div className="flex flex-col gap-4 px-4 py-4">
         {/* Greeting — date + nom (calqué proto enseignant/home.jsx) */}
         <Greeting fullName={teacher.fullName} now={now} />
 
@@ -125,6 +120,6 @@ export default function EnseignantHomePage() {
         sessions={updateModal.sessions}
         onClose={() => setUpdateModal({ open: false, sessions: [] })}
       />
-    </Shell>
+    </MobileShell>
   );
 }
