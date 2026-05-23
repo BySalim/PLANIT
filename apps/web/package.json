@@ -24,7 +24,8 @@
     "@tanstack/react-query": "^5.62.7",
     "react-hook-form": "^7.54.1",
     "@hookform/resolvers": "^3.9.1",
-    "date-fns": "^4.1.0"
+    "date-fns": "^4.1.0",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@planit/config": "workspace:*",
