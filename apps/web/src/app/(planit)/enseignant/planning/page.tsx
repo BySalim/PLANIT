@@ -36,10 +36,10 @@ export default function EnseignantPlanningPage() {
       activeNavId="planning"
     >
       <div className="flex h-full flex-col">
-        {/* Header : WeekNavigator + compteur séances */}
-        <div className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-border-soft bg-surface px-6 py-3">
+        {/* Header : WeekNavigator + compteur séances (espacement aéré calqué proto) */}
+        <div className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-border-soft bg-surface px-6 py-4">
           <WeekNavigator weekStart={weekStart} onChange={setWeekStart} />
-          <span className="text-[12px] font-medium text-text-faint">
+          <span className="text-[12.5px] font-medium text-text-sec">
             {sessions.length} séance{sessions.length > 1 ? 's' : ''} cette semaine
           </span>
         </div>

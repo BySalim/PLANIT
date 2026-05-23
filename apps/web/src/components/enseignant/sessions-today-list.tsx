@@ -1,8 +1,9 @@
-import { format } from 'date-fns';
+import { differenceInMinutes, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MapPinIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
-import { paletteForSession } from '@/lib/module-palette';
+import { categoryForType, paletteForSession, type SessionCategory } from '@/lib/module-palette';
+import { cn } from '@/lib/utils';
 
 export interface SessionsTodayListProps {
   readonly sessions: readonly SessionDto[];
@@ -21,16 +22,32 @@ function statusFor(session: SessionDto, now: Date): SessionStatus {
   return 'upcoming';
 }
 
-const STATUS_LABEL: Record<SessionStatus, string> = {
-  past: 'Terminée',
-  current: 'En cours',
-  upcoming: 'À venir',
+/** "2h" / "1h30" / "30min" — calque proto enseignant/components/session-card.jsx. */
+function formatDuration(start: Date, end: Date): string {
+  const minutes = differenceInMinutes(end, start);
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0 && m > 0) return `${h}h${String(m).padStart(2, '0')}`;
+  if (h > 0) return `${h}h`;
+  return `${m}min`;
+}
+
+const CATEGORY_LABEL: Record<SessionCategory, string> = {
+  cours: 'Cours',
+  evaluation: 'Éval',
+  evenement: 'Event',
 };
 
-const STATUS_CLASSES: Record<SessionStatus, string> = {
-  past: 'bg-bg text-text-faint border-border',
-  current: 'bg-accent-100 text-accent-800 border-accent-600',
-  upcoming: 'bg-ok-100 text-ok border-ok',
+/**
+ * Couleur du dot d'état (top-right de la carte) :
+ * - en cours → accent orange pulse
+ * - à venir → ok vert
+ * - passée → text-faint gris
+ */
+const DOT_CLASS: Record<SessionStatus, string> = {
+  current: 'bg-accent ring-2 ring-accent/30 animate-pulse',
+  upcoming: 'bg-ok',
+  past: 'bg-text-faint',
 };
 
 export function SessionsTodayList({
@@ -59,17 +76,24 @@ export function SessionsTodayList({
     <section aria-labelledby="today-title" className="flex flex-col gap-2">
       <h3
         id="today-title"
-        className="px-1 text-[10.5px] font-bold uppercase tracking-wider text-text-faint"
+        className="flex items-center gap-2 px-1 text-[13px] font-medium text-text"
       >
-        Aujourd&apos;hui · {sorted.length}
+        Aujourd&apos;hui
+        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-bg px-1.5 text-[11px] font-semibold text-text-sec">
+          {sorted.length}
+        </span>
       </h3>
+
       <ul className="flex flex-col gap-2">
         {sorted.map((session) => {
           const palette = paletteForSession(session.module.id, session.type);
           const status = statusFor(session, now);
           const start = new Date(session.startAt);
           const end = new Date(session.endAt);
+          const duration = formatDuration(start, end);
+          const category = categoryForType(session.type);
           const isInteractive = onSessionClick !== undefined;
+          const isPast = status === 'past';
 
           return (
             <li key={session.id}>
@@ -77,41 +101,71 @@ export function SessionsTodayList({
                 type="button"
                 onClick={isInteractive ? () => onSessionClick(session) : undefined}
                 disabled={!isInteractive}
-                aria-label={`Séance ${session.module.name} de ${format(start, 'HH:mm', { locale: fr })} à ${format(end, 'HH:mm', { locale: fr })}, ${STATUS_LABEL[status]}`}
-                className="group flex w-full items-center gap-3 rounded-xl border bg-surface px-4 py-3 text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default disabled:hover:shadow-none"
-                style={{ borderColor: palette.border }}
+                aria-label={`Séance ${session.module.name} de ${format(start, 'HH:mm', { locale: fr })} à ${format(end, 'HH:mm', { locale: fr })} (${duration})`}
+                className={cn(
+                  'group relative flex w-full items-stretch gap-3 overflow-hidden rounded-xl border text-left transition-shadow',
+                  'hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default disabled:hover:shadow-none',
+                  isPast && 'opacity-55',
+                )}
+                style={{
+                  background: isPast ? 'var(--color-surface)' : palette.bg,
+                  borderColor: isPast ? 'var(--color-border)' : palette.border,
+                }}
               >
+                {/* Bande latérale colorée */}
                 <span
                   aria-hidden
-                  className="h-12 w-1 flex-shrink-0 rounded-full"
+                  className="w-1 flex-shrink-0"
                   style={{ background: palette.bar }}
                 />
-                <div className="flex w-16 flex-shrink-0 flex-col text-sm font-semibold tabular-nums text-text">
-                  <span>{format(start, 'HH:mm', { locale: fr })}</span>
-                  <span className="text-xs font-medium text-text-faint">
+
+                {/* Colonne horaire 3 lignes */}
+                <div className="flex w-12 flex-shrink-0 flex-col justify-center py-3 text-text tabular-nums">
+                  <span className="text-[15px] font-semibold leading-tight">
+                    {format(start, 'HH:mm', { locale: fr })}
+                  </span>
+                  <span className="text-[11px] text-text-muted">
                     {format(end, 'HH:mm', { locale: fr })}
                   </span>
+                  <span className="mt-1 text-[10px] font-semibold text-text-faint">{duration}</span>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p
-                    className="truncate font-display text-sm font-semibold"
-                    style={{ color: palette.text }}
-                  >
+
+                {/* Centre : titre + classe + lieu */}
+                <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 py-3">
+                  <p className="truncate text-[14px] font-semibold" style={{ color: palette.text }}>
                     {session.module.name}
                   </p>
-                  <p className="mt-0.5 truncate text-xs text-text-sec">
-                    {session.classe.code} · {session.type}
-                  </p>
-                  <p className="mt-1 flex items-center gap-1 truncate text-xs text-text-faint">
+                  <div className="flex flex-wrap gap-1">
+                    <span
+                      className="inline-flex h-[18px] items-center rounded-[5px] border px-1.5 text-[10.5px] font-semibold tracking-wide"
+                      style={{
+                        background: 'rgba(255,255,255,0.55)',
+                        borderColor: palette.border,
+                        color: palette.text,
+                      }}
+                    >
+                      {session.classe.code}
+                    </span>
+                  </div>
+                  <div
+                    className="flex items-center gap-1 text-[12px]"
+                    style={{ color: palette.text, opacity: 0.75 }}
+                  >
                     <MapPinIcon size={11} color="currentColor" />
-                    {session.salle.name}
-                  </p>
+                    <span className="truncate">{session.salle.name}</span>
+                  </div>
                 </div>
-                <span
-                  className={`flex-shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${STATUS_CLASSES[status]}`}
-                >
-                  {STATUS_LABEL[status]}
-                </span>
+
+                {/* Droite : dot état (top) + catégorie (bottom) */}
+                <div className="flex flex-shrink-0 flex-col items-end justify-between py-3 pr-3">
+                  <span
+                    aria-hidden
+                    className={cn('block size-1.5 rounded-full', DOT_CLASS[status])}
+                  />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                    {CATEGORY_LABEL[category]}
+                  </span>
+                </div>
               </button>
             </li>
           );

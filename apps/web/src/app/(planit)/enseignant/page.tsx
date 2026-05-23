@@ -102,9 +102,7 @@ export default function EnseignantHomePage() {
             {/* Section : aperçu de la semaine */}
             <div className="flex flex-col gap-2">
               <div className="flex items-baseline justify-between px-1">
-                <h3 className="text-[10.5px] font-bold uppercase tracking-wider text-text-faint">
-                  Dans la semaine
-                </h3>
+                <h3 className="text-[13px] font-medium text-text">Dans la semaine</h3>
                 <Link
                   href="/enseignant/planning"
                   className="text-[12px] font-semibold text-accent-600 transition-colors hover:text-accent-800"

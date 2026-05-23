@@ -2,7 +2,6 @@ import { differenceInMinutes, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MapPinIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
-import { paletteForSession } from '@/lib/module-palette';
 
 export interface HeroCurrentSessionProps {
   readonly sessions: readonly SessionDto[];
@@ -29,14 +28,17 @@ function findNext(sessions: readonly SessionDto[], now: Date): SessionDto | null
   );
 }
 
-function formatRemaining(end: Date, now: Date): string {
+/**
+ * Label "Fin dans Xh YY" — calqué proto `session.remainingLabel`.
+ */
+function formatEndsIn(end: Date, now: Date): string {
   const minutes = differenceInMinutes(end, now);
   if (minutes <= 0) return 'Terminée';
-  if (minutes < 60) return `Encore ${minutes} min`;
+  if (minutes < 60) return `Fin dans ${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  if (rest === 0) return `Encore ${hours} h`;
-  return `Encore ${hours} h ${String(rest).padStart(2, '0')}`;
+  if (rest === 0) return `Fin dans ${hours} h`;
+  return `Fin dans ${hours}h ${String(rest).padStart(2, '0')}`;
 }
 
 function computeProgressPct(start: Date, end: Date, now: Date): number {
@@ -46,6 +48,16 @@ function computeProgressPct(start: Date, end: Date, now: Date): number {
   const pct = (elapsed / total) * 100;
   return Math.max(0, Math.min(100, pct));
 }
+
+const CATEGORY_LABEL: Record<SessionDto['type'], string> = {
+  CM: 'Cours',
+  TD: 'Cours',
+  TP: 'Cours',
+  EXAM: 'Éval',
+  RATTRAP: 'Éval',
+  DEVOIR: 'Éval',
+  EVENT: 'Événement',
+};
 
 export function HeroCurrentSession({ sessions, now = new Date() }: HeroCurrentSessionProps) {
   const current = findCurrent(sessions, now);
@@ -74,81 +86,75 @@ export function HeroCurrentSession({ sessions, now = new Date() }: HeroCurrentSe
     );
   }
 
-  const palette = paletteForSession(current.module.id, current.type);
   const start = new Date(current.startAt);
   const end = new Date(current.endAt);
   const progressPct = computeProgressPct(start, end, now);
-  const remainingLabel = formatRemaining(end, now);
+  const endsInLabel = formatEndsIn(end, now);
+  const categoryLabel = CATEGORY_LABEL[current.type];
 
   return (
     <section
       aria-labelledby="hero-current-title"
-      className="relative overflow-hidden rounded-2xl border shadow-sm"
-      style={{ background: palette.bg, borderColor: palette.border, color: palette.text }}
+      className="relative overflow-hidden rounded-2xl text-white shadow-[0_8px_24px_-8px_rgba(107,45,14,0.45)]"
+      style={{
+        background: 'linear-gradient(135deg, #6B2D0E 0%, #8B3A12 100%)',
+      }}
     >
+      {/* Halo radial décoratif top-right (calqué proto variant bold) */}
       <span
         aria-hidden
-        className="absolute inset-y-0 left-0 w-1.5"
-        style={{ background: palette.bar }}
+        className="pointer-events-none absolute -right-10 -top-10 size-44 rounded-full"
+        style={{
+          background: 'radial-gradient(circle, rgba(232,98,10,0.4) 0%, transparent 70%)',
+        }}
       />
-      <div className="flex flex-col gap-3 px-6 py-6 pl-8">
+
+      <div className="relative flex flex-col gap-3 px-6 py-5">
         {/* Header : badge EN COURS + temps restant */}
         <div className="flex items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
             <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-white" />
             En cours
           </span>
-          <span
-            className="text-[12.5px] font-semibold tabular-nums"
-            style={{ color: palette.text, opacity: 0.85 }}
-          >
-            {remainingLabel}
+          <span className="text-[12.5px] font-semibold tabular-nums text-white/90">
+            {endsInLabel}
           </span>
         </div>
 
-        {/* Titre module + classe/type */}
-        <div>
-          <h2
-            id="hero-current-title"
-            className="font-display text-xl font-semibold leading-tight tracking-tight sm:text-2xl"
-            style={{ color: palette.text }}
-          >
-            {current.module.name}
-          </h2>
-          <p className="mt-1 text-sm" style={{ color: palette.text, opacity: 0.75 }}>
-            {current.classe.code} · {current.type}
-          </p>
+        {/* Titre module */}
+        <h2
+          id="hero-current-title"
+          className="font-display text-xl font-semibold leading-tight tracking-tight sm:text-[22px]"
+        >
+          {current.module.name}
+        </h2>
+
+        {/* Classe en pill tinted blanc semi-transparent */}
+        <div className="flex flex-wrap gap-1.5">
+          <span className="inline-flex items-center rounded-md border border-white/30 bg-white/[0.18] px-2 py-0.5 text-[11px] font-semibold tracking-wide text-white">
+            {current.classe.code}
+          </span>
         </div>
 
         {/* Lieu */}
-        <div
-          className="flex items-center gap-1.5 text-sm"
-          style={{ color: palette.text, opacity: 0.85 }}
-        >
-          <MapPinIcon size={14} color="currentColor" />
+        <div className="flex items-center gap-1.5 text-[13px] text-white/80">
+          <MapPinIcon size={13} color="currentColor" />
           <span>{current.salle.name}</span>
         </div>
 
-        {/* Horaire + type pill */}
-        <div className="flex items-center justify-between">
-          <span
-            className="text-sm font-medium tabular-nums"
-            style={{ color: palette.text, opacity: 0.85 }}
-          >
+        {/* Horaire + catégorie en pied */}
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-[13px] font-medium tabular-nums text-white/80">
             {format(start, 'HH:mm', { locale: fr })} – {format(end, 'HH:mm', { locale: fr })}
           </span>
-          <span
-            className="rounded px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider"
-            style={{ background: 'rgba(255,255,255,0.55)', color: palette.text }}
-          >
-            {current.type}
+          <span className="rounded-md bg-white/[0.18] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+            {categoryLabel}
           </span>
         </div>
 
         {/* Barre de progression */}
         <div
-          className="h-1 overflow-hidden rounded-full"
-          style={{ background: 'rgba(255,255,255,0.45)' }}
+          className="h-1 overflow-hidden rounded-full bg-white/[0.18]"
           role="progressbar"
           aria-valuenow={Math.round(progressPct)}
           aria-valuemin={0}
@@ -156,8 +162,8 @@ export function HeroCurrentSession({ sessions, now = new Date() }: HeroCurrentSe
           aria-label="Avancement de la séance"
         >
           <div
-            className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${progressPct}%`, background: palette.bar }}
+            className="h-full rounded-full bg-accent transition-all duration-700"
+            style={{ width: `${progressPct}%` }}
           />
         </div>
       </div>
