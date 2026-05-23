@@ -14,20 +14,7 @@ export interface PlanningUpdateModalProps {
 
 const MAX_VISIBLE = 4;
 
-/**
- * Modale "Planning mis à jour" — affichée quand le RP republie le planning.
- *
- * Inspirée de `PLANIT-Design/shared/components/planning-update-modal.jsx` :
- * - Backdrop semi-transparent + blur
- * - Card centrée avec liste des séances modifiées
- * - Fermeture : bouton, clic backdrop, Escape
- *
- * Reçoit les séances depuis le payload WebSocket `session:published`.
- * Si le serveur ne fournit pas la liste, la modale affiche un message
- * générique invitant à rafraîchir le planning.
- */
 export function PlanningUpdateModal({ open, sessions, onClose }: PlanningUpdateModalProps) {
-  // Fermeture sur Escape
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -37,7 +24,6 @@ export function PlanningUpdateModal({ open, sessions, onClose }: PlanningUpdateM
     return () => document.removeEventListener('keydown', handler);
   }, [open, onClose]);
 
-  // Lock body scroll quand ouvert
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
@@ -59,7 +45,6 @@ export function PlanningUpdateModal({ open, sessions, onClose }: PlanningUpdateM
       aria-labelledby="planning-update-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
-      {/* Backdrop */}
       <button
         type="button"
         aria-label="Fermer"
@@ -67,9 +52,7 @@ export function PlanningUpdateModal({ open, sessions, onClose }: PlanningUpdateM
         className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
       />
 
-      {/* Card */}
       <div className="relative z-10 flex w-full max-w-md flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-2xl">
-        {/* Header */}
         <div className="flex items-start gap-3">
           <span
             aria-hidden
@@ -98,7 +81,6 @@ export function PlanningUpdateModal({ open, sessions, onClose }: PlanningUpdateM
           </div>
         </div>
 
-        {/* Liste des séances modifiées */}
         {visible.length > 0 ? (
           <ul className="flex flex-col gap-2">
             {visible.map((session) => {
@@ -143,7 +125,6 @@ export function PlanningUpdateModal({ open, sessions, onClose }: PlanningUpdateM
           </p>
         )}
 
-        {/* CTA */}
         <button
           type="button"
           onClick={onClose}

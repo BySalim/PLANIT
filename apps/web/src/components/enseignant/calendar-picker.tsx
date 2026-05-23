@@ -1,9 +1,10 @@
 'use client';
 
-import { addMonths, endOfMonth, format, isSameDay, startOfMonth } from 'date-fns';
+import { addMonths, endOfMonth, format, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useEffect, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@planit/ui';
+import { now as nowDakar } from '@planit/utils/date';
 import { cn } from '@/lib/utils';
 
 export interface CalendarPickerProps {
@@ -27,18 +28,15 @@ function buildCells(viewYear: number, viewMonth: number): readonly DayCell[] {
   const daysInMonth = endOfMonth(firstDay).getDate();
   const cells: DayCell[] = [];
 
-  // Jours du mois précédent (gris)
   for (let i = 0; i < startDow; i++) {
     cells.push({
       date: new Date(viewYear, viewMonth, 1 - startDow + i),
       inMonth: false,
     });
   }
-  // Jours du mois courant
   for (let i = 1; i <= daysInMonth; i++) {
     cells.push({ date: new Date(viewYear, viewMonth, i), inMonth: true });
   }
-  // Compléter la dernière semaine
   while (cells.length % 7 !== 0) {
     const last = cells[cells.length - 1];
     if (!last) break;
@@ -49,21 +47,16 @@ function buildCells(viewYear: number, viewMonth: number): readonly DayCell[] {
   return cells;
 }
 
-/**
- * Picker date simplifié — calque proto CalendarPicker mode="day" uniquement.
- * (V1 sans les modes month/year picker — hors-vague.)
- */
 export function CalendarPicker({
   open,
   selectedDate,
-  today = new Date(),
+  today = nowDakar(),
   onSelect,
   onClose,
 }: CalendarPickerProps) {
   const [viewMonth, setViewMonth] = useState(selectedDate.getMonth());
   const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
 
-  // Sync sur ouverture
   useEffect(() => {
     if (open) {
       setViewMonth(selectedDate.getMonth());
@@ -71,7 +64,6 @@ export function CalendarPicker({
     }
   }, [open, selectedDate]);
 
-  // Fermeture sur Escape
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -104,7 +96,6 @@ export function CalendarPicker({
         className="w-full max-w-sm overflow-hidden rounded-2xl border border-border-soft bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header navigation */}
         <div className="flex items-center gap-1.5 border-b border-border-soft p-3">
           <button
             type="button"
@@ -134,7 +125,6 @@ export function CalendarPicker({
           </button>
         </div>
 
-        {/* Initiales jours */}
         <div className="grid grid-cols-7 gap-1 px-2.5 pb-1 pt-2">
           {DAY_INITIALS.map((d, i) => (
             <div key={i} className="text-center text-[10px] font-semibold text-text-muted">
@@ -143,7 +133,6 @@ export function CalendarPicker({
           ))}
         </div>
 
-        {/* Cellules */}
         <div className="grid grid-cols-7 gap-1 px-2.5 pb-3">
           {cells.map(({ date, inMonth }, i) => {
             const isToday = isSameDay(date, today);
@@ -173,7 +162,6 @@ export function CalendarPicker({
           })}
         </div>
 
-        {/* Footer */}
         <button
           type="button"
           onClick={onClose}

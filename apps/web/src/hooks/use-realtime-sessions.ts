@@ -13,36 +13,11 @@ interface SessionPublishedPayload {
 }
 
 export interface UseRealtimeSessionsOptions {
-  /**
-   * Callback appelé à la réception d'un event `session:published`.
-   * Reçoit la liste des séances modifiées si le serveur la fournit
-   * (sinon undefined). Permet d'afficher une modale de diff, par ex.
-   */
   readonly onPublished?: (payload: SessionPublishedPayload) => void;
-  /**
-   * Si `true` (défaut), affiche un toast `success` à chaque event.
-   * Mettre à `false` quand un callback `onPublished` gère son propre UI.
-   */
+  /** Désactivé quand `onPublished` gère son propre UI. */
   readonly showToast?: boolean;
 }
 
-/**
- * E.5 — Connecte le client au WebSocket backend pour recevoir les
- * mises à jour temps réel du planning.
- *
- * Côté serveur (cf. backend) :
- *   - room `user:${userId}` : l'utilisateur ne reçoit que les events
- *     qui le concernent.
- *   - event `session:published` émis quand un RP publie une séance.
- *
- * Côté client :
- *   - Invalidation de toutes les queries `planningKeys.all` → TanStack
- *     refetch transparent (sessions de la semaine, stats, détail).
- *   - Toast in-app "Le planning a été mis à jour" (variant success).
- *
- * Le hook est no-op si `userId` est `null` (pas d'utilisateur courant).
- * Voir `docs/specs/VAGUE-01-02-enseignant.md` — décisions L3.
- */
 export function useRealtimeSessions(
   userId: string | null,
   options: UseRealtimeSessionsOptions = {},
@@ -56,11 +31,7 @@ export function useRealtimeSessions(
       return;
     }
 
-    const socket: Socket = io(API_BASE, {
-      auth: { userId },
-      // Reconnexion gérée par défaut par socket.io-client ;
-      // on garde les valeurs par défaut (reconnection: true, infini).
-    });
+    const socket: Socket = io(API_BASE, { auth: { userId } });
 
     socket.on('session:published', (payload?: SessionPublishedPayload) => {
       queryClient.invalidateQueries({ queryKey: planningKeys.all });

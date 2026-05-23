@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils';
 
 export interface MobileShellProps {
   readonly children: React.ReactNode;
-  /** Compteur badge cloche (0 = pas de badge, V1-D5 : pas de notifications). */
   readonly unread?: number;
 }
 
@@ -24,7 +23,6 @@ const TABS: readonly TabDef[] = [
   { id: 'planning', label: 'Planning', href: '/enseignant/planning', icon: CalendarIcon },
 ];
 
-/** Extrait les initiales d'un nom complet — "M. Oumar Ndiaye" → "ON". */
 function initialsFor(fullName: string): string {
   const clean = fullName.replace(/^(M\.|Mme|Mlle|Pr\.|Dr\.)\s+/i, '');
   const parts = clean.split(/\s+/).filter(Boolean);
@@ -34,16 +32,7 @@ function initialsFor(fullName: string): string {
   return (first + last).toUpperCase();
 }
 
-/**
- * Layout mobile pour les pages enseignant (calqué PLANIT-Design/enseignant/screens/app.jsx).
- *
- * Structure :
- * - Header sticky : logo PLANIT + cloche + avatar
- * - Contenu scrollable centré max-w-md
- * - Tab bar flottante bottom (Accueil / Planning)
- *
- * V1-D5 : pas de notifications → cloche sans badge (unread default 0).
- */
+// Simulation mobile sur web — voir L3-D3 / TD-027.
 export function MobileShell({ children, unread = 0 }: MobileShellProps) {
   const pathname = usePathname() ?? '';
   const teacher = useCurrentTeacher();
@@ -69,8 +58,7 @@ function MobileHeader({ unread, initials }: { unread: number; initials: string }
       <Link href="/enseignant" className="flex items-center gap-2" aria-label="Accueil enseignant">
         <span
           aria-hidden
-          className="flex size-9 items-center justify-center rounded-lg text-white"
-          style={{ background: 'linear-gradient(135deg, #6B2D0E 0%, #E8620A 100%)' }}
+          className="bg-brand-gradient flex size-9 items-center justify-center rounded-lg text-white"
         >
           <CalendarIcon size={18} color="currentColor" />
         </span>
@@ -122,16 +110,9 @@ function MobileTabBar({ activeId, unread }: { activeId: TabDef['id'] | null; unr
               className={cn(
                 'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full text-[13px] font-semibold transition-all duration-200',
                 active
-                  ? 'px-4 py-2.5 text-white shadow-[0_4px_14px_rgba(107,45,14,0.45)]'
+                  ? 'bg-brand-gradient-deep px-4 py-2.5 text-white shadow-[0_4px_14px_rgba(107,45,14,0.45)]'
                   : 'px-3.5 py-2.5 text-text/50',
               )}
-              style={
-                active
-                  ? {
-                      background: 'linear-gradient(155deg, #7A3410 0%, #6B2D0E 55%, #5A2509 100%)',
-                    }
-                  : undefined
-              }
             >
               <span className="relative inline-flex">
                 <Icon size={20} color="currentColor" />

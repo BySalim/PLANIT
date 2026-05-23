@@ -57,3 +57,15 @@ body {
   color: var(--color-text);
   font-family: var(--font-sans);
 }
+
+@utility bg-brand-gradient {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+}
+
+@utility bg-brand-gradient-deep {
+  background: linear-gradient(155deg, #7a3410 0%, var(--color-primary) 55%, #5a2509 100%);
+}
+
+@utility bg-brand-gradient-warm {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+}
