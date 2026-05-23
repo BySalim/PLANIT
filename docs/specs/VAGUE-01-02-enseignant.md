@@ -16,13 +16,17 @@
 
 ## Décisions V1 (validées avec Oumy)
 
-| ID    | Décision                                                    | Justification                                                                                                         |
-| ----- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| L3-D1 | Teacher ID hardcodé = `seed-teacher-algo` (M. Oumar Ndiaye) | V1-D2 — pas d'auth. Tech-debt pour Vague 02 (contexte d'auth).                                                        |
-| L3-D2 | `socket.io-client@^4.8.1` ajouté à `apps/web`               | Même version que backend NestJS pour cohérence. Décision sensible validée.                                            |
-| L3-D3 | Layout `<Shell>` réutilisé (sidebar + topbar Libasse)       | Cohérence UI avec `/rp`. Le Design mobile-first est porté dans la zone main, sans changer l'architecture.             |
-| L3-D4 | Pas de formulaires modify/cancel sur le détail séance       | V1 backend n'expose pas d'endpoint "demande de modification". Le Design les montre mais ils sont hors scope V1.       |
-| L3-D5 | Pas de notifications dans le DOM                            | V1-D5 — pas de système notif. L'icône cloche reste dans la topbar (de Libasse) mais sans badge actif côté enseignant. |
+> ⚠ **La vue web `/enseignant` et `/etudiant` est une simulation mobile** — elle existe pour démontrer l'UX cible en attendant l'app Expo (Vague 04). Le shell est volontairement étroit (`max-w-md`) et bottom-tabbed pour reproduire le rendu mobile sur navigateur.
+
+| ID    | Décision                                                                            | Justification                                                                                                                                                       |
+| ----- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| L3-D1 | Teacher ID hardcodé = `seed-teacher-algo` (M. Oumar Ndiaye)                         | V1-D2 — pas d'auth. Tech-debt pour Vague 02 (contexte d'auth).                                                                                                      |
+| L3-D2 | `socket.io-client@^4.8.1` ajouté à `apps/web`                                       | Même version que backend NestJS pour cohérence. Décision sensible validée.                                                                                          |
+| L3-D3 | **`<MobileShell>` custom** (header sticky + tab-bar flottante) au lieu de `<Shell>` | La vue web enseignant/étudiant simule le rendu mobile cible. Le `<Shell>` desktop (sidebar+topbar) reviendra en V2 quand l'app Expo prendra le relai. Tracé TD-027. |
+| L3-D4 | Pas de formulaires modify/cancel sur le détail séance                               | V1 backend n'expose pas d'endpoint "demande de modification". Le Design les montre mais ils sont hors scope V1.                                                     |
+| L3-D5 | Pas de notifications dans le DOM                                                    | V1-D5 — pas de système notif. La cloche du `<MobileShell>` reste sans badge actif.                                                                                  |
+| L3-D6 | `date-fns@^4.1.0` ajouté à `apps/web`                                               | Manipulation pure de dates (`addDays`, `startOfWeek`, `format`, `isSameDay`). `@planit/utils/date` reste obligatoire pour `now()` (fuseau Africa/Dakar).            |
+| L3-D7 | `<PlanningUpdateModal>` à la place du simple toast (E.6)                            | UX plus visible quand l'enseignant n'est pas focus sur l'app. Le toast reste disponible (option `showToast` du hook).                                               |
 
 ## Architecture des composants
 
@@ -37,12 +41,19 @@ app/(planit)/enseignant/
 
 ### Composants nouveaux
 
-| Composant                    | Fichier                                          | Props                          | Référence                   |
-| ---------------------------- | ------------------------------------------------ | ------------------------------ | --------------------------- |
-| `<HeroCurrentSession>`       | `components/enseignant/hero-current-session.tsx` | `{ sessions, teacherId }`      | `home.jsx#HeroCard`         |
-| `<SessionsTodayList>`        | `components/enseignant/sessions-today-list.tsx`  | `{ sessions, onSessionClick }` | `home.jsx` (liste)          |
-| `<SessionDetailView>`        | `components/enseignant/session-detail-view.tsx`  | `{ session }`                  | `session-detail.jsx#detail` |
-| `<Toast>`, `<ToastProvider>` | `components/ui/toast.tsx` + `toast-provider.tsx` | —                              | —                           |
+| Composant                    | Fichier                                           | Props                           | Référence                    |
+| ---------------------------- | ------------------------------------------------- | ------------------------------- | ---------------------------- |
+| `<MobileShell>`              | `components/enseignant/mobile-shell.tsx`          | `{ children, unread? }`         | `enseignant/app.jsx`         |
+| `<Greeting>`                 | `components/enseignant/greeting.tsx`              | `{ fullName, now }`             | `home.jsx`                   |
+| `<HeroCurrentSession>`       | `components/enseignant/hero-current-session.tsx`  | `{ sessions, now }`             | `home.jsx#HeroCard`          |
+| `<SessionsTodayList>`        | `components/enseignant/sessions-today-list.tsx`   | `{ sessions, onSessionClick }`  | `home.jsx` (liste)           |
+| `<WeekStrip>`                | `components/enseignant/week-strip.tsx`            | `{ sessions, now, onDayClick }` | `home.jsx` (bande jours)     |
+| `<DayTimeline>`              | `components/enseignant/day-timeline.tsx`          | `{ date, sessions, now, ... }`  | `planning.jsx` (vue jour)    |
+| `<WeekTimeline>`             | `components/enseignant/week-timeline.tsx`         | `{ weekStart, sessions, ... }`  | `planning.jsx` (vue semaine) |
+| `<CalendarPicker>`           | `components/enseignant/calendar-picker.tsx`       | `{ open, selectedDate, ... }`   | `planning.jsx` (datepicker)  |
+| `<SessionDetailView>`        | `components/enseignant/session-detail-view.tsx`   | `{ session }`                   | `session-detail.jsx#detail`  |
+| `<PlanningUpdateModal>`      | `components/enseignant/planning-update-modal.tsx` | `{ open, sessions, onClose }`   | —                            |
+| `<Toast>`, `<ToastProvider>` | `components/ui/toast.tsx` + `toast-provider.tsx`  | —                               | —                            |
 
 ### Hooks nouveaux
 
@@ -54,12 +65,7 @@ app/(planit)/enseignant/
 
 ### Composants réutilisés (LOT 2 — Libasse)
 
-- `<Shell>` — layout principal (sidebar + topbar)
-- `<PlanningGrid>` — grille jours × heures
-- `<WeekNavigator>` — navigation prev/next semaine
-- `<PlanningFooter>` (alias `<StatsBar>`) — compteurs en bas
-- `<SessionCard>` — carte séance individuelle
-- `<SessionDetailDrawer>` — drawer LOT 2 (optionnel, ou full page)
+- Aucun pour cette vague côté `/enseignant` — le `<MobileShell>` remplace `<Shell>`, les timelines mobiles remplacent `<PlanningGrid>`/`<WeekNavigator>`. Les composants RP restent intacts. Cf. TD-027 pour le retour au shell desktop en V2.
 
 ## API consommée
 
@@ -88,8 +94,9 @@ socket.on('session:published', ({ sessions }: { sessions: SessionDto[] }) => {
 
 - Tous les tokens via `@planit/design-tokens` (déjà importés dans `globals.css`)
 - Couleurs types séance : utilise les mappings établis dans `<SessionCard>` (LOT 2)
-- Pas de nouveau token requis
+- Nouvelle utility `@utility bg-brand-gradient` dans `globals.css` (gradient marron→orange via tokens, plus de hex en dur dans les composants)
 - Toast : couleur `success` (vert) pour les events de publication
+- **Fuseau** : tous les `now` passent par `now()` de `@planit/utils/date` (Africa/Dakar) — `new Date()` interdit pour le moment courant
 
 ## Définition de Done
 
@@ -108,4 +115,5 @@ socket.on('session:published', ({ sessions }: { sessions: SessionDto[] }) => {
 - ❌ Auth réelle
 - ❌ Notifications push réelles
 - ❌ Module progress block (Design `home.jsx`)
-- ❌ WeekStrip mobile (Design `home.jsx` — overlapping avec `<WeekNavigator>` existant)
+- ❌ Shell desktop pour `/enseignant` et `/etudiant` (V2 — voir TD-027)
+- ❌ App mobile Expo (Vague 04)

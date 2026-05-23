@@ -6,6 +6,7 @@ import { addDays, format, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CalendarIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
+import { now as nowDakar } from '@planit/utils/date';
 import { CalendarPicker } from '@/components/enseignant/calendar-picker';
 import { DayTimeline } from '@/components/enseignant/day-timeline';
 import { MobileShell } from '@/components/enseignant/mobile-shell';
@@ -27,7 +28,6 @@ const FILTER_LABEL: Record<TypeFilter, string> = {
   event: 'Évén.',
 };
 
-// Next.js App Router requires default export for page
 // eslint-disable-next-line no-restricted-syntax
 export default function EnseignantPlanningPage() {
   const router = useRouter();
@@ -35,12 +35,11 @@ export default function EnseignantPlanningPage() {
   const toast = useToast();
 
   const [view, setView] = useState<ViewMode>('day');
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => nowDakar());
   const [showCalendar, setShowCalendar] = useState(false);
-  // V1 — filtre affiché mais inactif (hors-vague, RP-only)
+  // Filtre affiché mais inactif — TD-019.
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
 
-  // Modale "Planning mis à jour" sur event WebSocket
   const [updateModal, setUpdateModal] = useState<{
     open: boolean;
     sessions: readonly SessionDto[];
@@ -55,7 +54,7 @@ export default function EnseignantPlanningPage() {
     showToast: false,
   });
 
-  const now = useMemo(() => new Date(), []);
+  const now = useMemo(() => nowDakar(), []);
   const weekStart = useMemo(() => startOfWeek(selectedDate, { weekStartsOn: 1 }), [selectedDate]);
 
   const { data } = useWeekSessionsQuery(weekStart, { teacherId: teacher.id });
@@ -80,9 +79,7 @@ export default function EnseignantPlanningPage() {
   return (
     <MobileShell>
       <div className="relative flex flex-col">
-        {/* Toolbar sticky : toggle + date + filtre + download */}
         <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-border-soft bg-surface px-3 py-2">
-          {/* Toggle Jour / Semaine */}
           <div className="flex rounded-[10px] border border-border-soft bg-bg p-0.5">
             {(['day', 'week'] as const).map((v) => {
               const active = view === v;
@@ -107,7 +104,6 @@ export default function EnseignantPlanningPage() {
             })}
           </div>
 
-          {/* Bouton date — ouvre CalendarPicker */}
           <button
             type="button"
             onClick={() => setShowCalendar((c) => !c)}
@@ -127,7 +123,6 @@ export default function EnseignantPlanningPage() {
 
           <div className="flex-1" />
 
-          {/* Dropdown filtre type — V1 affiché mais inactif */}
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
@@ -142,7 +137,6 @@ export default function EnseignantPlanningPage() {
             ))}
           </select>
 
-          {/* Bouton download — V1 toast bientôt disponible */}
           <button
             type="button"
             onClick={handleDownloadClick}
@@ -167,7 +161,6 @@ export default function EnseignantPlanningPage() {
           </button>
         </div>
 
-        {/* Vue Jour ou Semaine */}
         <div className="relative">
           {view === 'day' ? (
             <DayTimeline
@@ -190,7 +183,6 @@ export default function EnseignantPlanningPage() {
             />
           )}
 
-          {/* CalendarPicker modal */}
           <CalendarPicker
             open={showCalendar}
             selectedDate={selectedDate}

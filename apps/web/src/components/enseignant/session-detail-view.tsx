@@ -85,7 +85,6 @@ export function SessionDetailView({ session }: SessionDetailViewProps) {
 
   return (
     <article className="flex flex-col gap-4">
-      {/* Header : carte module colorée */}
       <header
         className="relative overflow-hidden rounded-2xl border"
         style={{ background: palette.bg, borderColor: palette.border, color: palette.text }}

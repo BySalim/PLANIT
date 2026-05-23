@@ -3,6 +3,7 @@
 import { addDays, format, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { SessionDto } from '@planit/contracts';
+import { now as nowDakar } from '@planit/utils/date';
 import { paletteForSession } from '@/lib/module-palette';
 import { cn } from '@/lib/utils';
 
@@ -80,17 +81,11 @@ export interface WeekTimelineProps {
   readonly onDaySelect?: (date: Date) => void;
 }
 
-/**
- * Timeline Semaine — calqué proto WeekTimelineView.
- * - Header sticky avec 7 jours cliquables (jour actif marron, today accent)
- * - 7 colonnes scrollables horizontalement (touch swipe)
- * - Sessions positionnées en absolute par colonne
- */
 export function WeekTimeline({
   weekStart,
   selectedDate,
   sessions,
-  now = new Date(),
+  now = nowDakar(),
   onSessionTap,
   onDaySelect,
 }: WeekTimelineProps) {
@@ -105,7 +100,6 @@ export function WeekTimeline({
 
   return (
     <div className="flex flex-col">
-      {/* Header jours (sticky top à l'intérieur du scroll vertical) */}
       <div className="sticky top-[112px] z-10 flex border-b border-border-soft bg-surface">
         <div className="flex-shrink-0" style={{ width: TIME_COL_W }} />
         <div className="flex-1 overflow-x-auto">
@@ -152,9 +146,7 @@ export function WeekTimeline({
         </div>
       </div>
 
-      {/* Grille timeline scrollable */}
       <div className="flex">
-        {/* Col heures fixe gauche */}
         <div
           className="relative flex-shrink-0 bg-surface"
           style={{ width: TIME_COL_W, height: totalHeight }}
@@ -184,7 +176,6 @@ export function WeekTimeline({
           ) : null}
         </div>
 
-        {/* 7 colonnes scroll horizontal */}
         <div className="flex-1 overflow-x-auto">
           <div className="flex" style={{ width: 7 * COL_W }}>
             {weekDates.map((date, di) => {
@@ -200,7 +191,6 @@ export function WeekTimeline({
                     background: isToday ? 'rgba(107,45,14,0.02)' : 'transparent',
                   }}
                 >
-                  {/* Lignes horaires majeures */}
                   {Array.from({ length: Math.floor(TOTAL_H / 4) }, (_, i) => i + 1).map((i) => (
                     <span
                       key={`maj-${i}`}
@@ -209,7 +199,6 @@ export function WeekTimeline({
                       style={{ top: i * 4 * HOUR_H }}
                     />
                   ))}
-                  {/* Lignes mineures */}
                   {Array.from({ length: Math.ceil(TOTAL_H / 4) }, (_, i) => i).map((i) => {
                     const y = (i * 4 + 2) * HOUR_H;
                     if (y >= totalHeight) return null;
@@ -222,7 +211,6 @@ export function WeekTimeline({
                       />
                     );
                   })}
-                  {/* Ligne now */}
                   {isToday ? (
                     <>
                       <span
@@ -237,7 +225,6 @@ export function WeekTimeline({
                       />
                     </>
                   ) : null}
-                  {/* Sessions */}
                   {daySessions.map((session) => {
                     const start = new Date(session.startAt);
                     const end = new Date(session.endAt);

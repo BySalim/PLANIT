@@ -2,6 +2,7 @@ import { differenceInMinutes, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MapPinIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
+import { now as nowDakar } from '@planit/utils/date';
 
 export interface HeroCurrentSessionProps {
   readonly sessions: readonly SessionDto[];
@@ -28,9 +29,6 @@ function findNext(sessions: readonly SessionDto[], now: Date): SessionDto | null
   );
 }
 
-/**
- * Label "Fin dans Xh YY" — calqué proto `session.remainingLabel`.
- */
 function formatEndsIn(end: Date, now: Date): string {
   const minutes = differenceInMinutes(end, now);
   if (minutes <= 0) return 'Terminée';
@@ -59,7 +57,7 @@ const CATEGORY_LABEL: Record<SessionDto['type'], string> = {
   EVENT: 'Événement',
 };
 
-export function HeroCurrentSession({ sessions, now = new Date() }: HeroCurrentSessionProps) {
+export function HeroCurrentSession({ sessions, now = nowDakar() }: HeroCurrentSessionProps) {
   const current = findCurrent(sessions, now);
 
   if (current === null) {
@@ -95,12 +93,8 @@ export function HeroCurrentSession({ sessions, now = new Date() }: HeroCurrentSe
   return (
     <section
       aria-labelledby="hero-current-title"
-      className="relative overflow-hidden rounded-2xl text-white shadow-[0_8px_24px_-8px_rgba(107,45,14,0.45)]"
-      style={{
-        background: 'linear-gradient(135deg, #6B2D0E 0%, #8B3A12 100%)',
-      }}
+      className="bg-brand-gradient-warm relative overflow-hidden rounded-2xl text-white shadow-[0_8px_24px_-8px_rgba(107,45,14,0.45)]"
     >
-      {/* Halo radial décoratif top-right (calqué proto variant bold) */}
       <span
         aria-hidden
         className="pointer-events-none absolute -right-10 -top-10 size-44 rounded-full"
@@ -110,7 +104,6 @@ export function HeroCurrentSession({ sessions, now = new Date() }: HeroCurrentSe
       />
 
       <div className="relative flex flex-col gap-3 px-6 py-5">
-        {/* Header : badge EN COURS + temps restant */}
         <div className="flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
             <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-white" />
@@ -121,7 +114,6 @@ export function HeroCurrentSession({ sessions, now = new Date() }: HeroCurrentSe
           </span>
         </div>
 
-        {/* Titre module */}
         <h2
           id="hero-current-title"
           className="font-display text-xl font-semibold leading-tight tracking-tight sm:text-[22px]"
@@ -129,20 +121,17 @@ export function HeroCurrentSession({ sessions, now = new Date() }: HeroCurrentSe
           {current.module.name}
         </h2>
 
-        {/* Classe en pill tinted blanc semi-transparent */}
         <div className="flex flex-wrap gap-1.5">
           <span className="inline-flex items-center rounded-md border border-white/30 bg-white/[0.18] px-2 py-0.5 text-[11px] font-semibold tracking-wide text-white">
             {current.classe.code}
           </span>
         </div>
 
-        {/* Lieu */}
         <div className="flex items-center gap-1.5 text-[13px] text-white/80">
           <MapPinIcon size={13} color="currentColor" />
           <span>{current.salle.name}</span>
         </div>
 
-        {/* Horaire + catégorie en pied */}
         <div className="flex items-center justify-between pt-1">
           <span className="text-[13px] font-medium tabular-nums text-white/80">
             {format(start, 'HH:mm', { locale: fr })} – {format(end, 'HH:mm', { locale: fr })}
@@ -152,7 +141,6 @@ export function HeroCurrentSession({ sessions, now = new Date() }: HeroCurrentSe
           </span>
         </div>
 
-        {/* Barre de progression */}
         <div
           className="h-1 overflow-hidden rounded-full bg-white/[0.18]"
           role="progressbar"

@@ -4,6 +4,7 @@ import { format, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MapPinIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
+import { now as nowDakar } from '@planit/utils/date';
 import { paletteForSession, categoryForType } from '@/lib/module-palette';
 import { cn } from '@/lib/utils';
 
@@ -58,7 +59,6 @@ function SessionBlock({ session, top, height, status, onTap }: SessionBlockProps
       ? 'bg-text-faint'
       : 'bg-ok';
 
-  // Seuils de densité (calqués proto comfortable)
   const showTime = height > 62;
   const showLoc = height > 78;
 
@@ -75,7 +75,6 @@ function SessionBlock({ session, top, height, status, onTap }: SessionBlockProps
       }}
       aria-label={`Séance ${session.module.name} de ${format(start, 'HH:mm')} à ${format(end, 'HH:mm')}`}
     >
-      {/* Colonne contenu */}
       <div className="flex min-w-0 flex-1 flex-col">
         <span
           className="truncate text-[13.5px] font-semibold leading-tight"
@@ -112,7 +111,6 @@ function SessionBlock({ session, top, height, status, onTap }: SessionBlockProps
           </span>
         ) : null}
       </div>
-      {/* Colonne droite : dot + catégorie */}
       <div className="flex flex-shrink-0 flex-col items-end justify-between py-0.5">
         <span aria-hidden className={cn('block size-1.5 rounded-full', statusDot)} />
         <span className="text-[9.5px] font-bold uppercase tracking-wider text-text-muted">
@@ -130,24 +128,16 @@ export interface DayTimelineProps {
   readonly onSessionTap?: (session: SessionDto) => void;
 }
 
-/**
- * Timeline verticale Jour — calqué PLANIT-Design/enseignant/screens/planning.jsx#DayTimelineView.
- * - Colonne heures (8h → 21h, étiquettes toutes les 2h)
- * - Sessions positionnées en absolute via timeToY()
- * - Ligne "now" rouge si on est aujourd'hui
- */
-export function DayTimeline({ date, sessions, now = new Date(), onSessionTap }: DayTimelineProps) {
+export function DayTimeline({ date, sessions, now = nowDakar(), onSessionTap }: DayTimelineProps) {
   const isToday = isSameDay(date, now);
   const nowY = timeToY(now);
   const totalHeight = TOTAL_H * HOUR_H;
 
-  // Étiquettes : toutes les 2h (8, 10, 12, ..., 20)
   const labelHours = Array.from(
     { length: Math.ceil(TOTAL_H / 2) + 1 },
     (_, i) => START_H + i * 2,
   ).filter((h) => h < END_H);
 
-  // Filtre les sessions du jour
   const daySessions = sessions.filter((s) => isSameDay(new Date(s.startAt), date));
 
   function statusFor(session: SessionDto): 'past' | 'ongoing' | 'upcoming' {
@@ -164,7 +154,6 @@ export function DayTimeline({ date, sessions, now = new Date(), onSessionTap }: 
 
   return (
     <div className="flex bg-bg">
-      {/* Colonne heures */}
       <div
         className="relative flex-shrink-0 bg-bg"
         style={{ width: TIME_COL_W, height: totalHeight }}
@@ -194,9 +183,7 @@ export function DayTimeline({ date, sessions, now = new Date(), onSessionTap }: 
         ) : null}
       </div>
 
-      {/* Zone sessions */}
       <div className="relative flex-1 border-l border-border-soft" style={{ height: totalHeight }}>
-        {/* Lignes horizontales majeures (toutes les 4h) */}
         {Array.from({ length: Math.floor(TOTAL_H / 4) }, (_, i) => i + 1).map((i) => (
           <span
             key={`maj-${i}`}
@@ -205,7 +192,6 @@ export function DayTimeline({ date, sessions, now = new Date(), onSessionTap }: 
             style={{ top: i * 4 * HOUR_H }}
           />
         ))}
-        {/* Lignes mineures (entre les majeures) */}
         {Array.from({ length: Math.ceil(TOTAL_H / 4) }, (_, i) => i).map((i) => {
           const y = (i * 4 + 2) * HOUR_H;
           if (y >= totalHeight) return null;
@@ -218,7 +204,6 @@ export function DayTimeline({ date, sessions, now = new Date(), onSessionTap }: 
             />
           );
         })}
-        {/* Ligne "now" */}
         {isToday ? (
           <>
             <span
@@ -233,7 +218,6 @@ export function DayTimeline({ date, sessions, now = new Date(), onSessionTap }: 
             />
           </>
         ) : null}
-        {/* Sessions */}
         {daySessions.map((session) => {
           const start = new Date(session.startAt);
           const end = new Date(session.endAt);
