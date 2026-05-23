@@ -11,8 +11,12 @@ async function bootstrap(): Promise<void> {
 
   app.useGlobalPipes(new ZodValidationPipe());
 
+  const isProd = process.env['NODE_ENV'] === 'production';
+  const frontendUrl = process.env['FRONTEND_URL'];
   app.enableCors({
-    origin: process.env['FRONTEND_URL'] ?? 'http://localhost:3000',
+    origin: isProd
+      ? (frontendUrl ?? 'http://localhost:3000')
+      : (frontendUrl ?? /^http:\/\/localhost:\d+$/),
     credentials: true,
   });
 
