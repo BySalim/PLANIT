@@ -2,6 +2,7 @@ import { differenceInMinutes, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MapPinIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
+import { now as nowDakar } from '@planit/utils/date';
 import { categoryForType, paletteForSession, type SessionCategory } from '@/lib/module-palette';
 import { cn } from '@/lib/utils';
 
@@ -22,7 +23,6 @@ function statusFor(session: SessionDto, now: Date): SessionStatus {
   return 'upcoming';
 }
 
-/** "2h" / "1h30" / "30min" — calque proto enseignant/components/session-card.jsx. */
 function formatDuration(start: Date, end: Date): string {
   const minutes = differenceInMinutes(end, start);
   const h = Math.floor(minutes / 60);
@@ -38,12 +38,6 @@ const CATEGORY_LABEL: Record<SessionCategory, string> = {
   evenement: 'Event',
 };
 
-/**
- * Couleur du dot d'état (top-right de la carte) :
- * - en cours → accent orange pulse
- * - à venir → ok vert
- * - passée → text-faint gris
- */
 const DOT_CLASS: Record<SessionStatus, string> = {
   current: 'bg-accent ring-2 ring-accent/30 animate-pulse',
   upcoming: 'bg-ok',
@@ -53,7 +47,7 @@ const DOT_CLASS: Record<SessionStatus, string> = {
 export function SessionsTodayList({
   sessions,
   onSessionClick,
-  now = new Date(),
+  now = nowDakar(),
 }: SessionsTodayListProps) {
   if (sessions.length === 0) {
     return (
@@ -112,14 +106,12 @@ export function SessionsTodayList({
                   borderColor: isPast ? 'var(--color-border)' : palette.border,
                 }}
               >
-                {/* Bande latérale colorée */}
                 <span
                   aria-hidden
                   className="w-1 flex-shrink-0"
                   style={{ background: palette.bar }}
                 />
 
-                {/* Colonne horaire 3 lignes */}
                 <div className="flex w-12 flex-shrink-0 flex-col justify-center py-3 text-text tabular-nums">
                   <span className="text-[15px] font-semibold leading-tight">
                     {format(start, 'HH:mm', { locale: fr })}
@@ -130,7 +122,6 @@ export function SessionsTodayList({
                   <span className="mt-1 text-[10px] font-semibold text-text-faint">{duration}</span>
                 </div>
 
-                {/* Centre : titre + classe + lieu */}
                 <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 py-3">
                   <p className="truncate text-[14px] font-semibold" style={{ color: palette.text }}>
                     {session.module.name}
@@ -156,7 +147,6 @@ export function SessionsTodayList({
                   </div>
                 </div>
 
-                {/* Droite : dot état (top) + catégorie (bottom) */}
                 <div className="flex flex-shrink-0 flex-col items-end justify-between py-3 pr-3">
                   <span
                     aria-hidden

@@ -1,6 +1,7 @@
 import { addDays, format, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { SessionDto } from '@planit/contracts';
+import { now as nowDakar } from '@planit/utils/date';
 import { categoryForType } from '@/lib/module-palette';
 import { cn } from '@/lib/utils';
 import { getCurrentWeekStart } from '@/lib/week';
@@ -33,9 +34,9 @@ function buildWeekCells(
     const daySessions = sessions.filter((s) => isSameDay(new Date(s.startAt), date));
     return {
       date,
-      initial: format(date, 'EEEEEE', { locale: fr }), // 2 lettres (lu, ma, ...)
+      initial: format(date, 'EEEEEE', { locale: fr }),
       num: date.getDate(),
-      month: format(date, 'MMM', { locale: fr }), // jan, fév, mar...
+      month: format(date, 'MMM', { locale: fr }),
       count: daySessions.length,
       hasEvaluation: daySessions.some((s) => categoryForType(s.type) === 'evaluation'),
       isToday: isSameDay(date, today),
@@ -43,7 +44,7 @@ function buildWeekCells(
   });
 }
 
-export function WeekStrip({ sessions, now = new Date(), onDayClick }: WeekStripProps) {
+export function WeekStrip({ sessions, now = nowDakar(), onDayClick }: WeekStripProps) {
   const weekStart = getCurrentWeekStart(now);
   const days = buildWeekCells(sessions, weekStart, now);
 

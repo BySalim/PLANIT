@@ -176,10 +176,7 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
           style={{ transition: 'padding .22s ease' }}
         >
           <div className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-sb-dark-2">
-            <div
-              className="flex h-8 w-8 items-center justify-center rounded-lg"
-              style={{ background: 'linear-gradient(135deg, #6B2D0E 0%, #E8620A 100%)' }}
-            >
+            <div className="bg-brand-gradient flex h-8 w-8 items-center justify-center rounded-lg">
               <span className="font-display text-[13px] font-bold leading-none tracking-tight text-white">
                 P
               </span>

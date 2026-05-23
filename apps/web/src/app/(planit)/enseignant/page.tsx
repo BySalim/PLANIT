@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { isSameDay } from 'date-fns';
 import type { SessionDto } from '@planit/contracts';
+import { now as nowDakar } from '@planit/utils/date';
 import { Greeting } from '@/components/enseignant/greeting';
 import { HeroCurrentSession } from '@/components/enseignant/hero-current-session';
 import { MobileShell } from '@/components/enseignant/mobile-shell';
@@ -15,28 +17,16 @@ import { useRealtimeSessions } from '@/hooks/use-realtime-sessions';
 import { useWeekSessionsQuery } from '@/lib/queries';
 import { getCurrentWeekStart } from '@/lib/week';
 
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
 function filterTodaySessions(sessions: readonly SessionDto[], now: Date): readonly SessionDto[] {
   return sessions.filter((s) => isSameDay(new Date(s.startAt), now));
 }
 
-// Next.js App Router requires default export for page
 // eslint-disable-next-line no-restricted-syntax
 export default function EnseignantHomePage() {
   const router = useRouter();
   const teacher = useCurrentTeacher();
 
-  // Modale "Planning mis à jour" : déclenchée par l'event WebSocket
-  // `session:published`. Le toast par défaut est désactivé puisque la
-  // modale prend le relai (UX plus visible quand l'enseignant n'est
-  // pas focus sur l'app).
+  // Modale au lieu du toast — UX plus visible quand l'enseignant n'est pas focus.
   const [updateModal, setUpdateModal] = useState<{
     open: boolean;
     sessions: readonly SessionDto[];
@@ -51,7 +41,7 @@ export default function EnseignantHomePage() {
     showToast: false,
   });
 
-  const now = useMemo(() => new Date(), []);
+  const now = useMemo(() => nowDakar(), []);
   const weekStart = useMemo(() => getCurrentWeekStart(now), [now]);
 
   const { data, isLoading, isError } = useWeekSessionsQuery(weekStart, {
@@ -68,7 +58,6 @@ export default function EnseignantHomePage() {
   return (
     <MobileShell>
       <div className="flex flex-col gap-4 px-4 py-4">
-        {/* Greeting — date + nom (calqué proto enseignant/home.jsx) */}
         <Greeting fullName={teacher.fullName} now={now} />
 
         {isLoading ? (
@@ -84,17 +73,14 @@ export default function EnseignantHomePage() {
           </div>
         ) : (
           <>
-            {/* Hero : séance en cours ou message d'attente */}
             <HeroCurrentSession sessions={todaySessions} now={now} />
 
-            {/* Section : séances du jour */}
             <SessionsTodayList
               sessions={todaySessions}
               now={now}
               onSessionClick={handleSessionClick}
             />
 
-            {/* Section : aperçu de la semaine */}
             <div className="flex flex-col gap-2">
               <div className="flex items-baseline justify-between px-1">
                 <h3 className="text-[13px] font-medium text-text">Dans la semaine</h3>

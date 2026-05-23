@@ -9,7 +9,6 @@ import { useCurrentTeacher } from '@/hooks/use-current-teacher';
 import { useRealtimeSessions } from '@/hooks/use-realtime-sessions';
 import { useSessionDetailQuery } from '@/lib/queries';
 
-// Next.js App Router requires default export for page
 // eslint-disable-next-line no-restricted-syntax
 export default function EnseignantSeanceDetailPage() {
   const teacher = useCurrentTeacher();
