@@ -175,6 +175,7 @@ export default function EtudiantPlanningPage() {
               selectedDate={selectedDate}
               sessions={sessions}
               now={now}
+              variant="student"
               onSessionTap={handleSessionTap}
               onDaySelect={(d) => {
                 setSelectedDate(d);

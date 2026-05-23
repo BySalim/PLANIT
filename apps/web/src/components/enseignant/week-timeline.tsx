@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { addDays, format, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import type { SessionDto } from '@planit/contracts';
+import type { SessionDto, SessionType } from '@planit/contracts';
+import { MapPinIcon, UserSmallIcon } from '@planit/ui';
 import { now as nowDakar } from '@planit/utils/date';
-import { paletteForSession } from '@/lib/module-palette';
+import { categoryForType, paletteForSession } from '@/lib/module-palette';
 import { cn } from '@/lib/utils';
 
 const HOUR_H = 54;
@@ -12,71 +14,264 @@ const START_H = 8;
 const END_H = 21;
 const TOTAL_H = END_H - START_H;
 const TIME_COL_W = 32;
-const COL_W = 140;
-
-function timeToY(date: Date): number {
-  const h = date.getHours();
-  const m = date.getMinutes();
-  return (h - START_H + m / 60) * HOUR_H;
-}
+const COL_W = 168;
 
 const DAY_INITIALS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-interface CompactBlockProps {
+function timeToY(date: Date): number {
+  return (date.getHours() - START_H + date.getMinutes() / 60) * HOUR_H;
+}
+
+type SlotStatus = 'past' | 'ongoing' | 'upcoming';
+
+function slotStatus(start: Date, end: Date, now: Date): SlotStatus {
+  if (now >= end) return 'past';
+  if (now >= start) return 'ongoing';
+  return 'upcoming';
+}
+
+function durLabel(start: Date, end: Date): string {
+  const mins = Math.round((end.getTime() - start.getTime()) / 60000);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h && m) return `${h}h${String(m).padStart(2, '0')}`;
+  if (h) return `${h}h`;
+  return `${m}min`;
+}
+
+// ── TypeBadge — conforme PLANIT-Design (fond transparent, catégorie) ──────────
+const CATEGORY_LABEL: Record<string, string> = {
+  cours: 'Cours',
+  evaluation: 'Éval.',
+  evenement: 'Évén.',
+};
+
+function TypeBadge({ type, compact }: { readonly type: SessionType; readonly compact?: boolean }) {
+  const cat = categoryForType(type);
+  const label = CATEGORY_LABEL[cat] ?? 'Cours';
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        height: compact ? 15 : 20,
+        padding: compact ? '0 4px' : '0 7px',
+        borderRadius: compact ? 3 : 4,
+        background: 'transparent',
+        color: '#3A2E22',
+        fontSize: compact ? 8.5 : 10.5,
+        fontWeight: 700,
+        letterSpacing: compact ? 0.35 : 0.5,
+        textTransform: 'uppercase',
+        fontFamily: 'Inter, system-ui',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+// ── PlanningSessionBlock (densité compact — vue semaine) ──────────────────────
+// variant 'teacher' : affiche classe.code · 'student' : affiche teacher.fullName
+interface BlockProps {
   readonly session: SessionDto;
   readonly top: number;
   readonly height: number;
+  readonly now: Date;
+  readonly variant: 'teacher' | 'student';
   readonly onTap?: (session: SessionDto) => void;
 }
 
-function CompactBlock({ session, top, height, onTap }: CompactBlockProps) {
+function PlanningSessionBlock({ session, top, height, now, variant, onTap }: BlockProps) {
   const palette = paletteForSession(session.module.id, session.type);
   const start = new Date(session.startAt);
   const end = new Date(session.endAt);
+  const status = slotStatus(start, end, now);
+
+  const dotColor = status === 'ongoing' ? '#E8620A' : status === 'past' ? '#A8A29E' : '#16A34A';
+
+  // Seuils identiques au design de référence (density compact)
+  const showMeta = height > 36; // classe ou enseignant
+  const showTime = height > 48;
+  const showLocation = height > 62;
+  const twoLineName = height > 72;
+
+  // Ligne meta : enseignant → classe · étudiant → nom du prof
+  const metaLine = variant === 'teacher' ? session.classe.code : session.teacher.fullName;
+
   return (
     <button
       type="button"
       onClick={onTap ? () => onTap(session) : undefined}
-      className="absolute left-[3px] right-[3px] flex flex-col overflow-hidden rounded-lg px-1.5 pb-1 pt-1 text-left shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className="absolute overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       style={{
         top,
         height,
+        left: 3,
+        right: 3,
+        borderRadius: 8,
         background: palette.bg,
         borderLeft: `3px solid ${palette.bar}`,
+        boxShadow: '0 1px 2px rgba(28,25,23,0.05)',
+        display: 'flex',
+        gap: 8,
+        padding: '5px 8px 5px 8px',
+        boxSizing: 'border-box',
+        cursor: 'pointer',
+        textAlign: 'left',
       }}
       aria-label={`${session.module.name} ${format(start, 'HH:mm')}–${format(end, 'HH:mm')}`}
     >
-      <span
-        className="truncate text-[10.5px] font-semibold leading-tight"
-        style={{ color: palette.text }}
+      {/* Colonne gauche — contenu */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* Nom du module — nom complet (équivalent mod.short || mod.name dans le design) */}
+        <span
+          style={{
+            fontFamily: 'Inter, system-ui',
+            fontWeight: 600,
+            fontSize: 10.5,
+            color: palette.text,
+            lineHeight: 1.25,
+            letterSpacing: -0.1,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: twoLineName ? 2 : 1,
+            WebkitBoxOrient: 'vertical',
+          }}
+        >
+          {session.module.name}
+        </span>
+
+        {/* Meta — classe (enseignant, sans icône) ou nom prof avec icône (étudiant) */}
+        {showMeta ? (
+          variant === 'student' ? (
+            <span
+              style={{
+                marginTop: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 9.5,
+                color: palette.text,
+                opacity: 0.78,
+                fontWeight: 500,
+                fontFamily: 'Inter, system-ui',
+                lineHeight: 1.3,
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              <UserSmallIcon size={10} color={palette.text} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{metaLine}</span>
+            </span>
+          ) : (
+            <span
+              style={{
+                marginTop: 2,
+                fontSize: 9.5,
+                color: palette.text,
+                opacity: 0.78,
+                fontWeight: 600,
+                fontFamily: 'Inter, system-ui',
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+                lineHeight: 1.2,
+              }}
+            >
+              {metaLine}
+            </span>
+          )
+        ) : null}
+
+        {/* Horaire + durée */}
+        {showTime ? (
+          <span
+            style={{
+              marginTop: 2,
+              fontSize: 9.5,
+              color: palette.text,
+              opacity: 0.85,
+              fontFamily: 'Inter, system-ui',
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1.3,
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {format(start, 'HH:mm')}
+            {' – '}
+            {format(end, 'HH:mm')}
+            <span style={{ opacity: 0.35, margin: '0 3px' }}>·</span>
+            <span style={{ fontWeight: 600 }}>{durLabel(start, end)}</span>
+          </span>
+        ) : null}
+
+        {/* Salle — avec icône mapPin */}
+        {showLocation ? (
+          <span
+            style={{
+              marginTop: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 9.5,
+              color: palette.text,
+              opacity: 0.72,
+              fontFamily: 'Inter, system-ui',
+              lineHeight: 1.3,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            <MapPinIcon size={10} color={palette.text} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {session.salle.name}
+            </span>
+          </span>
+        ) : null}
+      </div>
+
+      {/* Colonne droite — dot statut (haut) + TypeBadge catégorie (bas) */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+          minHeight: 22,
+        }}
       >
-        {session.module.name}
-      </span>
-      {height > 36 ? (
         <span
-          className="mt-0.5 truncate text-[9.5px] font-semibold opacity-80"
-          style={{ color: palette.text }}
-        >
-          {session.classe.code}
-        </span>
-      ) : null}
-      {height > 48 ? (
-        <span
-          className="mt-0.5 text-[9.5px] font-medium tabular-nums opacity-85"
-          style={{ color: palette.text }}
-        >
-          {format(start, 'HH:mm', { locale: fr })}
-        </span>
-      ) : null}
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            background: dotColor,
+            flexShrink: 0,
+            animation: status === 'ongoing' ? 'planitPulse 1.6s ease-in-out infinite' : 'none',
+            boxShadow: status === 'ongoing' ? '0 0 0 2px rgba(232,98,10,0.28)' : 'none',
+          }}
+        />
+        <TypeBadge type={session.type} compact />
+      </div>
     </button>
   );
 }
 
+// ── WeekTimeline ──────────────────────────────────────────────────────────────
 export interface WeekTimelineProps {
   readonly weekStart: Date;
   readonly selectedDate: Date;
   readonly sessions: readonly SessionDto[];
   readonly now?: Date;
+  /** 'teacher' (défaut) : affiche classe · 'student' : affiche nom du prof */
+  readonly variant?: 'teacher' | 'student';
   readonly onSessionTap?: (session: SessionDto) => void;
   readonly onDaySelect?: (date: Date) => void;
 }
@@ -86,6 +281,7 @@ export function WeekTimeline({
   selectedDate,
   sessions,
   now = nowDakar(),
+  variant = 'teacher',
   onSessionTap,
   onDaySelect,
 }: WeekTimelineProps) {
@@ -98,12 +294,28 @@ export function WeekTimeline({
   const hasToday = weekDates.some((d) => isSameDay(d, now));
   const nowY = timeToY(now);
 
+  // Scroll horizontal de la grille — l'en-tête suit via transform pour rester aligné.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [scrollX, setScrollX] = useState(0);
+  useEffect(() => {
+    if (gridRef.current) gridRef.current.scrollLeft = 0;
+    setScrollX(0);
+  }, [weekStart.getTime()]);
+
   return (
     <div className="flex flex-col">
-      <div className="sticky top-[112px] z-10 flex border-b border-border-soft bg-surface">
+      {/* ── En-tête jours (sticky, scroll synchronisé via transform) ── */}
+      <div className="sticky top-[112px] z-10 flex border-b border-border bg-surface">
         <div className="flex-shrink-0" style={{ width: TIME_COL_W }} />
-        <div className="flex-1 overflow-x-auto">
-          <div className="flex" style={{ width: 7 * COL_W }}>
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div
+            className="flex"
+            style={{
+              width: 7 * COL_W,
+              transform: `translateX(-${scrollX}px)`,
+              willChange: 'transform',
+            }}
+          >
             {weekDates.map((d, i) => {
               const isToday = isSameDay(d, now);
               const isSel = isSameDay(d, selectedDate);
@@ -112,33 +324,58 @@ export function WeekTimeline({
                   key={i}
                   type="button"
                   onClick={onDaySelect ? () => onDaySelect(d) : undefined}
-                  className="flex flex-col items-center justify-center py-1.5"
-                  style={{ width: COL_W }}
+                  className="flex flex-shrink-0 flex-col items-center"
+                  style={{ width: COL_W, padding: '5px 0' }}
                   aria-label={format(d, 'EEEE d MMMM', { locale: fr })}
                   aria-pressed={isSel}
                 >
                   <span
-                    className={cn(
-                      'text-[10px] font-semibold uppercase tracking-wide',
-                      isToday ? 'text-accent' : 'text-text-muted',
-                    )}
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: isToday ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                      letterSpacing: '0.3px',
+                      fontFamily: 'Inter, system-ui',
+                      lineHeight: 1,
+                    }}
                   >
                     {DAY_INITIALS[i]}
                   </span>
-                  <span
-                    className={cn(
-                      'mt-0.5 flex size-[22px] items-center justify-center rounded-full font-display text-[11px] font-bold leading-none',
-                      isSel
+                  <div
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: 2,
+                      background: isSel
                         ? isToday
-                          ? 'bg-accent text-white'
-                          : 'bg-primary text-white'
+                          ? 'var(--color-accent)'
+                          : 'var(--color-primary)'
                         : isToday
-                          ? 'border-[1.5px] border-accent text-accent'
-                          : 'text-text',
-                    )}
+                          ? 'var(--color-accent-100)'
+                          : 'transparent',
+                      border: isToday && !isSel ? '1.5px solid var(--color-accent)' : 'none',
+                    }}
                   >
-                    {d.getDate()}
-                  </span>
+                    <span
+                      style={{
+                        fontFamily: 'Poppins, system-ui',
+                        fontSize: 11,
+                        fontWeight: isToday || isSel ? 700 : 500,
+                        color: isSel
+                          ? '#FFF'
+                          : isToday
+                            ? 'var(--color-accent)'
+                            : 'var(--color-text)',
+                        lineHeight: 1,
+                      }}
+                    >
+                      {d.getDate()}
+                    </span>
+                  </div>
                 </button>
               );
             })}
@@ -146,7 +383,9 @@ export function WeekTimeline({
         </div>
       </div>
 
+      {/* ── Grille ── */}
       <div className="flex">
+        {/* Axe horaire */}
         <div
           className="relative flex-shrink-0 bg-surface"
           style={{ width: TIME_COL_W, height: totalHeight }}
@@ -176,7 +415,12 @@ export function WeekTimeline({
           ) : null}
         </div>
 
-        <div className="flex-1 overflow-x-auto">
+        {/* Colonnes jours */}
+        <div
+          ref={gridRef}
+          className="flex-1 overflow-x-auto"
+          onScroll={(e) => setScrollX(e.currentTarget.scrollLeft)}
+        >
           <div className="flex" style={{ width: 7 * COL_W }}>
             {weekDates.map((date, di) => {
               const isToday = isSameDay(date, now);
@@ -188,9 +432,10 @@ export function WeekTimeline({
                   style={{
                     width: COL_W,
                     height: totalHeight,
-                    background: isToday ? 'rgba(107,45,14,0.02)' : 'transparent',
+                    background: isToday ? 'rgba(107,45,14,0.025)' : 'transparent',
                   }}
                 >
+                  {/* Lignes majeures (toutes les 4h) */}
                   {Array.from({ length: Math.floor(TOTAL_H / 4) }, (_, i) => i + 1).map((i) => (
                     <span
                       key={`maj-${i}`}
@@ -199,6 +444,7 @@ export function WeekTimeline({
                       style={{ top: i * 4 * HOUR_H }}
                     />
                   ))}
+                  {/* Lignes mineures (toutes les 2h) */}
                   {Array.from({ length: Math.ceil(TOTAL_H / 4) }, (_, i) => i).map((i) => {
                     const y = (i * 4 + 2) * HOUR_H;
                     if (y >= totalHeight) return null;
@@ -211,6 +457,7 @@ export function WeekTimeline({
                       />
                     );
                   })}
+                  {/* Ligne heure courante */}
                   {isToday ? (
                     <>
                       <span
@@ -220,22 +467,25 @@ export function WeekTimeline({
                       />
                       <span
                         aria-hidden
-                        className="absolute z-[5] size-2 rounded-full bg-accent shadow-[0_0_0_2px_var(--color-surface),0_1px_3px_rgba(232,98,10,0.5)]"
+                        className="absolute z-[5] size-[9px] rounded-full bg-accent shadow-[0_0_0_2px_var(--color-surface),0_1px_3px_rgba(232,98,10,0.5)]"
                         style={{ top: nowY - 4.5, left: -4.5 }}
                       />
                     </>
                   ) : null}
+                  {/* Séances */}
                   {daySessions.map((session) => {
                     const start = new Date(session.startAt);
                     const end = new Date(session.endAt);
                     const top = timeToY(start);
                     const height = Math.max(timeToY(end) - top - 2, 22);
                     return (
-                      <CompactBlock
+                      <PlanningSessionBlock
                         key={session.id}
                         session={session}
                         top={top + 1}
                         height={height}
+                        now={now}
+                        variant={variant}
                         {...(onSessionTap !== undefined ? { onTap: onSessionTap } : {})}
                       />
                     );
