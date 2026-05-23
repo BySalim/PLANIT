@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SessionDto } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
 import { Greeting } from '@/components/enseignant/greeting';
 import { HeroCurrentSession } from '@/components/enseignant/hero-current-session';
+import { PlanningUpdateModal } from '@/components/enseignant/planning-update-modal';
 import { SessionsTodayList } from '@/components/enseignant/sessions-today-list';
 import { WeekStrip } from '@/components/enseignant/week-strip';
 import { useCurrentTeacher } from '@/hooks/use-current-teacher';
@@ -31,7 +32,24 @@ function filterTodaySessions(sessions: readonly SessionDto[], now: Date): readon
 export default function EnseignantHomePage() {
   const router = useRouter();
   const teacher = useCurrentTeacher();
-  useRealtimeSessions(teacher.id);
+
+  // Modale "Planning mis à jour" : déclenchée par l'event WebSocket
+  // `session:published`. Le toast par défaut est désactivé puisque la
+  // modale prend le relai (UX plus visible quand l'enseignant n'est
+  // pas focus sur l'app).
+  const [updateModal, setUpdateModal] = useState<{
+    open: boolean;
+    sessions: readonly SessionDto[];
+  }>({ open: false, sessions: [] });
+
+  const handlePublished = useCallback(({ sessions }: { sessions?: readonly SessionDto[] }) => {
+    setUpdateModal({ open: true, sessions: sessions ?? [] });
+  }, []);
+
+  useRealtimeSessions(teacher.id, {
+    onPublished: handlePublished,
+    showToast: false,
+  });
 
   const now = useMemo(() => new Date(), []);
   const weekStart = useMemo(() => getCurrentWeekStart(now), [now]);
@@ -103,6 +121,12 @@ export default function EnseignantHomePage() {
           </>
         )}
       </div>
+
+      <PlanningUpdateModal
+        open={updateModal.open}
+        sessions={updateModal.sessions}
+        onClose={() => setUpdateModal({ open: false, sessions: [] })}
+      />
     </Shell>
   );
 }
