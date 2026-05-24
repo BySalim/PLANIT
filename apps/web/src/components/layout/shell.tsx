@@ -45,7 +45,9 @@ export function Shell({
         />
         <main
           className={cn(
-            fullBleed ? 'min-h-0 flex-1 overflow-hidden' : 'flex-1 overflow-auto px-6 py-6',
+            fullBleed
+              ? 'min-h-0 flex-1 overflow-hidden'
+              : 'scrollbar-hide flex-1 overflow-auto px-6 py-6',
           )}
         >
           {children}
