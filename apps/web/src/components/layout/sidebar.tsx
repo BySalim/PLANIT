@@ -197,7 +197,7 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
         {/* Navigation */}
         <nav
           className={cn(
-            'flex-1 overflow-y-auto overflow-x-hidden',
+            'scrollbar-hide flex-1 overflow-y-auto overflow-x-hidden',
             collapsed ? 'px-1.5 py-2' : 'px-2.5 py-2.5',
           )}
           style={{ transition: 'padding .22s ease' }}

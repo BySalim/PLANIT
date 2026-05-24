@@ -1,12 +1,14 @@
 import { differenceInMinutes, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { MapPinIcon } from '@planit/ui';
+import { MapPinIcon, UserSmallIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
 import { now as nowDakar } from '@planit/utils/date';
 
 export interface HeroCurrentSessionProps {
   readonly sessions: readonly SessionDto[];
   readonly now?: Date;
+  /** 'teacher' (défaut) : badge classe · 'student' : nom du prof. */
+  readonly variant?: 'teacher' | 'student';
 }
 
 function findCurrent(sessions: readonly SessionDto[], now: Date): SessionDto | null {
@@ -57,7 +59,11 @@ const CATEGORY_LABEL: Record<SessionDto['type'], string> = {
   EVENT: 'Événement',
 };
 
-export function HeroCurrentSession({ sessions, now = nowDakar() }: HeroCurrentSessionProps) {
+export function HeroCurrentSession({
+  sessions,
+  now = nowDakar(),
+  variant = 'teacher',
+}: HeroCurrentSessionProps) {
   const current = findCurrent(sessions, now);
 
   if (current === null) {
@@ -121,15 +127,25 @@ export function HeroCurrentSession({ sessions, now = nowDakar() }: HeroCurrentSe
           {current.module.name}
         </h2>
 
-        <div className="flex flex-wrap gap-1.5">
-          <span className="inline-flex items-center rounded-md border border-white/30 bg-white/[0.18] px-2 py-0.5 text-[11px] font-semibold tracking-wide text-white">
-            {current.classe.code}
-          </span>
-        </div>
+        {variant === 'teacher' ? (
+          <div className="flex flex-wrap gap-1.5">
+            <span className="inline-flex items-center rounded-md border border-white/30 bg-white/[0.18] px-2 py-0.5 text-[11px] font-semibold tracking-wide text-white">
+              {current.classe.code}
+            </span>
+          </div>
+        ) : null}
 
-        <div className="flex items-center gap-1.5 text-[13px] text-white/80">
-          <MapPinIcon size={13} color="currentColor" />
-          <span>{current.salle.name}</span>
+        <div className="flex items-center gap-3 text-[13px] text-white/80">
+          {variant === 'student' ? (
+            <span className="inline-flex items-center gap-1.5">
+              <UserSmallIcon size={13} color="currentColor" />
+              <span>{current.teacher.fullName}</span>
+            </span>
+          ) : null}
+          <span className="inline-flex items-center gap-1.5">
+            <MapPinIcon size={13} color="currentColor" />
+            <span>{current.salle.name}</span>
+          </span>
         </div>
 
         <div className="flex items-center justify-between pt-1">

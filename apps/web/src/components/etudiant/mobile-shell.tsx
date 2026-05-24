@@ -44,9 +44,11 @@ export function MobileShell({ children, unread = 0 }: MobileShellProps) {
       : null;
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col bg-bg">
+    // h-dvh (et non min-h-screen) pour que <main> soit le vrai conteneur de scroll
+    // vertical — sinon sticky top-0 sur la toolbar ne s'active pas (TD-027 lié).
+    <div className="mx-auto flex h-dvh max-w-md flex-col overflow-hidden bg-bg">
       <MobileHeader unread={unread} initials={initialsFor(student.fullName)} />
-      <main className="flex-1 overflow-y-auto pb-28">{children}</main>
+      <main className="scrollbar-hide min-h-0 flex-1 overflow-y-auto pb-28">{children}</main>
       <MobileTabBar activeId={activeId} unread={unread} />
     </div>
   );

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isSameDay } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import type { SessionDto } from '@planit/contracts';
 import { now as nowDakar } from '@planit/utils/date';
 import { Greeting } from '@/components/enseignant/greeting';
@@ -73,11 +73,12 @@ export default function EtudiantHomePage() {
           </div>
         ) : (
           <>
-            <HeroCurrentSession sessions={todaySessions} now={now} />
+            <HeroCurrentSession sessions={todaySessions} now={now} variant="student" />
 
             <SessionsTodayList
               sessions={todaySessions}
               now={now}
+              variant="student"
               onSessionClick={handleSessionClick}
             />
 
@@ -94,7 +95,9 @@ export default function EtudiantHomePage() {
               <WeekStrip
                 sessions={weekSessions}
                 now={now}
-                onDayClick={() => router.push('/etudiant/planning')}
+                onDayClick={(date) =>
+                  router.push(`/etudiant/planning?date=${format(date, 'yyyy-MM-dd')}`)
+                }
               />
             </div>
           </>

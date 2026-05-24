@@ -2,7 +2,7 @@
 
 import { format, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { MapPinIcon } from '@planit/ui';
+import { MapPinIcon, UserSmallIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
 import { now as nowDakar } from '@planit/utils/date';
 import { paletteForSession, categoryForType } from '@/lib/module-palette';
@@ -41,10 +41,11 @@ interface SessionBlockProps {
   readonly top: number;
   readonly height: number;
   readonly status: 'past' | 'ongoing' | 'upcoming';
+  readonly variant: 'teacher' | 'student';
   readonly onTap?: (session: SessionDto) => void;
 }
 
-function SessionBlock({ session, top, height, status, onTap }: SessionBlockProps) {
+function SessionBlock({ session, top, height, status, variant, onTap }: SessionBlockProps) {
   const palette = paletteForSession(session.module.id, session.type);
   const start = new Date(session.startAt);
   const end = new Date(session.endAt);
@@ -82,16 +83,18 @@ function SessionBlock({ session, top, height, status, onTap }: SessionBlockProps
         >
           {session.module.name}
         </span>
-        <span
-          className="mt-0.5 inline-flex max-w-fit items-center rounded-[4px] border px-1.5 text-[10.5px] font-semibold leading-[1.4]"
-          style={{
-            background: 'rgba(255,255,255,0.55)',
-            borderColor: palette.border,
-            color: palette.text,
-          }}
-        >
-          {session.classe.code}
-        </span>
+        {variant === 'teacher' ? (
+          <span
+            className="mt-0.5 inline-flex max-w-fit items-center rounded-[4px] border px-1.5 text-[10.5px] font-semibold leading-[1.4]"
+            style={{
+              background: 'rgba(255,255,255,0.55)',
+              borderColor: palette.border,
+              color: palette.text,
+            }}
+          >
+            {session.classe.code}
+          </span>
+        ) : null}
         {showTime ? (
           <span
             className="mt-1 text-[11.5px] font-medium tabular-nums"
@@ -99,6 +102,16 @@ function SessionBlock({ session, top, height, status, onTap }: SessionBlockProps
           >
             {format(start, 'HH:mm', { locale: fr })} – {format(end, 'HH:mm', { locale: fr })}{' '}
             <span className="opacity-60">·</span> <span className="font-semibold">{duration}</span>
+          </span>
+        ) : null}
+        {variant === 'student' ? (
+          // Étudiant : prof juste après l'heure (design ref)
+          <span
+            className="mt-1 flex items-center gap-1 truncate text-[11.5px]"
+            style={{ color: palette.text, opacity: 0.78 }}
+          >
+            <UserSmallIcon size={12} color="currentColor" />
+            <span className="truncate">{session.teacher.fullName}</span>
           </span>
         ) : null}
         {showLoc ? (
@@ -125,10 +138,18 @@ export interface DayTimelineProps {
   readonly date: Date;
   readonly sessions: readonly SessionDto[];
   readonly now?: Date;
+  /** 'teacher' (défaut) : affiche le code classe · 'student' : affiche le prof. */
+  readonly variant?: 'teacher' | 'student';
   readonly onSessionTap?: (session: SessionDto) => void;
 }
 
-export function DayTimeline({ date, sessions, now = nowDakar(), onSessionTap }: DayTimelineProps) {
+export function DayTimeline({
+  date,
+  sessions,
+  now = nowDakar(),
+  variant = 'teacher',
+  onSessionTap,
+}: DayTimelineProps) {
   const isToday = isSameDay(date, now);
   const nowY = timeToY(now);
   const totalHeight = TOTAL_H * HOUR_H;
@@ -230,6 +251,7 @@ export function DayTimeline({ date, sessions, now = nowDakar(), onSessionTap }: 
               top={top + 1}
               height={height}
               status={statusFor(session)}
+              variant={variant}
               {...(onSessionTap !== undefined ? { onTap: onSessionTap } : {})}
             />
           );

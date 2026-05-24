@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { addDays, format, startOfWeek } from 'date-fns';
+import { Suspense, useCallback, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CalendarIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
@@ -11,7 +11,7 @@ import { CalendarPicker } from '@/components/enseignant/calendar-picker';
 import { DayTimeline } from '@/components/enseignant/day-timeline';
 import { MobileShell } from '@/components/etudiant/mobile-shell';
 import { PlanningUpdateModal } from '@/components/enseignant/planning-update-modal';
-import { WeekTimeline } from '@/components/enseignant/week-timeline';
+import { WeekDayHeader, WeekTimeline } from '@/components/enseignant/week-timeline';
 import { useToast } from '@/components/ui/toast-provider';
 import { useCurrentStudent } from '@/hooks/use-current-student';
 import { useRealtimeSessions } from '@/hooks/use-realtime-sessions';
@@ -28,17 +28,39 @@ const FILTER_LABEL: Record<TypeFilter, string> = {
   event: 'Évén.',
 };
 
+// Next 15 : useSearchParams() exige un boundary Suspense pour le prerender.
 // eslint-disable-next-line no-restricted-syntax
 export default function EtudiantPlanningPage() {
+  return (
+    <Suspense fallback={null}>
+      <EtudiantPlanningPageInner />
+    </Suspense>
+  );
+}
+
+function EtudiantPlanningPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const student = useCurrentStudent();
   const toast = useToast();
 
+  // ?date=YYYY-MM-DD : ouverture sur un jour précis (clic depuis WeekStrip).
+  const initialDate = useMemo<Date>(() => {
+    const raw = searchParams?.get('date');
+    if (raw !== null && raw !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const parsed = parseISO(raw);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    return nowDakar();
+  }, [searchParams]);
+
   const [view, setView] = useState<ViewMode>('day');
-  const [selectedDate, setSelectedDate] = useState<Date>(() => nowDakar());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => initialDate);
   const [showCalendar, setShowCalendar] = useState(false);
   // Filtre affiché mais inactif — TD-019.
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  // ScrollX partagé entre WeekDayHeader (sticky) et WeekTimeline (grille).
+  const [weekScrollX, setWeekScrollX] = useState(0);
 
   const [updateModal, setUpdateModal] = useState<{
     open: boolean;
@@ -79,86 +101,102 @@ export default function EtudiantPlanningPage() {
   return (
     <MobileShell>
       <div className="relative flex flex-col">
-        <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-border-soft bg-surface px-3 py-2">
-          <div className="flex rounded-[10px] border border-border-soft bg-bg p-0.5">
-            {(['day', 'week'] as const).map((v) => {
-              const active = view === v;
-              return (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => {
-                    setView(v);
-                    setShowCalendar(false);
-                  }}
-                  className={cn(
-                    'rounded-[7px] px-2.5 py-1 text-[12px] font-semibold transition-all',
-                    active
-                      ? 'bg-primary text-white shadow-[0_2px_6px_rgba(107,45,14,0.25)]'
-                      : 'text-text-muted',
-                  )}
-                >
-                  {v === 'day' ? 'Jour' : 'Semaine'}
-                </button>
-              );
-            })}
+        {/* Bloc sticky unique : toolbar + (en vue semaine) ligne des jours, pour rester collés. */}
+        <div className="sticky top-0 z-20 bg-surface">
+          <div className="flex items-center gap-2 border-b border-border-soft bg-surface px-3 py-2">
+            <div className="flex rounded-[10px] border border-border-soft bg-bg p-0.5">
+              {(['day', 'week'] as const).map((v) => {
+                const active = view === v;
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => {
+                      setView(v);
+                      setShowCalendar(false);
+                    }}
+                    className={cn(
+                      'rounded-[7px] px-2.5 py-1 text-[12px] font-semibold transition-all',
+                      active
+                        ? 'bg-primary text-white shadow-[0_2px_6px_rgba(107,45,14,0.25)]'
+                        : 'text-text-muted',
+                    )}
+                  >
+                    {v === 'day' ? 'Jour' : 'Semaine'}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowCalendar((c) => !c)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11.5px] font-medium transition-colors',
+                showCalendar
+                  ? 'border-primary bg-primary-100 text-primary'
+                  : 'border-border bg-surface text-text',
+              )}
+            >
+              <CalendarIcon
+                size={13}
+                color={showCalendar ? 'var(--color-primary)' : 'var(--color-accent)'}
+              />
+              {dateLabel}
+            </button>
+
+            <div className="flex-1" />
+
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+              aria-label="Filtrer par type"
+              className="cursor-pointer rounded-md border border-border bg-surface px-1.5 py-1 text-[10.5px] text-text outline-none"
+              title="Filtre bientôt disponible"
+            >
+              {(['all', 'cours', 'eval', 'event'] as const).map((f) => (
+                <option key={f} value={f}>
+                  {FILTER_LABEL[f]}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={handleDownloadClick}
+              className="flex size-8 items-center justify-center rounded-lg border border-border bg-surface text-text-sec transition-colors hover:border-primary hover:text-primary"
+              aria-label="Exporter mon planning"
+              title="Export bientôt disponible"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowCalendar((c) => !c)}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11.5px] font-medium transition-colors',
-              showCalendar
-                ? 'border-primary bg-primary-100 text-primary'
-                : 'border-border bg-surface text-text',
-            )}
-          >
-            <CalendarIcon
-              size={13}
-              color={showCalendar ? 'var(--color-primary)' : 'var(--color-accent)'}
+          {view === 'week' ? (
+            <WeekDayHeader
+              weekStart={weekStart}
+              selectedDate={selectedDate}
+              now={now}
+              scrollX={weekScrollX}
+              onDaySelect={(d) => {
+                setSelectedDate(d);
+                setView('day');
+              }}
             />
-            {dateLabel}
-          </button>
-
-          <div className="flex-1" />
-
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
-            aria-label="Filtrer par type"
-            className="cursor-pointer rounded-md border border-border bg-surface px-1.5 py-1 text-[10.5px] text-text outline-none"
-            title="Filtre bientôt disponible"
-          >
-            {(['all', 'cours', 'eval', 'event'] as const).map((f) => (
-              <option key={f} value={f}>
-                {FILTER_LABEL[f]}
-              </option>
-            ))}
-          </select>
-
-          <button
-            type="button"
-            onClick={handleDownloadClick}
-            className="flex size-8 items-center justify-center rounded-lg border border-border bg-surface text-text-sec transition-colors hover:border-primary hover:text-primary"
-            aria-label="Exporter mon planning"
-            title="Export bientôt disponible"
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-          </button>
+          ) : null}
         </div>
 
         <div className="relative">
@@ -167,20 +205,17 @@ export default function EtudiantPlanningPage() {
               date={selectedDate}
               sessions={sessions}
               now={now}
+              variant="student"
               onSessionTap={handleSessionTap}
             />
           ) : (
             <WeekTimeline
               weekStart={weekStart}
-              selectedDate={selectedDate}
               sessions={sessions}
               now={now}
               variant="student"
               onSessionTap={handleSessionTap}
-              onDaySelect={(d) => {
-                setSelectedDate(d);
-                setView('day');
-              }}
+              onScrollXChange={setWeekScrollX}
             />
           )}
 
