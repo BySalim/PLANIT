@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { addDays, format, startOfWeek } from 'date-fns';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CalendarIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
@@ -31,11 +31,22 @@ const FILTER_LABEL: Record<TypeFilter, string> = {
 // eslint-disable-next-line no-restricted-syntax
 export default function EtudiantPlanningPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const student = useCurrentStudent();
   const toast = useToast();
 
+  // ?date=YYYY-MM-DD : ouverture sur un jour précis (clic depuis WeekStrip).
+  const initialDate = useMemo<Date>(() => {
+    const raw = searchParams?.get('date');
+    if (raw !== null && raw !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const parsed = parseISO(raw);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    return nowDakar();
+  }, [searchParams]);
+
   const [view, setView] = useState<ViewMode>('day');
-  const [selectedDate, setSelectedDate] = useState<Date>(() => nowDakar());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => initialDate);
   const [showCalendar, setShowCalendar] = useState(false);
   // Filtre affiché mais inactif — TD-019.
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
