@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -28,8 +28,17 @@ const FILTER_LABEL: Record<TypeFilter, string> = {
   event: 'Évén.',
 };
 
+// Next 15 : useSearchParams() exige un boundary Suspense pour le prerender.
 // eslint-disable-next-line no-restricted-syntax
 export default function EnseignantPlanningPage() {
+  return (
+    <Suspense fallback={null}>
+      <EnseignantPlanningPageInner />
+    </Suspense>
+  );
+}
+
+function EnseignantPlanningPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const teacher = useCurrentTeacher();
