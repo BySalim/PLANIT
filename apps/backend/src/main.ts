@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { corsOrigin } from './common/cors';
 import { ZodValidationPipe } from './common/zod-validation.pipe';
 
 async function bootstrap(): Promise<void> {
@@ -11,14 +12,8 @@ async function bootstrap(): Promise<void> {
 
   app.useGlobalPipes(new ZodValidationPipe());
 
-  const isProd = process.env['NODE_ENV'] === 'production';
-  const frontendUrl = process.env['FRONTEND_URL'];
-  app.enableCors({
-    origin: isProd
-      ? (frontendUrl ?? 'http://localhost:3000')
-      : (frontendUrl ?? /^http:\/\/localhost:\d+$/),
-    credentials: true,
-  });
+  // CORS HTTP — voir common/cors.ts pour la logique partagée HTTP + WS.
+  app.enableCors({ origin: corsOrigin(), credentials: true });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('PLANIT API')

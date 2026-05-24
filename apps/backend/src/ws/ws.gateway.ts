@@ -2,14 +2,18 @@ import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import type { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
 import type { SessionDto } from '@planit/contracts';
+import { corsOrigin } from '../common/cors';
 
 /**
  * Realtime gateway. Clients identify themselves at connection time with
  * `io(url, { auth: { userId } })`; the gateway joins them to a per-user room
  * so events can be emitted to concerned actors only (V1-D2: no auth yet).
+ *
+ * CORS partagé avec HTTP via `common/cors.ts` — éviter qu'un fix HTTP n'oublie
+ * le WS et inversement (régression vue avec preview MCP sur port dynamique).
  */
 @WebSocketGateway({
-  cors: { origin: process.env['FRONTEND_URL'] ?? 'http://localhost:3000' },
+  cors: { origin: corsOrigin() },
 })
 export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
