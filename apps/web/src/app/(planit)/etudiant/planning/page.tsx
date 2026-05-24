@@ -196,6 +196,7 @@ export default function EtudiantPlanningPage() {
               date={selectedDate}
               sessions={sessions}
               now={now}
+              variant="student"
               onSessionTap={handleSessionTap}
             />
           ) : (

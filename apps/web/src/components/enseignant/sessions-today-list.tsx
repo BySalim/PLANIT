@@ -1,6 +1,6 @@
 import { differenceInMinutes, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { MapPinIcon } from '@planit/ui';
+import { MapPinIcon, UserSmallIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
 import { now as nowDakar } from '@planit/utils/date';
 import { categoryForType, paletteForSession, type SessionCategory } from '@/lib/module-palette';
@@ -10,6 +10,8 @@ export interface SessionsTodayListProps {
   readonly sessions: readonly SessionDto[];
   readonly onSessionClick?: (session: SessionDto) => void;
   readonly now?: Date;
+  /** 'teacher' (défaut) : badge classe · 'student' : nom du prof + salle inline. */
+  readonly variant?: 'teacher' | 'student';
 }
 
 type SessionStatus = 'past' | 'current' | 'upcoming';
@@ -48,6 +50,7 @@ export function SessionsTodayList({
   sessions,
   onSessionClick,
   now = nowDakar(),
+  variant = 'teacher',
 }: SessionsTodayListProps) {
   if (sessions.length === 0) {
     return (
@@ -126,25 +129,45 @@ export function SessionsTodayList({
                   <p className="truncate text-[14px] font-semibold" style={{ color: palette.text }}>
                     {session.module.name}
                   </p>
-                  <div className="flex flex-wrap gap-1">
-                    <span
-                      className="inline-flex h-[18px] items-center rounded-[5px] border px-1.5 text-[10.5px] font-semibold tracking-wide"
-                      style={{
-                        background: 'rgba(255,255,255,0.55)',
-                        borderColor: palette.border,
-                        color: palette.text,
-                      }}
+                  {variant === 'teacher' ? (
+                    <>
+                      <div className="flex flex-wrap gap-1">
+                        <span
+                          className="inline-flex h-[18px] items-center rounded-[5px] border px-1.5 text-[10.5px] font-semibold tracking-wide"
+                          style={{
+                            background: 'rgba(255,255,255,0.55)',
+                            borderColor: palette.border,
+                            color: palette.text,
+                          }}
+                        >
+                          {session.classe.code}
+                        </span>
+                      </div>
+                      <div
+                        className="flex items-center gap-1 text-[12px]"
+                        style={{ color: palette.text, opacity: 0.75 }}
+                      >
+                        <MapPinIcon size={11} color="currentColor" />
+                        <span className="truncate">{session.salle.name}</span>
+                      </div>
+                    </>
+                  ) : (
+                    // Étudiant : prof + salle sur la même ligne (design ref SessionCard)
+                    <div
+                      className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px]"
+                      style={{ color: palette.text, opacity: 0.78 }}
                     >
-                      {session.classe.code}
-                    </span>
-                  </div>
-                  <div
-                    className="flex items-center gap-1 text-[12px]"
-                    style={{ color: palette.text, opacity: 0.75 }}
-                  >
-                    <MapPinIcon size={11} color="currentColor" />
-                    <span className="truncate">{session.salle.name}</span>
-                  </div>
+                      <span className="inline-flex items-center gap-1">
+                        <UserSmallIcon size={11} color="currentColor" />
+                        <span className="truncate">{session.teacher.fullName}</span>
+                      </span>
+                      <span className="text-text-faint">·</span>
+                      <span className="inline-flex items-center gap-1">
+                        <MapPinIcon size={11} color="currentColor" />
+                        <span className="truncate">{session.salle.name}</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-shrink-0 flex-col items-end justify-between py-3 pr-3">

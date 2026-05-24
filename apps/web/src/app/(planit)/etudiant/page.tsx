@@ -73,11 +73,12 @@ export default function EtudiantHomePage() {
           </div>
         ) : (
           <>
-            <HeroCurrentSession sessions={todaySessions} now={now} />
+            <HeroCurrentSession sessions={todaySessions} now={now} variant="student" />
 
             <SessionsTodayList
               sessions={todaySessions}
               now={now}
+              variant="student"
               onSessionClick={handleSessionClick}
             />
 

@@ -144,47 +144,24 @@ function PlanningSessionBlock({ session, top, height, now, variant, onTap }: Blo
           {session.module.name}
         </span>
 
-        {/* Meta — classe (enseignant, sans icône) ou nom prof avec icône (étudiant) */}
-        {showMeta ? (
-          variant === 'student' ? (
-            <span
-              style={{
-                marginTop: 2,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                fontSize: 9.5,
-                color: palette.text,
-                opacity: 0.78,
-                fontWeight: 500,
-                fontFamily: 'Inter, system-ui',
-                lineHeight: 1.3,
-                overflow: 'hidden',
-                whiteSpace: 'nowrap',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              <UserSmallIcon size={10} color={palette.text} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{metaLine}</span>
-            </span>
-          ) : (
-            <span
-              style={{
-                marginTop: 2,
-                fontSize: 9.5,
-                color: palette.text,
-                opacity: 0.78,
-                fontWeight: 600,
-                fontFamily: 'Inter, system-ui',
-                overflow: 'hidden',
-                whiteSpace: 'nowrap',
-                textOverflow: 'ellipsis',
-                lineHeight: 1.2,
-              }}
-            >
-              {metaLine}
-            </span>
-          )
+        {/* Ordre design : enseignant → classe puis heure · étudiant → heure puis prof */}
+        {variant === 'teacher' && showMeta ? (
+          <span
+            style={{
+              marginTop: 2,
+              fontSize: 9.5,
+              color: palette.text,
+              opacity: 0.78,
+              fontWeight: 600,
+              fontFamily: 'Inter, system-ui',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              lineHeight: 1.2,
+            }}
+          >
+            {metaLine}
+          </span>
         ) : null}
 
         {/* Horaire + durée */}
@@ -207,6 +184,30 @@ function PlanningSessionBlock({ session, top, height, now, variant, onTap }: Blo
             {format(end, 'HH:mm')}
             <span style={{ opacity: 0.35, margin: '0 3px' }}>·</span>
             <span style={{ fontWeight: 600 }}>{durLabel(start, end)}</span>
+          </span>
+        ) : null}
+
+        {/* Prof avec icône — vue étudiant uniquement, après l'heure */}
+        {variant === 'student' && showMeta ? (
+          <span
+            style={{
+              marginTop: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 9.5,
+              color: palette.text,
+              opacity: 0.72,
+              fontWeight: 500,
+              fontFamily: 'Inter, system-ui',
+              lineHeight: 1.3,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            <UserSmallIcon size={10} color={palette.text} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{metaLine}</span>
           </span>
         ) : null}
 
