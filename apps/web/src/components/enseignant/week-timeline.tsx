@@ -431,7 +431,7 @@ export function WeekTimeline({
       {/* Colonnes jours */}
       <div
         ref={gridRef}
-        className="flex-1 overflow-x-auto"
+        className="scrollbar-hide flex-1 overflow-x-auto"
         onScroll={(e) => onScrollXChange?.(e.currentTarget.scrollLeft)}
       >
         <div className="flex" style={{ width: 7 * COL_W }}>
