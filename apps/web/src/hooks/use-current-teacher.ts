@@ -1,10 +1,15 @@
-// V1 sans auth (V1-D2 / L3-D1) — TD-022 trace le remplacement par un contexte d'auth.
+'use client';
+
+import { useAuth } from '@/contexts/auth-context';
+
 export interface CurrentTeacher {
   readonly id: string;
   readonly fullName: string;
   readonly role: 'ENSEIGNANT';
 }
 
+// Fallback utilisé si l'état auth n'est pas encore résolu (RequireAuth garantit
+// que ce cas ne se produit pas en production dans une page ENSEIGNANT).
 const HARDCODED_TEACHER: CurrentTeacher = {
   id: 'seed-teacher-algo',
   fullName: 'M. Oumar Ndiaye',
@@ -12,5 +17,7 @@ const HARDCODED_TEACHER: CurrentTeacher = {
 };
 
 export function useCurrentTeacher(): CurrentTeacher {
-  return HARDCODED_TEACHER;
+  const { state } = useAuth();
+  if (state.status !== 'authenticated') return HARDCODED_TEACHER;
+  return { id: state.user.id, fullName: state.user.nomComplet, role: 'ENSEIGNANT' };
 }

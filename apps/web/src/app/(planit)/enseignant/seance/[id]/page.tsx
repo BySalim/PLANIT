@@ -12,7 +12,7 @@ import { useSessionDetailQuery } from '@/lib/queries';
 // eslint-disable-next-line no-restricted-syntax
 export default function EnseignantSeanceDetailPage() {
   const teacher = useCurrentTeacher();
-  useRealtimeSessions(teacher.id);
+  useRealtimeSessions(true);
 
   const params = useParams<{ id: string }>();
   const sessionId = params.id;

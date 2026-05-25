@@ -19,7 +19,7 @@ export interface UseRealtimeSessionsOptions {
 }
 
 export function useRealtimeSessions(
-  userId: string | null,
+  enabled: boolean,
   options: UseRealtimeSessionsOptions = {},
 ): void {
   const { onPublished, showToast = true } = options;
@@ -27,11 +27,12 @@ export function useRealtimeSessions(
   const toast = useToast();
 
   useEffect(() => {
-    if (userId === null) {
+    if (!enabled) {
       return;
     }
 
-    const socket: Socket = io(API_BASE, { auth: { userId } });
+    // Le cookie httpOnly sert d'authentification — plus de userId en clair (F.6)
+    const socket: Socket = io(API_BASE, { withCredentials: true });
 
     socket.on('session:published', (payload?: SessionPublishedPayload) => {
       queryClient.invalidateQueries({ queryKey: planningKeys.all });
@@ -46,5 +47,5 @@ export function useRealtimeSessions(
     return () => {
       socket.disconnect();
     };
-  }, [userId, queryClient, toast, onPublished, showToast]);
+  }, [enabled, queryClient, toast, onPublished, showToast]);
 }
