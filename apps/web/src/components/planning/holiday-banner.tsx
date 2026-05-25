@@ -9,10 +9,7 @@ export function HolidayBanner({ weekStart }: HolidayBannerProps) {
   if (holidays.length === 0) return null;
 
   return (
-    <div
-      className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2 text-[12.5px]"
-      style={{ background: '#FEF3C7', borderColor: '#FDE68A', color: '#92400E' }}
-    >
+    <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-warn-text/30 bg-warn px-4 py-2 text-[12.5px] text-warn-text">
       <span className="flex flex-shrink-0 items-center gap-2 font-semibold">
         <span aria-hidden>🗓</span>
         Jour(s) fermé(s) cette semaine :
@@ -21,8 +18,7 @@ export function HolidayBanner({ weekStart }: HolidayBannerProps) {
         {holidays.map((h) => (
           <span
             key={h.date.toISOString()}
-            className="inline-flex items-center rounded px-2 py-0.5 text-[12px] font-semibold capitalize"
-            style={{ background: '#FCD34D', color: '#78350F' }}
+            className="inline-flex items-center rounded bg-accent-100 px-2 py-0.5 text-[12px] font-semibold capitalize text-warn-text"
           >
             {h.dayLabel} — {h.name} — jour férié
           </span>

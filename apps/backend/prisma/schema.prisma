@@ -120,5 +120,8 @@ model Seance {
 
   @@index([classeId, startAt])
   @@index([teacherId, startAt])
+  // Accélère le scan `findMany({ where: { isPublished: false, classeId } })`
+  // déclenché par POST /api/sessions/publish (B.5).
+  @@index([isPublished, classeId])
   @@map("seances")
 }

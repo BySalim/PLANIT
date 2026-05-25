@@ -58,7 +58,7 @@ function TypeBadge({ type, compact }: { readonly type: SessionType; readonly com
         padding: compact ? '0 4px' : '0 7px',
         borderRadius: compact ? 3 : 4,
         background: 'transparent',
-        color: '#3A2E22',
+        color: 'var(--color-text)',
         fontSize: compact ? 8.5 : 10.5,
         fontWeight: 700,
         letterSpacing: compact ? 0.35 : 0.5,
@@ -90,7 +90,13 @@ function PlanningSessionBlock({ session, top, height, now, variant, onTap }: Blo
   const end = new Date(session.endAt);
   const status = slotStatus(start, end, now);
 
-  const dotColor = status === 'ongoing' ? '#E8620A' : status === 'past' ? '#A8A29E' : '#16A34A';
+  // Dot status couleurs — alignées sur les tokens (accent/text-faint/ok).
+  const dotColor =
+    status === 'ongoing'
+      ? 'var(--color-accent)'
+      : status === 'past'
+        ? 'var(--color-text-faint)'
+        : 'var(--color-ok)';
 
   // Seuils identiques au design de référence (density compact)
   const showMeta = height > 36; // classe ou enseignant
@@ -345,7 +351,11 @@ export function WeekDayHeader({
                       fontFamily: 'Poppins, system-ui',
                       fontSize: 11,
                       fontWeight: isToday || isSel ? 700 : 500,
-                      color: isSel ? '#FFF' : isToday ? 'var(--color-accent)' : 'var(--color-text)',
+                      color: isSel
+                        ? 'var(--color-surface)'
+                        : isToday
+                          ? 'var(--color-accent)'
+                          : 'var(--color-text)',
                       lineHeight: 1,
                     }}
                   >

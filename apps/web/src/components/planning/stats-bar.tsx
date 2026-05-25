@@ -56,24 +56,15 @@ export function PlanningFooter({
             </span>
             <span className="text-text-faint">·</span>
             <span>
-              <strong className="font-semibold" style={{ color: '#15803D' }}>
-                {published}
-              </strong>{' '}
-              publiées
+              <strong className="font-semibold text-ok">{published}</strong> publiées
             </span>
             <span className="text-text-faint">·</span>
             <span>
-              <strong className="font-semibold" style={{ color: '#1E40AF' }}>
-                {validated}
-              </strong>{' '}
-              validées
+              <strong className="font-semibold text-info">{validated}</strong> validées
             </span>
             <span className="text-text-faint">·</span>
             <span>
-              <strong className="font-semibold" style={{ color: '#92400E' }}>
-                {provisoires}
-              </strong>{' '}
-              provisoires
+              <strong className="font-semibold text-warn-text">{provisoires}</strong> provisoires
             </span>
           </>
         )}

@@ -1,19 +1,50 @@
 /**
  * Source unique de vérité pour la configuration CORS — HTTP et WebSocket.
  *
- * - Production : `FRONTEND_URL` strict (fallback `http://localhost:3000`).
- * - Développement : regex `^http://localhost:\d+$` pour accepter tous les ports
- *   locaux (preview MCP, Turbopack auto-port, etc.) si `FRONTEND_URL` n'est
- *   pas défini ; sinon `FRONTEND_URL` strict.
+ * Politique : whitelist explicite (plus de regex `^http://localhost:\d+$`
+ * qui acceptait n'importe quel port local et exposait l'API à n'importe
+ * quel service tournant en local, légitime ou non).
  *
- * Utilisé par `main.ts` (`app.enableCors`) et `ws.gateway.ts` (`@WebSocketGateway`)
- * pour éviter qu'un fix HTTP n'oublie le WS et inversement.
+ * Règles :
+ * - Si `FRONTEND_URL` est défini → source de vérité exclusive (prod, staging,
+ *   dev avec override). Quel que soit l'env.
+ * - Sinon, en `development` → whitelist explicite des ports utilisés par
+ *   l'équipe : 3000 (apps/web Next.js) et 5500 (prototype PLANIT-IA).
+ * - Sinon (prod / test / autre sans `FRONTEND_URL`) → on **refuse tout**
+ *   (tableau vide) et on log une erreur. Aucune origine autorisée par défaut.
+ *
+ * Utilisé par `main.ts` (`app.enableCors`) et `ws.gateway.ts`
+ * (`@WebSocketGateway`) pour éviter qu'un fix HTTP n'oublie le WS et
+ * inversement.
  */
-export type CorsOrigin = string | RegExp;
+export type CorsOrigin = string | string[];
+
+/** Ports dev autorisés en l'absence de `FRONTEND_URL`. */
+const DEV_ALLOWED_ORIGINS = [
+  'http://localhost:3000', // apps/web (Next.js)
+  'http://localhost:5500', // PLANIT-IA prototype
+];
+
+/**
+ * Garde-fou : un seul log d'erreur par process si la config CORS prod est
+ * incomplète. Évite de polluer la sortie pour chaque connexion entrante.
+ */
+let prodMisconfigReported = false;
 
 export function corsOrigin(): CorsOrigin {
-  const isProd = process.env['NODE_ENV'] === 'production';
   const frontendUrl = process.env['FRONTEND_URL'];
-  if (isProd) return frontendUrl ?? 'http://localhost:3000';
-  return frontendUrl ?? /^http:\/\/localhost:\d+$/;
+  if (frontendUrl !== undefined && frontendUrl.length > 0) return frontendUrl;
+
+  const isDev = process.env['NODE_ENV'] === 'development';
+  if (isDev) return DEV_ALLOWED_ORIGINS;
+
+  if (!prodMisconfigReported) {
+    prodMisconfigReported = true;
+    // Pas d'injection pino possible ici (fonction utilitaire pure) — on émet
+    // sur stderr une seule fois pour signaler une configuration cassée.
+    process.stderr.write(
+      '[CORS] FRONTEND_URL non défini hors développement : toutes les origines sont refusées.\n',
+    );
+  }
+  return [];
 }

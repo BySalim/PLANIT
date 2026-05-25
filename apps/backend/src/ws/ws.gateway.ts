@@ -1,8 +1,11 @@
+import { Inject } from '@nestjs/common';
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import type { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
+import type { Logger } from 'pino';
 import type { Server, Socket } from 'socket.io';
 import type { SessionDto } from '@planit/contracts';
 import { corsOrigin } from '../common/cors';
+import { PINO_LOGGER } from '../common/logger.module';
 
 /**
  * Realtime gateway. Clients identify themselves at connection time with
@@ -19,6 +22,8 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
 
+  constructor(@Inject(PINO_LOGGER) private readonly logger: Logger) {}
+
   /** Socket.IO room name for a given user id. */
   private static room(userId: string): string {
     return `user:${userId}`;
@@ -28,14 +33,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userId: unknown = client.handshake.auth['userId'];
     if (typeof userId === 'string' && userId.length > 0) {
       void client.join(WsGateway.room(userId));
-      console.log(`[WS] client connected: ${client.id} (user ${userId})`);
+      this.logger.info({ clientId: client.id, userId }, '[WS] client connected');
     } else {
-      console.log(`[WS] client connected: ${client.id} (anonymous)`);
+      this.logger.info({ clientId: client.id }, '[WS] client connected (anonymous)');
     }
   }
 
   handleDisconnect(client: Socket): void {
-    console.log(`[WS] client disconnected: ${client.id}`);
+    this.logger.info({ clientId: client.id }, '[WS] client disconnected');
   }
 
   /**
