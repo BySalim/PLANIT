@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AlertTriangleIcon, BellIcon, InboxIcon, SearchIcon } from '@planit/ui';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/auth-context';
 
 export interface BreadcrumbItem {
   label: string;
@@ -18,7 +19,14 @@ interface TopbarProps {
   unreadNotifs?: number | undefined;
 }
 
-const PROFILE_INITIALS = 'AD';
+function computeInitials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+}
 
 export function Topbar({
   title,
@@ -29,6 +37,10 @@ export function Topbar({
   unreadNotifs = 0,
 }: TopbarProps) {
   const [search, setSearch] = useState('');
+  const [profileOpen, setProfileOpen] = useState(false);
+  const { state, logout } = useAuth();
+  const initials =
+    state.status === 'authenticated' ? computeInitials(state.user.nomComplet) : '...';
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border-soft bg-surface px-6">
@@ -95,13 +107,45 @@ export function Topbar({
         <IconActionButton icon={InboxIcon} label="Demandes" badge={pendingDemands} />
         <IconActionButton icon={BellIcon} label="Notifications" badge={unreadNotifs} />
 
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 text-[12px] font-bold text-primary"
-          aria-label="Profil"
+        <div
+          className="relative"
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+              setProfileOpen(false);
+            }
+          }}
         >
-          {PROFILE_INITIALS}
-        </button>
+          <button
+            type="button"
+            onClick={() => setProfileOpen((o) => !o)}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 text-[12px] font-bold text-primary"
+            aria-label="Profil"
+            aria-expanded={profileOpen}
+          >
+            {initials}
+          </button>
+          {profileOpen && (
+            <div className="absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+              <button
+                type="button"
+                disabled
+                className="w-full cursor-not-allowed px-4 py-2.5 text-left text-sm text-text-muted"
+              >
+                Mon compte {/* V03 */}
+              </button>
+              <div className="border-t border-border" />
+              <button
+                type="button"
+                onClick={() => {
+                  void logout();
+                }}
+                className="w-full px-4 py-2.5 text-left text-sm text-text hover:bg-bg"
+              >
+                Se déconnecter
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
