@@ -92,11 +92,9 @@ function NewSessionButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex h-8 flex-shrink-0 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-bold text-white shadow-sm transition-all',
+        'inline-flex h-8 flex-shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 text-[12.5px] font-bold text-white shadow-sm transition-all',
         'hover:brightness-110 active:brightness-95',
       )}
-      // CTA principal : orange vif saturé (PLANIT-IA ORANGE), plus saturé que --color-accent.
-      style={{ background: '#EA580C' }}
     >
       <PlusIcon size={14} color="currentColor" />
       {/* Label responsive : « Nouvelle séance » en large, « Séance » plus étroit. */}

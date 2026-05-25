@@ -58,7 +58,7 @@ function TypeBadge({ type, compact }: { readonly type: SessionType; readonly com
         padding: compact ? '0 4px' : '0 7px',
         borderRadius: compact ? 3 : 4,
         background: 'transparent',
-        color: '#3A2E22',
+        color: 'var(--color-text)',
         fontSize: compact ? 8.5 : 10.5,
         fontWeight: 700,
         letterSpacing: compact ? 0.35 : 0.5,
@@ -90,7 +90,13 @@ function PlanningSessionBlock({ session, top, height, now, variant, onTap }: Blo
   const end = new Date(session.endAt);
   const status = slotStatus(start, end, now);
 
-  const dotColor = status === 'ongoing' ? '#E8620A' : status === 'past' ? '#A8A29E' : '#16A34A';
+  // Dot status couleurs — alignées sur les tokens (accent/text-faint/ok).
+  const dotColor =
+    status === 'ongoing'
+      ? 'var(--color-accent)'
+      : status === 'past'
+        ? 'var(--color-text-faint)'
+        : 'var(--color-ok)';
 
   // Seuils identiques au design de référence (density compact)
   const showMeta = height > 36; // classe ou enseignant
@@ -144,47 +150,24 @@ function PlanningSessionBlock({ session, top, height, now, variant, onTap }: Blo
           {session.module.name}
         </span>
 
-        {/* Meta — classe (enseignant, sans icône) ou nom prof avec icône (étudiant) */}
-        {showMeta ? (
-          variant === 'student' ? (
-            <span
-              style={{
-                marginTop: 2,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                fontSize: 9.5,
-                color: palette.text,
-                opacity: 0.78,
-                fontWeight: 500,
-                fontFamily: 'Inter, system-ui',
-                lineHeight: 1.3,
-                overflow: 'hidden',
-                whiteSpace: 'nowrap',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              <UserSmallIcon size={10} color={palette.text} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{metaLine}</span>
-            </span>
-          ) : (
-            <span
-              style={{
-                marginTop: 2,
-                fontSize: 9.5,
-                color: palette.text,
-                opacity: 0.78,
-                fontWeight: 600,
-                fontFamily: 'Inter, system-ui',
-                overflow: 'hidden',
-                whiteSpace: 'nowrap',
-                textOverflow: 'ellipsis',
-                lineHeight: 1.2,
-              }}
-            >
-              {metaLine}
-            </span>
-          )
+        {/* Ordre design : enseignant → classe puis heure · étudiant → heure puis prof */}
+        {variant === 'teacher' && showMeta ? (
+          <span
+            style={{
+              marginTop: 2,
+              fontSize: 9.5,
+              color: palette.text,
+              opacity: 0.78,
+              fontWeight: 600,
+              fontFamily: 'Inter, system-ui',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              lineHeight: 1.2,
+            }}
+          >
+            {metaLine}
+          </span>
         ) : null}
 
         {/* Horaire + durée */}
@@ -207,6 +190,30 @@ function PlanningSessionBlock({ session, top, height, now, variant, onTap }: Blo
             {format(end, 'HH:mm')}
             <span style={{ opacity: 0.35, margin: '0 3px' }}>·</span>
             <span style={{ fontWeight: 600 }}>{durLabel(start, end)}</span>
+          </span>
+        ) : null}
+
+        {/* Prof avec icône — vue étudiant uniquement, après l'heure */}
+        {variant === 'student' && showMeta ? (
+          <span
+            style={{
+              marginTop: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 9.5,
+              color: palette.text,
+              opacity: 0.72,
+              fontWeight: 500,
+              fontFamily: 'Inter, system-ui',
+              lineHeight: 1.3,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            <UserSmallIcon size={10} color={palette.text} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{metaLine}</span>
           </span>
         ) : null}
 
@@ -264,14 +271,12 @@ function PlanningSessionBlock({ session, top, height, now, variant, onTap }: Blo
   );
 }
 
-// ── WeekDayHeader ─────────────────────────────────────────────────────────────
-// En-tête jours indépendant — à placer dans le même bloc sticky que la toolbar
-// (pattern PLANIT-Design : la toolbar + l'en-tête jours sticky ensemble).
+// ── WeekDayHeader — ligne des jours (à imbriquer dans la sticky toolbar parente) ──
+// Le scrollX est piloté par le parent pour rester synchronisé avec la grille.
 export interface WeekDayHeaderProps {
   readonly weekStart: Date;
   readonly selectedDate: Date;
-  readonly today: Date;
-  /** Décalage horizontal en pixels — synchronisé avec le scroll de la grille. */
+  readonly now?: Date;
   readonly scrollX: number;
   readonly onDaySelect?: (date: Date) => void;
 }
@@ -279,11 +284,12 @@ export interface WeekDayHeaderProps {
 export function WeekDayHeader({
   weekStart,
   selectedDate,
-  today,
+  now = nowDakar(),
   scrollX,
   onDaySelect,
 }: WeekDayHeaderProps) {
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
   return (
     <div className="flex border-b border-border bg-surface">
       <div className="flex-shrink-0" style={{ width: TIME_COL_W }} />
@@ -297,7 +303,7 @@ export function WeekDayHeader({
           }}
         >
           {weekDates.map((d, i) => {
-            const isToday = isSameDay(d, today);
+            const isToday = isSameDay(d, now);
             const isSel = isSameDay(d, selectedDate);
             return (
               <button
@@ -345,7 +351,11 @@ export function WeekDayHeader({
                       fontFamily: 'Poppins, system-ui',
                       fontSize: 11,
                       fontWeight: isToday || isSel ? 700 : 500,
-                      color: isSel ? '#FFF' : isToday ? 'var(--color-accent)' : 'var(--color-text)',
+                      color: isSel
+                        ? 'var(--color-surface)'
+                        : isToday
+                          ? 'var(--color-accent)'
+                          : 'var(--color-text)',
                       lineHeight: 1,
                     }}
                   >
@@ -361,24 +371,19 @@ export function WeekDayHeader({
   );
 }
 
-// ── WeekTimeline ──────────────────────────────────────────────────────────────
-// Grille semaine (axe horaire + colonnes jours) — sans en-tête (utiliser
-// <WeekDayHeader/> séparément pour qu'il puisse être placé dans la sticky toolbar).
+// ── WeekTimeline — grille uniquement (le header est rendu par le parent) ──────
 export interface WeekTimelineProps {
   readonly weekStart: Date;
-  readonly selectedDate: Date;
   readonly sessions: readonly SessionDto[];
   readonly now?: Date;
   /** 'teacher' (défaut) : affiche classe · 'student' : affiche nom du prof */
   readonly variant?: 'teacher' | 'student';
   readonly onSessionTap?: (session: SessionDto) => void;
-  /** Callback de scroll horizontal — sync avec <WeekDayHeader scrollX={...}/>. */
-  readonly onScrollXChange?: (x: number) => void;
+  readonly onScrollXChange?: (scrollX: number) => void;
 }
 
 export function WeekTimeline({
   weekStart,
-  selectedDate: _selectedDate,
   sessions,
   now = nowDakar(),
   variant = 'teacher',
@@ -394,7 +399,7 @@ export function WeekTimeline({
   const hasToday = weekDates.some((d) => isSameDay(d, now));
   const nowY = timeToY(now);
 
-  // Scroll horizontal de la grille — reset à 0 au changement de semaine.
+  // Scroll horizontal — le parent reçoit scrollX pour synchroniser le header.
   const gridRef = useRef<HTMLDivElement>(null);
   const weekStartTs = weekStart.getTime();
   useEffect(() => {
@@ -403,118 +408,115 @@ export function WeekTimeline({
   }, [weekStartTs, onScrollXChange]);
 
   return (
-    <div className="flex flex-col">
-      {/* ── Grille ── */}
-      <div className="flex">
-        {/* Axe horaire */}
-        <div
-          className="relative flex-shrink-0 bg-surface"
-          style={{ width: TIME_COL_W, height: totalHeight }}
-        >
-          {labelHours.map((h) => {
-            const isMajor = (h - START_H) % 4 === 0;
+    <div className="flex">
+      {/* Axe horaire */}
+      <div
+        className="relative flex-shrink-0 bg-surface"
+        style={{ width: TIME_COL_W, height: totalHeight }}
+      >
+        {labelHours.map((h) => {
+          const isMajor = (h - START_H) % 4 === 0;
+          return (
+            <span
+              key={h}
+              className={cn(
+                'absolute right-1 pt-0.5 tabular-nums',
+                isMajor ? 'text-[9px] text-text-muted' : 'text-[8px] text-text-faint',
+              )}
+              style={{ top: (h - START_H) * HOUR_H }}
+            >
+              {h}h
+            </span>
+          );
+        })}
+        {hasToday ? (
+          <span
+            className="absolute right-0.5 flex h-4 items-center rounded bg-accent px-1 text-[8.5px] font-bold tabular-nums text-white shadow-[0_2px_5px_rgba(232,98,10,0.4)]"
+            style={{ top: nowY - 8 }}
+          >
+            {format(now, 'HH:mm', { locale: fr })}
+          </span>
+        ) : null}
+      </div>
+
+      {/* Colonnes jours */}
+      <div
+        ref={gridRef}
+        className="scrollbar-hide flex-1 overflow-x-auto"
+        onScroll={(e) => onScrollXChange?.(e.currentTarget.scrollLeft)}
+      >
+        <div className="flex" style={{ width: 7 * COL_W }}>
+          {weekDates.map((date, di) => {
+            const isToday = isSameDay(date, now);
+            const daySessions = sessions.filter((s) => isSameDay(new Date(s.startAt), date));
             return (
-              <span
-                key={h}
-                className={cn(
-                  'absolute right-1 pt-0.5 tabular-nums',
-                  isMajor ? 'text-[9px] text-text-muted' : 'text-[8px] text-text-faint',
-                )}
-                style={{ top: (h - START_H) * HOUR_H }}
+              <div
+                key={di}
+                className="relative flex-shrink-0"
+                style={{
+                  width: COL_W,
+                  height: totalHeight,
+                  background: isToday ? 'rgba(107,45,14,0.025)' : 'transparent',
+                }}
               >
-                {h}h
-              </span>
+                {/* Lignes majeures (toutes les 4h) */}
+                {Array.from({ length: Math.floor(TOTAL_H / 4) }, (_, i) => i + 1).map((i) => (
+                  <span
+                    key={`maj-${i}`}
+                    aria-hidden
+                    className="absolute inset-x-0 border-t border-border"
+                    style={{ top: i * 4 * HOUR_H }}
+                  />
+                ))}
+                {/* Lignes mineures (toutes les 2h) */}
+                {Array.from({ length: Math.ceil(TOTAL_H / 4) }, (_, i) => i).map((i) => {
+                  const y = (i * 4 + 2) * HOUR_H;
+                  if (y >= totalHeight) return null;
+                  return (
+                    <span
+                      key={`min-${i}`}
+                      aria-hidden
+                      className="absolute inset-x-0 border-t border-border-soft opacity-60"
+                      style={{ top: y }}
+                    />
+                  );
+                })}
+                {/* Ligne heure courante */}
+                {isToday ? (
+                  <>
+                    <span
+                      aria-hidden
+                      className="absolute inset-x-0 z-[4] h-[1.5px] bg-accent shadow-[0_0_6px_rgba(232,98,10,0.55)]"
+                      style={{ top: nowY - 0.75 }}
+                    />
+                    <span
+                      aria-hidden
+                      className="absolute z-[5] size-[9px] rounded-full bg-accent shadow-[0_0_0_2px_var(--color-surface),0_1px_3px_rgba(232,98,10,0.5)]"
+                      style={{ top: nowY - 4.5, left: -4.5 }}
+                    />
+                  </>
+                ) : null}
+                {/* Séances */}
+                {daySessions.map((session) => {
+                  const start = new Date(session.startAt);
+                  const end = new Date(session.endAt);
+                  const top = timeToY(start);
+                  const height = Math.max(timeToY(end) - top - 2, 22);
+                  return (
+                    <PlanningSessionBlock
+                      key={session.id}
+                      session={session}
+                      top={top + 1}
+                      height={height}
+                      now={now}
+                      variant={variant}
+                      {...(onSessionTap !== undefined ? { onTap: onSessionTap } : {})}
+                    />
+                  );
+                })}
+              </div>
             );
           })}
-          {hasToday ? (
-            <span
-              className="absolute right-0.5 flex h-4 items-center rounded bg-accent px-1 text-[8.5px] font-bold tabular-nums text-white shadow-[0_2px_5px_rgba(232,98,10,0.4)]"
-              style={{ top: nowY - 8 }}
-            >
-              {format(now, 'HH:mm', { locale: fr })}
-            </span>
-          ) : null}
-        </div>
-
-        {/* Colonnes jours */}
-        <div
-          ref={gridRef}
-          className="flex-1 overflow-x-auto"
-          onScroll={(e) => onScrollXChange?.(e.currentTarget.scrollLeft)}
-        >
-          <div className="flex" style={{ width: 7 * COL_W }}>
-            {weekDates.map((date, di) => {
-              const isToday = isSameDay(date, now);
-              const daySessions = sessions.filter((s) => isSameDay(new Date(s.startAt), date));
-              return (
-                <div
-                  key={di}
-                  className="relative flex-shrink-0"
-                  style={{
-                    width: COL_W,
-                    height: totalHeight,
-                    background: isToday ? 'rgba(107,45,14,0.025)' : 'transparent',
-                  }}
-                >
-                  {/* Lignes majeures (toutes les 4h) */}
-                  {Array.from({ length: Math.floor(TOTAL_H / 4) }, (_, i) => i + 1).map((i) => (
-                    <span
-                      key={`maj-${i}`}
-                      aria-hidden
-                      className="absolute inset-x-0 border-t border-border"
-                      style={{ top: i * 4 * HOUR_H }}
-                    />
-                  ))}
-                  {/* Lignes mineures (toutes les 2h) */}
-                  {Array.from({ length: Math.ceil(TOTAL_H / 4) }, (_, i) => i).map((i) => {
-                    const y = (i * 4 + 2) * HOUR_H;
-                    if (y >= totalHeight) return null;
-                    return (
-                      <span
-                        key={`min-${i}`}
-                        aria-hidden
-                        className="absolute inset-x-0 border-t border-border-soft opacity-60"
-                        style={{ top: y }}
-                      />
-                    );
-                  })}
-                  {/* Ligne heure courante */}
-                  {isToday ? (
-                    <>
-                      <span
-                        aria-hidden
-                        className="absolute inset-x-0 z-[4] h-[1.5px] bg-accent shadow-[0_0_6px_rgba(232,98,10,0.55)]"
-                        style={{ top: nowY - 0.75 }}
-                      />
-                      <span
-                        aria-hidden
-                        className="absolute z-[5] size-[9px] rounded-full bg-accent shadow-[0_0_0_2px_var(--color-surface),0_1px_3px_rgba(232,98,10,0.5)]"
-                        style={{ top: nowY - 4.5, left: -4.5 }}
-                      />
-                    </>
-                  ) : null}
-                  {/* Séances */}
-                  {daySessions.map((session) => {
-                    const start = new Date(session.startAt);
-                    const end = new Date(session.endAt);
-                    const top = timeToY(start);
-                    const height = Math.max(timeToY(end) - top - 2, 22);
-                    return (
-                      <PlanningSessionBlock
-                        key={session.id}
-                        session={session}
-                        top={top + 1}
-                        height={height}
-                        now={now}
-                        variant={variant}
-                        {...(onSessionTap !== undefined ? { onTap: onSessionTap } : {})}
-                      />
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
         </div>
       </div>
     </div>

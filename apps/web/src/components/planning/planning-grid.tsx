@@ -335,13 +335,15 @@ export function PlanningGrid({
 
   return (
     // Clic hors d'une séance → désélection (les cartes stoppent la propagation).
-    <div className="h-full overflow-auto bg-surface" onClick={() => setSelectedId(null)}>
-      {/* Colonnes : 64 px de rail heures + 7 jours min-250 / max-1fr.
-          Sous ~1114 px utiles, la grille déborde et le scroll horizontal
-          apparaît automatiquement sur le conteneur parent (overflow-auto). */}
-      <div className="grid grid-cols-[64px_repeat(7,minmax(250px,2fr))]">
+    // Calqué sur PLANIT-IA/rp/planning-canvas.jsx : rail heures 44px, en-tête
+    // 42px non-capitalisé, scrollbars masquées (UX desktop pro).
+    <div
+      className="scrollbar-hide h-full overflow-auto bg-surface"
+      onClick={() => setSelectedId(null)}
+    >
+      <div className="grid grid-cols-[44px_repeat(7,minmax(250px,2fr))]">
         {/* Header row : sticky corner + day labels (fond blanc, calqué PLANIT-IA) */}
-        <div className="sticky left-0 top-0 z-30 flex items-center justify-center border-b border-r border-border bg-surface text-text-faint">
+        <div className="sticky left-0 top-0 z-30 flex h-[42px] items-center justify-center border-b border-r border-border-soft bg-surface text-text-faint">
           <BarChartIcon size={15} color="currentColor" />
         </div>
         {Array.from({ length: DAY_COUNT }, (_, dayIndex) => {
@@ -349,30 +351,30 @@ export function PlanningGrid({
           return (
             <div
               key={dayIndex}
-              className="sticky top-0 z-20 border-b border-r border-border bg-surface px-3 py-2.5 text-center"
+              className="sticky top-0 z-20 flex h-[42px] flex-col justify-center border-b border-r border-border-soft bg-surface px-2.5 text-center"
             >
-              <div className="text-xs font-semibold uppercase tracking-wide text-text-sec">
+              <span className="truncate text-[11px] font-semibold leading-tight text-text">
                 {format(dayDate, 'EEEE', { locale: fr })}
-              </div>
-              <div className="text-[11px] text-text-muted">
+              </span>
+              <span className="mt-px truncate text-[10px] leading-tight text-text-muted">
                 {format(dayDate, 'd MMM', { locale: fr })}
-              </div>
+              </span>
             </div>
           );
         })}
 
         {/* Body : sticky hour column + day columns with absolute-positioned sessions */}
         <div
-          className="sticky left-0 z-10 border-r border-border bg-surface"
+          className="sticky left-0 z-10 border-r border-border-soft bg-surface"
           style={{ height: GRID_HEIGHT }}
         >
-          {HOURS.map((hour) => (
-            // Label positionné JUSTE SOUS la ligne horaire correspondante
-            // (sinon l'étiquette 8h est masquée par l'en-tête sticky).
+          {HOURS.filter((h) => (h - DAY_START) % 2 === 0).map((hour) => (
+            // Label uniquement toutes les 2h, à droite avec léger padding,
+            // pour matcher PLANIT-IA (heures impaires absentes du rail).
             <div
               key={hour}
-              className="absolute right-1 text-[10px] font-medium text-text-muted"
-              style={{ top: (hour - DAY_START) * HOUR_HEIGHT + 2 }}
+              className="absolute pr-1.5 pt-0.5 text-[9px] font-medium tabular-nums text-text-muted"
+              style={{ top: (hour - DAY_START) * HOUR_HEIGHT, right: 0 }}
             >
               {hour}h
             </div>

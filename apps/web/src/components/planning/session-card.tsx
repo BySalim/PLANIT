@@ -49,9 +49,12 @@ export function SessionCard({
   const duration = formatDuration(start, end);
   const categoryLabel = CATEGORY_LABEL[categoryForType(session.type)];
 
-  const cardBg = hasConflict ? '#FEF2F2' : palette.bg;
-  const barColor = hasConflict ? '#DC2626' : palette.bar;
-  const textColor = hasConflict ? '#991B1B' : palette.text;
+  // En cas de conflit, on bascule sur les tokens d'erreur du design system
+  // (var(--color-err-100), var(--color-err)). Le texte foncé d'accentuation
+  // n'a pas de token dédié — on garde une variation Tailwind sémantique.
+  const cardBg = hasConflict ? 'var(--color-err-100)' : palette.bg;
+  const barColor = hasConflict ? 'var(--color-err)' : palette.bar;
+  const textColor = hasConflict ? 'var(--color-err)' : palette.text;
 
   return (
     <button

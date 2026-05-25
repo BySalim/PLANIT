@@ -10,7 +10,8 @@ const prisma = new PrismaClient();
 seedDatabase(prisma)
   .then(() => {
     console.log(
-      'Seed complete (vague-01): 1 RP, 3 enseignants, 1 étudiant, 1 classe, 3 modules, 3 salles, 6 séances.',
+      'Seed complete (vague-02): 2 filières, 3 classes, 1 RP, 3 enseignants, 1 étudiant (argon2id), ' +
+        '3 UE, 6 modules, 4 salles, settings singleton, 10 séances (incl. 1 multi-classes + 1 évaluation + 2 drafts).',
     );
   })
   .catch((error: unknown) => {

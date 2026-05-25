@@ -65,6 +65,15 @@ export const weekPlanningQuerySchema = z.object({
   classeId: z.string().min(1).optional(),
   teacherId: z.string().min(1).optional(),
   studentId: z.string().min(1).optional(),
+  // Pagination — par défaut on ramène 100 séances max (largement suffisant
+  // pour une semaine humaine ; protection contre les requêtes pathologiques).
+  take: z.coerce.number().int().min(1).max(500).default(100),
+  skip: z.coerce.number().int().min(0).default(0),
+});
+
+// ── Publish query parameters (POST /sessions/publish) ───────────────
+export const publishQuerySchema = z.object({
+  classeId: z.string().min(1).optional(),
 });
 
 // ── Week planning statistics (RP planning header counters) ──────────
@@ -83,4 +92,5 @@ export type SessionDto = z.infer<typeof sessionSchema>;
 export type CreateSessionDto = z.infer<typeof createSessionSchema>;
 export type UpdateSessionDto = z.infer<typeof updateSessionSchema>;
 export type WeekPlanningQueryDto = z.infer<typeof weekPlanningQuerySchema>;
+export type PublishQueryDto = z.infer<typeof publishQuerySchema>;
 export type SessionStatsDto = z.infer<typeof sessionStatsSchema>;

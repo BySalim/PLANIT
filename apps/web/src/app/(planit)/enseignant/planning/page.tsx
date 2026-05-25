@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { addDays, format, startOfWeek } from 'date-fns';
+import { Suspense, useCallback, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CalendarIcon } from '@planit/ui';
 import type { SessionDto } from '@planit/contracts';
@@ -28,18 +28,38 @@ const FILTER_LABEL: Record<TypeFilter, string> = {
   event: 'Évén.',
 };
 
+// Next 15 : useSearchParams() exige un boundary Suspense pour le prerender.
 // eslint-disable-next-line no-restricted-syntax
 export default function EnseignantPlanningPage() {
+  return (
+    <Suspense fallback={null}>
+      <EnseignantPlanningPageInner />
+    </Suspense>
+  );
+}
+
+function EnseignantPlanningPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const teacher = useCurrentTeacher();
   const toast = useToast();
 
+  // ?date=YYYY-MM-DD : ouverture sur un jour précis (clic depuis WeekStrip).
+  const initialDate = useMemo<Date>(() => {
+    const raw = searchParams?.get('date');
+    if (raw !== null && raw !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const parsed = parseISO(raw);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    return nowDakar();
+  }, [searchParams]);
+
   const [view, setView] = useState<ViewMode>('day');
-  const [selectedDate, setSelectedDate] = useState<Date>(() => nowDakar());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => initialDate);
   const [showCalendar, setShowCalendar] = useState(false);
   // Filtre affiché mais inactif — TD-019.
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-  // Scroll horizontal partagé entre <WeekDayHeader/> et <WeekTimeline/>.
+  // ScrollX partagé entre WeekDayHeader (sticky) et WeekTimeline (grille).
   const [weekScrollX, setWeekScrollX] = useState(0);
 
   const [updateModal, setUpdateModal] = useState<{
@@ -80,11 +100,10 @@ export default function EnseignantPlanningPage() {
 
   return (
     <MobileShell>
-      <div className="relative">
-        {/* Sticky wrapper : toolbar + en-tête jours (semaine) sticky ensemble.
-            Styles inline pour garantir position:sticky sans surprise Tailwind. */}
-        <div className="bg-surface" style={{ position: 'sticky', top: 0, zIndex: 20 }}>
-          <div className="flex items-center gap-2 border-b border-border-soft px-3 py-2">
+      <div className="relative flex flex-col">
+        {/* Bloc sticky unique : toolbar + (en vue semaine) ligne des jours, pour rester collés. */}
+        <div className="sticky top-0 z-20 bg-surface">
+          <div className="flex items-center gap-2 border-b border-border-soft bg-surface px-3 py-2">
             <div className="flex rounded-[10px] border border-border-soft bg-bg p-0.5">
               {(['day', 'week'] as const).map((v) => {
                 const active = view === v;
@@ -166,12 +185,11 @@ export default function EnseignantPlanningPage() {
             </button>
           </div>
 
-          {/* En-tête jours — dans la sticky toolbar pour rester pinned avec elle. */}
           {view === 'week' ? (
             <WeekDayHeader
               weekStart={weekStart}
               selectedDate={selectedDate}
-              today={now}
+              now={now}
               scrollX={weekScrollX}
               onDaySelect={(d) => {
                 setSelectedDate(d);
@@ -192,7 +210,6 @@ export default function EnseignantPlanningPage() {
           ) : (
             <WeekTimeline
               weekStart={weekStart}
-              selectedDate={selectedDate}
               sessions={sessions}
               now={now}
               onSessionTap={handleSessionTap}

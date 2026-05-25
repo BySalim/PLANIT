@@ -67,6 +67,39 @@ pnpm build       # Build de production
 pnpm format      # Prettier
 ```
 
+## Setup local -- FAQ
+
+Problemes recurrents rencontres par l'equipe pendant la Vague 01. Version
+detaillee dans [docs/runbooks/local-setup-faq.md](docs/runbooks/local-setup-faq.md).
+
+| Symptome                                             | Cause                                      | Solution                                                                      |
+| ---------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------- |
+| `pnpm install` qui timeout (depuis Dakar)            | Latence registry npm vers l'Europe         | `pnpm install --fetch-timeout=180000 --fetch-retries=5`                       |
+| `pnpm db:reset` echoue avec `connection refused`     | Docker pas demarre                         | `docker compose -f infra/docker-compose.dev.yml up -d postgres redis`         |
+| `pg_isready` timeout en boucle                       | Postgres pas pret ou port deja pris        | Verifier `docker ps` ; tuer un autre Postgres local (`lsof -i :5432`)         |
+| Glob WSL qui timeout (Windows)                       | Acces via UNC (`\\wsl.localhost\...`)      | Travailler depuis le filesystem ext4 natif WSL (`/home/user/...`), pas en UNC |
+| `chmod` / `EACCES` sur fichiers en pre-commit        | Permissions read-only laisses par un build | `chmod u+w <fichier>` puis retenter le commit                                 |
+| `EPERM` Prisma sur Windows lors de `prisma generate` | Process `node`/`tsc` qui locke `dist/`     | Tuer le watch (`Ctrl+C` sur `pnpm dev`) puis relancer `pnpm db:generate`      |
+
+## Secrets en production
+
+**Avant tout deploiement reel**, changer obligatoirement les variables
+suivantes (cf. `.env.example` racine et `apps/backend/.env.example`) :
+
+- [ ] `JWT_SECRET` -- generer 64 octets random : `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
+- [ ] `REFRESH_TOKEN_SECRET` -- meme commande, **valeur distincte** de `JWT_SECRET`
+- [ ] `DATABASE_URL` -- pointer sur Postgres prod (jamais `localhost` / `planit_dev_password`)
+- [ ] `MINIO_ACCESS_KEY` et `MINIO_SECRET_KEY` -- credentials prod, jamais `minioadmin`/`planit_minio_dev`
+- [ ] `RESEND_API_KEY` -- cle Resend (ou autre provider) reelle, pas `re_xxxxxxxx`
+- [ ] `WHATSAPP_SESSION_PATH` -- chemin persistant hors container (volume Docker)
+- [ ] `ORANGE_SMS_API_KEY` -- cle Orange Senegal reelle, pas un placeholder
+- [ ] `FRONTEND_URL` -- domaine prod (`https://planit.ism.edu.sn`), pas `localhost:3000`
+- [ ] `NODE_ENV=production`
+
+`gitleaks` est branche en pre-commit -- une cle reelle commitee fera echouer
+le hook. Si une cle a fuite malgre tout : la **revoque immediatement** chez le
+provider avant tout `git push --force`.
+
 ## Equipe
 
 | Membre                        | Branche        | Role                     |

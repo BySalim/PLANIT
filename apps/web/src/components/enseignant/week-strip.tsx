@@ -49,7 +49,11 @@ export function WeekStrip({ sessions, now = nowDakar(), onDayClick }: WeekStripP
   const days = buildWeekCells(sessions, weekStart, now);
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Jours de la semaine">
+    <div
+      className="scrollbar-hide flex gap-2 overflow-x-auto pb-1"
+      role="list"
+      aria-label="Jours de la semaine"
+    >
       {days.map((d) => {
         const active = d.isToday;
         const interactive = onDayClick !== undefined;

@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isSameDay } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import type { SessionDto } from '@planit/contracts';
 import { now as nowDakar } from '@planit/utils/date';
 import { Greeting } from '@/components/enseignant/greeting';
 import { HeroCurrentSession } from '@/components/enseignant/hero-current-session';
+import { HeroSkeleton } from '@/components/enseignant/hero-skeleton';
 import { MobileShell } from '@/components/enseignant/mobile-shell';
 import { PlanningUpdateModal } from '@/components/enseignant/planning-update-modal';
 import { SessionsTodayList } from '@/components/enseignant/sessions-today-list';
@@ -61,9 +62,7 @@ export default function EnseignantHomePage() {
         <Greeting fullName={teacher.fullName} now={now} />
 
         {isLoading ? (
-          <div className="rounded-2xl border border-border bg-surface px-6 py-8 text-center text-sm text-text-sec">
-            Chargement de votre planning…
-          </div>
+          <HeroSkeleton />
         ) : isError ? (
           <div
             role="alert"
@@ -94,7 +93,9 @@ export default function EnseignantHomePage() {
               <WeekStrip
                 sessions={weekSessions}
                 now={now}
-                onDayClick={() => router.push('/enseignant/planning')}
+                onDayClick={(date) =>
+                  router.push(`/enseignant/planning?date=${format(date, 'yyyy-MM-dd')}`)
+                }
               />
             </div>
           </>

@@ -14,7 +14,15 @@ export default defineConfig({
     include: ['test/**/*.spec.ts'],
     setupFiles: ['./test/setup.ts'],
     globalSetup: ['./test/global-setup.ts'],
-    env: { DATABASE_URL: TEST_DATABASE_URL },
+    env: {
+      DATABASE_URL: TEST_DATABASE_URL,
+      // Secrets JWT factices pour les tests d'intégration (cf. ADR-0007).
+      // Hex 64 chars — équivalent 256 bits, suffisant pour HS256.
+      JWT_ACCESS_SECRET: 'test_access_secret_0000000000000000000000000000000000000000000000aa',
+      JWT_REFRESH_SECRET: 'test_refresh_secret_000000000000000000000000000000000000000000000bb',
+      JWT_ACCESS_TTL: '900',
+      JWT_REFRESH_TTL: '604800',
+    },
     fileParallelism: false,
     hookTimeout: 30000,
     testTimeout: 30000,

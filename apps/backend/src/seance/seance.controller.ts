@@ -1,21 +1,26 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import {
   createSessionSchema,
+  publishQuerySchema,
   updateSessionSchema,
   weekPlanningQuerySchema,
 } from '@planit/contracts';
 import type {
   CreateSessionDto,
+  PublishQueryDto,
   SessionDto,
   SessionStatsDto,
   UpdateSessionDto,
   WeekPlanningQueryDto,
 } from '@planit/contracts';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { SeanceService } from './seance.service';
 
 @ApiTags('Sessions')
+@ApiCookieAuth('access')
 @Controller('sessions')
 export class SeanceController {
   constructor(private readonly seances: SeanceService) {}
@@ -53,9 +58,14 @@ export class SeanceController {
 
   /** B.2 — create a session. */
   @Post()
+  @Roles('RESPONSABLE_PROGRAMME')
+  // Mutation sensible : 10 créations max / minute / IP.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Créer une séance' })
   @ApiResponse({ status: 201, description: 'Séance créée' })
   @ApiResponse({ status: 400, description: 'Corps invalide ou référence inexistante' })
+  @ApiResponse({ status: 403, description: 'Rôle insuffisant (RP requis)' })
+  @ApiResponse({ status: 429, description: 'Trop de requêtes' })
   create(
     @Body(new ZodValidationPipe(createSessionSchema)) dto: CreateSessionDto,
   ): Promise<SessionDto> {
@@ -64,10 +74,15 @@ export class SeanceController {
 
   /** B.3 — update a session (reverts it to unpublished). */
   @Put(':id')
+  @Roles('RESPONSABLE_PROGRAMME')
+  // Mutation sensible : 10 mises à jour max / minute / IP.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Modifier une séance' })
   @ApiResponse({ status: 200, description: 'Séance mise à jour' })
   @ApiResponse({ status: 400, description: 'Corps invalide' })
+  @ApiResponse({ status: 403, description: 'Rôle insuffisant (RP requis)' })
   @ApiResponse({ status: 404, description: 'Séance introuvable' })
+  @ApiResponse({ status: 429, description: 'Trop de requêtes' })
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateSessionSchema)) dto: UpdateSessionDto,
@@ -77,10 +92,18 @@ export class SeanceController {
 
   /** B.5 — publish every pending session, optionally scoped to a class. */
   @Post('publish')
+  @Roles('RESPONSABLE_PROGRAMME')
   @HttpCode(200)
+  // Mutation très sensible (broadcast WS) : 10 publications max / minute / IP.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Publier les séances en attente' })
   @ApiResponse({ status: 200, description: 'Séances publiées' })
-  publish(@Query('classeId') classeId?: string): Promise<SessionDto[]> {
-    return this.seances.publish(classeId);
+  @ApiResponse({ status: 400, description: 'classeId invalide' })
+  @ApiResponse({ status: 403, description: 'Rôle insuffisant (RP requis)' })
+  @ApiResponse({ status: 429, description: 'Trop de requêtes' })
+  publish(
+    @Query(new ZodValidationPipe(publishQuerySchema)) query: PublishQueryDto,
+  ): Promise<SessionDto[]> {
+    return this.seances.publish(query.classeId);
   }
 }
