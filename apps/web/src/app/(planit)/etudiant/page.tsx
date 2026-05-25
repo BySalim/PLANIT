@@ -8,6 +8,7 @@ import type { SessionDto } from '@planit/contracts';
 import { now as nowDakar } from '@planit/utils/date';
 import { Greeting } from '@/components/enseignant/greeting';
 import { HeroCurrentSession } from '@/components/enseignant/hero-current-session';
+import { HeroSkeleton } from '@/components/enseignant/hero-skeleton';
 import { MobileShell } from '@/components/etudiant/mobile-shell';
 import { PlanningUpdateModal } from '@/components/enseignant/planning-update-modal';
 import { SessionsTodayList } from '@/components/enseignant/sessions-today-list';
@@ -61,9 +62,7 @@ export default function EtudiantHomePage() {
         <Greeting fullName={student.fullName} now={now} />
 
         {isLoading ? (
-          <div className="rounded-2xl border border-border bg-surface px-6 py-8 text-center text-sm text-text-sec">
-            Chargement de votre planning…
-          </div>
+          <HeroSkeleton />
         ) : isError ? (
           <div
             role="alert"

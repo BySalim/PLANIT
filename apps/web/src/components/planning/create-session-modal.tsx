@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { format } from 'date-fns';
 import { type CreateSessionDto, sessionTypeSchema, z } from '@planit/contracts';
+import { now as nowDakar } from '@planit/utils/date';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
@@ -46,7 +47,7 @@ function toIsoUtc(date: string, time: string): string {
 }
 
 function defaultDateString(date: Date | undefined): string {
-  return format(date ?? new Date(), 'yyyy-MM-dd');
+  return format(date ?? nowDakar(), 'yyyy-MM-dd');
 }
 
 export function CreateSessionModal({ isOpen, onClose, defaultDay }: CreateSessionModalProps) {

@@ -1,5 +1,6 @@
 import { addDays, format, getISOWeek, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { now as nowDakar } from '@planit/utils/date';
 
 const WEEK_LENGTH_DAYS = 7;
 
@@ -11,8 +12,9 @@ export function getWeekNumber(weekStart: Date): number {
 /**
  * Africa/Dakar runs on UTC+0 year-round (no DST), so plain Date math is safe
  * when we anchor to ISO date strings (YYYY-MM-DD) without a time component.
+ * Le `reference` par défaut passe par `nowDakar()` pour respecter le fuseau projet.
  */
-export function getCurrentWeekStart(reference: Date = new Date()): Date {
+export function getCurrentWeekStart(reference: Date = nowDakar()): Date {
   return startOfWeek(reference, { weekStartsOn: 1 });
 }
 

@@ -28,11 +28,11 @@ export function PublishButton({ sessions }: PublishButtonProps) {
       className={cn(
         'inline-flex h-8 flex-shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-[12.5px] font-bold text-white transition-all',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        !disabled && 'bg-brand-gradient hover:brightness-110 active:brightness-95',
+        disabled ? 'bg-text-faint' : 'bg-brand-gradient hover:brightness-110 active:brightness-95',
       )}
       style={
         disabled
-          ? { background: '#9CA3AF' }
+          ? undefined
           : {
               boxShadow: '0 2px 8px -2px rgba(232, 98, 10, 0.6)',
             }

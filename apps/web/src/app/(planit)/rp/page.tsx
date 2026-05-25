@@ -7,6 +7,7 @@ import { CreateSessionModal } from '@/components/planning/create-session-modal';
 import { HolidayBanner } from '@/components/planning/holiday-banner';
 import { PlanningFooter } from '@/components/planning/stats-bar';
 import { PlanningGrid } from '@/components/planning/planning-grid';
+import { PlanningGridSkeleton } from '@/components/planning/planning-grid-skeleton';
 import { PlanningToolbar } from '@/components/planning/planning-toolbar';
 import { SessionDetailDrawer } from '@/components/planning/session-detail-drawer';
 import { ViewScopeToggle, type ViewScope } from '@/components/planning/view-scope-toggle';
@@ -65,14 +66,18 @@ export default function RpPlanningPage() {
 
         {/* Planning grid — fills remaining height, scrolls internally */}
         <div className="min-h-0 flex-1">
-          <PlanningGrid
-            weekStart={weekStart}
-            sessions={sessions}
-            isLoading={sessionsQuery.isLoading}
-            error={sessionsQuery.error}
-            onSessionOpen={handleSessionOpen}
-            onRetry={() => sessionsQuery.refetch()}
-          />
+          {sessionsQuery.isLoading ? (
+            <PlanningGridSkeleton />
+          ) : (
+            <PlanningGrid
+              weekStart={weekStart}
+              sessions={sessions}
+              isLoading={false}
+              error={sessionsQuery.error}
+              onSessionOpen={handleSessionOpen}
+              onRetry={() => sessionsQuery.refetch()}
+            />
+          )}
         </div>
 
         {/* Footer with stats + actions */}
