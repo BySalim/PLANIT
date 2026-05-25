@@ -165,7 +165,12 @@ export class SeanceService {
 
   /** Actors concerned by a set of sessions: their teachers + students of their classes. */
   private async concernedUserIds(seances: SeanceWithRelations[]): Promise<string[]> {
-    const teacherIds = seances.map((seance) => seance.teacherId);
+    // `teacherId` est devenu nullable en V02 (LOT 2 migration). On filtre
+    // les `null` ici — un EVENEMENT V02 sans enseignant interne n'a pas de
+    // teacher à notifier côté V01.
+    const teacherIds = seances
+      .map((seance) => seance.teacherId)
+      .filter((id): id is string => id !== null);
     const classeIds = [...new Set(seances.map((seance) => seance.classeId))];
     const students = await this.prisma.user.findMany({
       where: { classeId: { in: classeIds }, role: 'ETUDIANT' },
