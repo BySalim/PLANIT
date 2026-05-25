@@ -4,3 +4,7 @@ export * from '@planit/design-tokens';
 
 // Icon set + brand logo (ported from PLANIT-IA prototype).
 export * from './icons';
+
+// V02 primitives (LOT 0).
+export * from './hooks';
+export * from './components';
