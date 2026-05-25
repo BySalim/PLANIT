@@ -5,6 +5,8 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createTestApp } from './helpers/app';
 import { resetDb } from './helpers/db';
+import { loginAs } from './helpers/auth';
+import type { LoggedInSession } from './helpers/auth';
 import { WsGateway } from '../src/ws/ws.gateway';
 
 /** Current week's Monday as YYYY-MM-DD — matches the seed anchoring. */
@@ -22,6 +24,8 @@ const weekStart = currentMonday();
 const prisma = new PrismaClient();
 let app: INestApplication;
 let emitSpy: MockInstance;
+let rp: LoggedInSession;
+let student: LoggedInSession;
 
 /** A valid create payload referencing seed entities. */
 function validCreateBody(): Record<string, string> {
@@ -50,6 +54,10 @@ beforeEach(async () => {
   // emitSessionPublished is stubbed: a real broadcast needs a live Socket.IO
   // server, which is only attached on app.listen() — not on app.init().
   emitSpy = vi.spyOn(app.get(WsGateway), 'emitSessionPublished').mockImplementation(() => {});
+
+  // Login après resetDb : les comptes sont recréés à chaque test.
+  rp = await loginAs(app, 'RESPONSABLE_PROGRAMME');
+  student = await loginAs(app, 'ETUDIANT');
 });
 
 afterEach(() => {
@@ -63,7 +71,10 @@ describe('GET /api/sessions (B.1)', () => {
   // + 1 Conférence multi-classes publiée + 1 Évaluation publiée
   // + 2 drafts non publiées (NET TD GL3-B, SEC CM GL3-A). Total = 10.
   it('returns the 10 seed sessions of the current week', async () => {
-    const res = await api().get('/api/sessions').query({ weekStart });
+    const res = await api()
+      .get('/api/sessions')
+      .set('Cookie', rp.cookieHeader)
+      .query({ weekStart });
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(10);
   });
@@ -71,6 +82,7 @@ describe('GET /api/sessions (B.1)', () => {
   it('filters by teacher', async () => {
     const res = await api()
       .get('/api/sessions')
+      .set('Cookie', rp.cookieHeader)
       .query({ weekStart, teacherId: 'seed-teacher-algo' });
     expect(res.status).toBe(200);
     // V02 seed: teacher-algo owns seance-01 (CM), -02 (TD), -05 (CM), the
@@ -82,19 +94,30 @@ describe('GET /api/sessions (B.1)', () => {
   });
 
   it('rejects a missing weekStart with 400', async () => {
-    const res = await api().get('/api/sessions');
+    const res = await api().get('/api/sessions').set('Cookie', rp.cookieHeader);
     expect(res.status).toBe(400);
   });
 
   it('rejects an invalid weekStart format with 400', async () => {
-    const res = await api().get('/api/sessions').query({ weekStart: 'not-a-date' });
+    const res = await api()
+      .get('/api/sessions')
+      .set('Cookie', rp.cookieHeader)
+      .query({ weekStart: 'not-a-date' });
     expect(res.status).toBe(400);
+  });
+
+  it('rejects an unauthenticated request with 401', async () => {
+    const res = await api().get('/api/sessions').query({ weekStart });
+    expect(res.status).toBe(401);
   });
 });
 
 describe('POST /api/sessions (B.2)', () => {
   it('creates an unpublished session', async () => {
-    const res = await api().post('/api/sessions').send(validCreateBody());
+    const res = await api()
+      .post('/api/sessions')
+      .set('Cookie', rp.cookieHeader)
+      .send(validCreateBody());
     expect(res.status).toBe(201);
     expect(res.body.type).toBe('TP');
     expect(res.body.isPublished).toBe(false);
@@ -102,21 +125,36 @@ describe('POST /api/sessions (B.2)', () => {
   });
 
   it('rejects an invalid body with 400', async () => {
-    const res = await api().post('/api/sessions').send({ type: 'CM' });
+    const res = await api()
+      .post('/api/sessions')
+      .set('Cookie', rp.cookieHeader)
+      .send({ type: 'CM' });
     expect(res.status).toBe(400);
   });
 
   it('rejects an unknown foreign key with 400', async () => {
     const res = await api()
       .post('/api/sessions')
+      .set('Cookie', rp.cookieHeader)
       .send({ ...validCreateBody(), moduleId: 'ghost-module' });
     expect(res.status).toBe(400);
+  });
+
+  it('rejects an ETUDIANT (RBAC) with 403', async () => {
+    const res = await api()
+      .post('/api/sessions')
+      .set('Cookie', student.cookieHeader)
+      .send(validCreateBody());
+    expect(res.status).toBe(403);
   });
 });
 
 describe('PUT /api/sessions/:id (B.3)', () => {
   it('updates a session and reverts it to unpublished', async () => {
-    const res = await api().put('/api/sessions/seed-seance-01').send({ salleId: 'seed-salle-201' });
+    const res = await api()
+      .put('/api/sessions/seed-seance-01')
+      .set('Cookie', rp.cookieHeader)
+      .send({ salleId: 'seed-salle-201' });
     expect(res.status).toBe(200);
     expect(res.body.salle.id).toBe('seed-salle-201');
     expect(res.body.isPublished).toBe(false);
@@ -124,19 +162,25 @@ describe('PUT /api/sessions/:id (B.3)', () => {
   });
 
   it('rejects an unknown id with 404', async () => {
-    const res = await api().put('/api/sessions/ghost-id').send({ type: 'CM' });
+    const res = await api()
+      .put('/api/sessions/ghost-id')
+      .set('Cookie', rp.cookieHeader)
+      .send({ type: 'CM' });
     expect(res.status).toBe(404);
   });
 
   it('rejects an invalid body with 400', async () => {
-    const res = await api().put('/api/sessions/seed-seance-01').send({ startAt: 'not-a-datetime' });
+    const res = await api()
+      .put('/api/sessions/seed-seance-01')
+      .set('Cookie', rp.cookieHeader)
+      .send({ startAt: 'not-a-datetime' });
     expect(res.status).toBe(400);
   });
 });
 
 describe('GET /api/sessions/:id (B.4)', () => {
   it('returns a session detail', async () => {
-    const res = await api().get('/api/sessions/seed-seance-01');
+    const res = await api().get('/api/sessions/seed-seance-01').set('Cookie', rp.cookieHeader);
     expect(res.status).toBe(200);
     expect(res.body.id).toBe('seed-seance-01');
     expect(res.body.module.code).toBe('ALGO');
@@ -144,14 +188,14 @@ describe('GET /api/sessions/:id (B.4)', () => {
   });
 
   it('rejects an unknown id with 404', async () => {
-    const res = await api().get('/api/sessions/ghost-id');
+    const res = await api().get('/api/sessions/ghost-id').set('Cookie', rp.cookieHeader);
     expect(res.status).toBe(404);
   });
 });
 
 describe('POST /api/sessions/publish (B.5 / B.6)', () => {
   it('publishes every pending session', async () => {
-    const res = await api().post('/api/sessions/publish');
+    const res = await api().post('/api/sessions/publish').set('Cookie', rp.cookieHeader);
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(2); // seed has 2 pending sessions
     for (const session of res.body) {
@@ -161,7 +205,7 @@ describe('POST /api/sessions/publish (B.5 / B.6)', () => {
   });
 
   it('notifies only the actors concerned by the published sessions', async () => {
-    await api().post('/api/sessions/publish').expect(200);
+    await api().post('/api/sessions/publish').set('Cookie', rp.cookieHeader).expect(200);
 
     expect(emitSpy).toHaveBeenCalledTimes(1);
     const userIds = emitSpy.mock.calls[0][0] as string[];
@@ -173,11 +217,19 @@ describe('POST /api/sessions/publish (B.5 / B.6)', () => {
     expect(userIds).not.toContain('seed-teacher-algo');
     expect(userIds).not.toContain('seed-teacher-bdd');
   });
+
+  it('rejects an ETUDIANT (RBAC) with 403', async () => {
+    const res = await api().post('/api/sessions/publish').set('Cookie', student.cookieHeader);
+    expect(res.status).toBe(403);
+  });
 });
 
 describe('GET /api/sessions/stats (B.7)', () => {
   it('returns the weekly counters', async () => {
-    const res = await api().get('/api/sessions/stats').query({ weekStart });
+    const res = await api()
+      .get('/api/sessions/stats')
+      .set('Cookie', rp.cookieHeader)
+      .query({ weekStart });
     expect(res.status).toBe(200);
     // V02 seed: 10 séances, 8 publiées (6 héritées + Conf + Eval), 2 drafts.
     // V01 enum breakdown: CM=4, TD=2, TP=2, EXAM=1, EVENT=1, RATTRAP=0, DEVOIR=0.
@@ -192,7 +244,7 @@ describe('GET /api/sessions/stats (B.7)', () => {
   });
 
   it('rejects a missing weekStart with 400', async () => {
-    const res = await api().get('/api/sessions/stats');
+    const res = await api().get('/api/sessions/stats').set('Cookie', rp.cookieHeader);
     expect(res.status).toBe(400);
   });
 });

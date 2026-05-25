@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
 import type { Logger } from 'pino';
 import { AppModule } from '../../src/app.module';
 import { AllExceptionsFilter } from '../../src/common/all-exceptions.filter';
@@ -15,6 +16,9 @@ export async function createTestApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api');
+  // cookie-parser : indispensable depuis V02 LOT 1 — les strategies
+  // passport-jwt extraient les cookies `access`/`refresh` via `req.cookies`.
+  app.use(cookieParser());
   app.useGlobalPipes(new ZodValidationPipe());
   const logger = app.get<Logger>(PINO_LOGGER);
   app.useGlobalFilters(new AllExceptionsFilter(logger));
