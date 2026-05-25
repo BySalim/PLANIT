@@ -77,7 +77,11 @@ export function useRealtimeSessions(
       return;
     }
 
-    const socket: Socket = io(API_BASE, { auth: { userId } });
+    // V02 LOT 1 : le backend lit `userId` + `role` depuis le cookie HttpOnly
+    // au handshake (cf. `ws.gateway.ts`). On envoie donc les cookies via
+    // `withCredentials: true`. Le `userId` reste utile uniquement comme clé
+    // de dépendance React pour réinitialiser le socket quand l'acteur change.
+    const socket: Socket = io(API_BASE, { withCredentials: true });
 
     socket.on('session:published', (payload?: SessionPublishedPayload) => {
       const sessions = payload?.sessions;

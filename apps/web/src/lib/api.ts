@@ -26,6 +26,10 @@ async function request<T>(
   const init: RequestInit = {
     method,
     headers: { 'Content-Type': 'application/json' },
+    // V02 LOT 1 : les endpoints sont protégés par cookies HttpOnly (ADR-0007 §2).
+    // `credentials: 'include'` est requis pour que le navigateur envoie les
+    // cookies sur les requêtes cross-origin (front :3000 → backend :3001).
+    credentials: 'include',
   };
   if (body !== undefined) {
     init.body = JSON.stringify(body);
