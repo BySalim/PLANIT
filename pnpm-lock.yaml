@@ -340,6 +340,9 @@ importers:
 
   packages/utils:
     devDependencies:
+      '@planit/config':
+        specifier: workspace:*
+        version: link:../config
       typescript:
         specifier: ^5.8.3
         version: 5.9.3

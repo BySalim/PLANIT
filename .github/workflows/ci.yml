@@ -48,14 +48,17 @@ jobs:
           pnpm prisma migrate deploy
           pnpm prisma generate
 
-      # @planit/contracts exports point to ./dist/*.js (the package is
-      # consumed by Node/CommonJS at runtime via NestJS). Vite/Vitest in
-      # apps/web resolves these exports too — without a prior build, the
-      # web test suite fails with "Failed to resolve entry". Build here
-      # before lint/typecheck/test so every downstream step sees a hydrated
-      # dist/ directory.
-      - name: Build @planit/contracts
-        run: pnpm --filter @planit/contracts build
+      # @planit/contracts and @planit/utils export ./dist/*.js (the packages
+      # are consumed by Node/CommonJS at runtime via NestJS — Node v24 ESM
+      # refuses directory imports in source TS, so a built CJS dist/ is
+      # required). Vite/Vitest in apps/web also resolves these exports —
+      # without a prior build, the web test suite fails with "Failed to
+      # resolve entry". Build before lint/typecheck/test so every downstream
+      # step sees hydrated dist/ directories.
+      - name: Build internal packages (contracts + utils)
+        run: |
+          pnpm --filter @planit/contracts build
+          pnpm --filter @planit/utils build
 
       - name: Lint
         run: pnpm lint
