@@ -39,8 +39,7 @@ export function Topbar({
   const [search, setSearch] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
   const { state, logout } = useAuth();
-  const initials =
-    state.status === 'authenticated' ? computeInitials(state.user.nomComplet) : '...';
+  const initials = state.status === 'authenticated' ? computeInitials(state.user.fullName) : '...';
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border-soft bg-surface px-6">
