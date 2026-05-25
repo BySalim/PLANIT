@@ -43,7 +43,7 @@ export function useWeekSessionsQuery(
 
   return useQuery<SessionDto[]>({
     queryKey,
-    queryFn: () => apiGet(`/api/sessions?${params.toString()}`, sessionListSchema),
+    queryFn: () => apiGet(`/sessions?${params.toString()}`, sessionListSchema),
   });
 }
 
@@ -51,14 +51,14 @@ export function useWeekStatsQuery(weekStart: Date) {
   const weekStartParam = toWeekStartParam(weekStart);
   return useQuery<SessionStatsDto>({
     queryKey: planningKeys.stats(weekStartParam),
-    queryFn: () => apiGet(`/api/sessions/stats?weekStart=${weekStartParam}`, sessionStatsSchema),
+    queryFn: () => apiGet(`/sessions/stats?weekStart=${weekStartParam}`, sessionStatsSchema),
   });
 }
 
 export function useSessionDetailQuery(sessionId: string | null) {
   return useQuery<SessionDto>({
     queryKey: planningKeys.session(sessionId ?? ''),
-    queryFn: () => apiGet(`/api/sessions/${sessionId}`, sessionSchema),
+    queryFn: () => apiGet(`/sessions/${sessionId}`, sessionSchema),
     enabled: sessionId !== null,
   });
 }
