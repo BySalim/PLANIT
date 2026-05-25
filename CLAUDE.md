@@ -124,6 +124,37 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 - Validation Zod via `@planit/contracts`
 - Tests : Vitest unit + integration, Playwright e2e
 - Commits : Conventional Commits (`feat`, `fix`, `refactor`, etc.), en-tête < 72 chars
+- `exactOptionalPropertyTypes` activé : une prop optionnelle qui peut être absente **ET** vouloir prendre `undefined` doit être typée `T | undefined` explicitement (`foo?: string | undefined`)
+- Pas de `console.log` / `console.warn` / `console.error` dans `apps/backend/src/` — utiliser le logger pino injectable (`@Inject(PINO_LOGGER)`). Linter `no-console` en place sur le backend.
+
+---
+
+## Patterns émergés Vague 01
+
+> Ces patterns sont **acquis** : ne pas les remettre en cause sans ADR. Tout nouveau code suit ces conventions.
+
+### Backend (NestJS)
+
+- **Prisma direct dans les Services** — pas de Repository pattern pour l'instant. Un `SeanceService` consomme `PrismaService` directement. L'extraction `SeanceRepository` est tracée en tech-debt (`REPOSITORY-PATTERN`) et sera faite en V02 conjointement avec `AuthRepository`.
+- **Validation Zod systématique** côté contracts via `ZodValidationPipe` global (`apps/backend/src/common/zod-validation.pipe.ts`). Tout DTO de body/query passe par un schéma Zod de `@planit/contracts`. Pas de validation `class-validator`.
+- **Logger pino injectable** via `LoggerModule` (`apps/backend/src/common/logger.module.ts`) avec **redacter** sur `password`, `passwordHash`, `token`, `accessToken`, `refreshToken`, `authorization`, `cookie`, `mfaSecret` (variantes top-level **et** profondes `*.field`). Format `pino-pretty` en dev, JSON pur en prod/test.
+- **CORS partagé** HTTP + WS : helper unique `common/cors.ts` consommé par `main.ts` et `WsGateway`. Empêche les régressions silencieuses sur le WS lors d'un fix HTTP.
+- **Rate limiting global** : `ThrottlerModule` enregistré dans `app.module.ts` (100 req/min/IP). Les mutations sensibles peuvent surcharger via `@Throttle({...})` au niveau contrôleur.
+- **PrismaService exporté** depuis `PrismaModule` (`@Global()`) — disponible partout sans `imports` supplémentaire.
+
+### Frontend (Next.js + React 19)
+
+- **Hooks d'acteur courant hardcodés V1** : `useCurrentTeacher()` et `useCurrentStudent()` (`apps/web/src/hooks/`) retournent un seed-id figé. Ils seront fusionnés en un futur `useCurrentActor()` quand l'auth arrivera en V02 (cf. tech-debt `TD-022`).
+- **TanStack Query keys centralisées** dans `apps/web/src/lib/queries.ts` (`planningKeys`, etc.). Toute nouvelle query déclare sa clé ici — jamais d'inline.
+- **WebSocket via hook** `useRealtimeSessions(userId, options)` (`apps/web/src/hooks/use-realtime-sessions.ts`). Encapsule la connexion `socket.io-client`, le toast de succès, et l'invalidation `planningKeys.all`. À réutiliser tel quel.
+- **Tokens depuis `@planit/design-tokens`** — jamais de hex en dur dans les composants. Si un token manque, l'ajouter au package partagé puis le consommer.
+- **Vues étudiant/enseignant** quasi-identiques (`/etudiant/page.tsx` ≈ `/enseignant/page.tsx`) : factorisation reportée à V02 (`FACTOR-PAGES`) — attend `useCurrentActor()`.
+
+### Architecture
+
+- **Statut séance V1** : `isPublished: boolean` simple (séance non publiée ou publiée). L'enum à 3 valeurs `PROVISOIRE/VALIDE/PUBLIE` est documentée dans le vocabulaire métier mais pas encore appliquée côté Prisma — bascule prévue V02.
+- **Vue planning** : deux composants distincts en V1, `<PlanningGrid>` (RP — drag/resize/copier-coller) vs `<WeekTimeline>` (Enseignant/Étudiant — lecture). Décision de fusion ou de séparation actée par ADR à écrire début V02 (cf. tech-debt `FUSION-PLANNING`).
+- **Realtime backend → frontend** : 1 event public en V01 (`session:published`). Cf. ADR-0004 et `docs/runbooks/ws-events.md`.
 
 ---
 
@@ -135,6 +166,7 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 - Pas de `eval`, pas de `dangerouslySetInnerHTML` sans justification commentée
 - RBAC côté serveur sur chaque endpoint sensible (à partir de la Vague 02 où l'auth arrive)
 - Schéma Prisma User prêt à l'auth (Vague 02)
+- Couverture unit ≥50% sur les services backend obligatoire à partir Vague 02
 
 ---
 
