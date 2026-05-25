@@ -2,6 +2,8 @@
   "name": "@planit/utils",
   "version": "0.0.1",
   "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -14,6 +16,10 @@
     "./result": {
       "types": "./src/result/index.ts",
       "default": "./src/result/index.ts"
+    },
+    "./json-stable": {
+      "types": "./src/json-stable.ts",
+      "default": "./src/json-stable.ts"
     }
   },
   "scripts": {
