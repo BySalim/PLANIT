@@ -18,6 +18,22 @@ enum Role {
   PARTENAIRE
 }
 
+enum SessionType {
+  CM
+  TD
+  TP
+  EXAM
+  RATTRAP
+  DEVOIR
+  EVENT
+}
+
+enum SessionStatus {
+  PROVISOIRE
+  VALIDE
+  PUBLIE
+}
+
 model User {
   id             String    @id @default(cuid())
   email          String    @unique
@@ -29,5 +45,83 @@ model User {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
+  // Students belong to a class.
+  classeId String?
+  classe   Classe? @relation(fields: [classeId], references: [id])
+
+  // Teachers own the sessions they teach.
+  taughtSeances Seance[] @relation("SeanceTeacher")
+
   @@map("users")
+}
+
+model Classe {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  students User[]
+  seances  Seance[]
+
+  @@map("classes")
+}
+
+model Module {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  seances Seance[]
+
+  @@map("modules")
+}
+
+model Salle {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  type      String
+  capacity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  seances Seance[]
+
+  @@map("salles")
+}
+
+model Seance {
+  id              String        @id @default(cuid())
+  type            SessionType
+  status          SessionStatus @default(PROVISOIRE)
+  startAt         DateTime
+  endAt           DateTime
+  isPublished     Boolean       @default(false)
+  lastModifiedAt  DateTime      @default(now())
+  lastPublishedAt DateTime?
+
+  classeId String
+  classe   Classe @relation(fields: [classeId], references: [id])
+
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id])
+
+  salleId String
+  salle   Salle  @relation(fields: [salleId], references: [id])
+
+  teacherId String
+  teacher   User   @relation("SeanceTeacher", fields: [teacherId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([classeId, startAt])
+  @@index([teacherId, startAt])
+  // Accélère le scan `findMany({ where: { isPublished: false, classeId } })`
+  // déclenché par POST /api/sessions/publish (B.5).
+  @@index([isPublished, classeId])
+  @@map("seances")
 }

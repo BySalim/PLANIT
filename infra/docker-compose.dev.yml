@@ -12,6 +12,8 @@ services:
       POSTGRES_DB: planit_dev
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Creates the planit_test database on first volume init (backend tests).
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U planit -d planit_dev']
       interval: 10s

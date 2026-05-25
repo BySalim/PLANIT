@@ -1,14 +1,15 @@
 @import 'tailwindcss';
 
 @theme {
-  /* PLANIT brand colors — ported from @planit/design-tokens */
-  --color-primary: #6b2d0e;
+  /* PLANIT brand colors — source: PLANIT-IA/shared/tokens.js (référence design)
+     Modifier ici ET dans colors.ts en même temps pour rester synchronisé. */
+  --color-primary: #6b2d0e; /* PLANIT marron */
   --color-primary-hover: #8b3a12;
   --color-primary-50: #fcf7f4;
   --color-primary-100: #f5e6dc;
   --color-primary-200: #e8c9b0;
 
-  --color-accent: #e8620a;
+  --color-accent: #e8620a; /* PLANIT orange */
   --color-accent-100: #fde8d0;
   --color-accent-600: #c44e07;
   --color-accent-800: #742e04;
@@ -40,8 +41,14 @@
   --color-event-border: #c4b5fd;
   --color-event-text: #5b21b6;
 
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-display: 'Poppins', system-ui, sans-serif;
+  /* Sidebar dark theme — source: PLANIT-IA tokens-ext (rp/) */
+  --color-sb-dark: #2a1c12;
+  --color-sb-dark-2: #3a2a1e;
+  --color-sb-dark-text: #f5e6dc;
+  --color-sb-dark-muted: rgba(245, 230, 220, 0.55);
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-poppins), system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
@@ -49,4 +56,37 @@ body {
   background-color: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
+}
+
+@utility bg-brand-gradient {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+}
+
+@utility bg-brand-gradient-deep {
+  background: linear-gradient(155deg, #7a3410 0%, var(--color-primary) 55%, #5a2509 100%);
+}
+
+@utility bg-brand-gradient-warm {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+}
+
+/* Masque les scrollbars natives (UX mobile) tout en gardant le scroll fonctionnel. */
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes planitPulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 2px rgba(232, 98, 10, 0.28);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 4px rgba(232, 98, 10, 0.1);
+  }
 }

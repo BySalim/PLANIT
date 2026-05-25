@@ -11,7 +11,8 @@ Crée un ADR pour : **$ARGUMENTS**.
 2. Lis les 3 derniers ADR pour t'aligner sur le style
 3. `git log --oneline -10` pour comprendre le contexte récent
 4. `git diff main...HEAD` pour voir si la décision résulte du code en cours
-5. Lis `../PLANIT-Strategie-VibeCode/strategies/08-PIVOT-ADAPTATION.md` pour la procédure ADR
+
+> Format ADR détaillé à l'étape 3 ci-dessous — pas de doc externe à charger.
 
 ## Étape 2 — Pose-moi 4 questions
 

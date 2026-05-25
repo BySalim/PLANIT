@@ -8,13 +8,12 @@ Donne-moi un état complet de la vague en cours.
 # À lire
 
 1. `git branch --show-current` puis identifie le membre
-2. Trouve le fichier vague actif : `../PLANIT-Strategie-VibeCode/vagues/vague-*.md` (le plus récent non terminé — statut "En cours" dans README)
-3. Lis ses tableaux de tâches (lots A, B, C, D, E…)
-4. `gh pr list --state open --limit 20`
-5. `git log --oneline --all -20`
-6. Liste les ADR récents : `ls -t docs/architecture/adr/ | head -5`
-7. Lis `docs/shared-resources-lock.md`
-8. Lis le dernier journal du membre : `ls -t docs/agent-journal/<membre>/ | head -1`
+2. `../PLANIT-Strategie-VibeCode/vagues/vague-01-index.md` (titre, décisions, statut global) puis `vague-01-lots.md` (tableaux des tâches LOT 0→5)
+3. `gh pr list --state open --limit 20`
+4. `git log --oneline --all -20`
+5. Liste les ADR récents : `ls -t docs/architecture/adr/ | head -5`
+6. Lis `docs/shared-resources-lock.md`
+7. Lis le dernier journal du membre : `ls -t docs/agent-journal/<membre>/ | head -1`
 
 # Affiche un récap structuré
 

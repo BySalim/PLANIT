@@ -17,7 +17,7 @@ Phase JOURNAL du workflow.
 
 Si le fichier existe déjà → ajouter une section « Reprise <HH:MM> » à la fin et continuer. Sinon → créer en partant du format complet.
 
-# Format strict (cf. strategies/11-TRACABILITE-AUTONOME.md)
+# Format strict
 
 ```markdown
 ---
@@ -99,7 +99,7 @@ Smoke navigateur ...
 - Le « pourquoi » prime sur le « quoi » (le quoi est dans git)
 - Toujours en français
 - Si session sans livrable → écrire quand même un journal court avec « Statut: exploration »
-- Anti-patterns à éviter (cf. strategies/11-TRACABILITE-AUTONOME.md) :
+- Anti-patterns à éviter :
   - Journal vide
   - Journal qui répète le diff
   - Journal de 5 pages

@@ -5,7 +5,8 @@
     "build": {
       "dependsOn": ["^build", "db:generate"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": ["DATABASE_URL"]
     },
     "dev": {
       "cache": false,
@@ -20,11 +21,13 @@
     "test": {
       "dependsOn": ["^build", "db:generate"],
       "inputs": ["$TURBO_DEFAULT$"],
-      "outputs": ["coverage/**"]
+      "outputs": ["coverage/**"],
+      "env": ["DATABASE_URL"]
     },
     "db:generate": {
       "cache": false,
-      "inputs": ["prisma/schema.prisma"]
+      "inputs": ["prisma/schema.prisma"],
+      "env": ["DATABASE_URL"]
     },
     "db:migrate": {
       "cache": false

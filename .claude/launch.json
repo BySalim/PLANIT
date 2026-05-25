@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@planit/web", "dev"],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "design",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [".claude/start-design.py", "5500"],
+      "port": 5500,
+      "autoPort": true
+    }
+  ]
+}
