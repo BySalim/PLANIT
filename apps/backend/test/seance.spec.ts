@@ -59,10 +59,13 @@ afterEach(() => {
 const api = (): ReturnType<typeof request> => request(app.getHttpServer());
 
 describe('GET /api/sessions (B.1)', () => {
-  it('returns the 6 seed sessions of the current week', async () => {
+  // V02 seed: 6 V01-héritées (toutes COURS publiées sur GL3-A, teacher algo/bdd/net)
+  // + 1 Conférence multi-classes publiée + 1 Évaluation publiée
+  // + 2 drafts non publiées (NET TD GL3-B, SEC CM GL3-A). Total = 10.
+  it('returns the 10 seed sessions of the current week', async () => {
     const res = await api().get('/api/sessions').query({ weekStart });
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(6);
+    expect(res.body).toHaveLength(10);
   });
 
   it('filters by teacher', async () => {
@@ -70,7 +73,9 @@ describe('GET /api/sessions (B.1)', () => {
       .get('/api/sessions')
       .query({ weekStart, teacherId: 'seed-teacher-algo' });
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(2);
+    // V02 seed: teacher-algo owns seance-01 (CM), -02 (TD), -05 (CM), the
+    // -07-conf placeholder, and -08-eval. = 5 sessions.
+    expect(res.body).toHaveLength(5);
     for (const session of res.body) {
       expect(session.teacher.id).toBe('seed-teacher-algo');
     }
@@ -160,12 +165,13 @@ describe('POST /api/sessions/publish (B.5 / B.6)', () => {
 
     expect(emitSpy).toHaveBeenCalledTimes(1);
     const userIds = emitSpy.mock.calls[0][0] as string[];
-    // Pending seed sessions belong to the BDD and NET teachers + GL3-A students.
-    expect(userIds).toContain('seed-teacher-bdd');
+    // V02 seed pending sessions: both drafts (seance-09 NET GL3-B, seance-10
+    // SEC GL3-A) belong to teacher-net. seed-student is on GL3-A so receives
+    // for seance-10-draft. ALGO and BDD teachers have no pending session.
     expect(userIds).toContain('seed-teacher-net');
     expect(userIds).toContain('seed-student');
-    // The ALGO teacher has no pending session — must NOT be notified.
     expect(userIds).not.toContain('seed-teacher-algo');
+    expect(userIds).not.toContain('seed-teacher-bdd');
   });
 });
 
@@ -173,12 +179,16 @@ describe('GET /api/sessions/stats (B.7)', () => {
   it('returns the weekly counters', async () => {
     const res = await api().get('/api/sessions/stats').query({ weekStart });
     expect(res.status).toBe(200);
-    expect(res.body.total).toBe(6);
-    expect(res.body.published).toBe(4);
+    // V02 seed: 10 séances, 8 publiées (6 héritées + Conf + Eval), 2 drafts.
+    // V01 enum breakdown: CM=4, TD=2, TP=2, EXAM=1, EVENT=1, RATTRAP=0, DEVOIR=0.
+    expect(res.body.total).toBe(10);
+    expect(res.body.published).toBe(8);
     expect(res.body.pending).toBe(2);
-    expect(res.body.byType.CM).toBe(3);
+    expect(res.body.byType.CM).toBe(4);
     expect(res.body.byType.TD).toBe(2);
-    expect(res.body.byType.TP).toBe(1);
+    expect(res.body.byType.TP).toBe(2);
+    expect(res.body.byType.EXAM).toBe(1);
+    expect(res.body.byType.EVENT).toBe(1);
   });
 
   it('rejects a missing weekStart with 400', async () => {
