@@ -19,5 +19,5 @@ const HARDCODED_STUDENT: CurrentStudent = {
 export function useCurrentStudent(): CurrentStudent {
   const { state } = useAuth();
   if (state.status !== 'authenticated') return HARDCODED_STUDENT;
-  return { id: state.user.id, fullName: state.user.nomComplet, role: 'ETUDIANT' };
+  return { id: state.user.id, fullName: state.user.fullName, role: 'ETUDIANT' };
 }

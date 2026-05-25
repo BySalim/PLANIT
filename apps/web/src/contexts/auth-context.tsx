@@ -14,7 +14,7 @@ const authMeSchema = z.object({
     'ASSISTANT_PROGRAMME',
     'RESPONSABLE_CLASSE',
   ]),
-  nomComplet: z.string(),
+  fullName: z.string(),
 });
 
 // Schéma local en attente de @planit/contracts v2 (Salim, 0.4)
@@ -84,11 +84,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
     const raw: unknown = await r.json();
     // Le backend retourne { user: AuthMeDto } (cf. A.1)
-    const parsed = z.object({ user: authMeSchema }).safeParse(raw);
+    const parsed = authMeSchema.safeParse(raw);
     if (!parsed.success) throw new Error('Réponse inattendue du serveur');
 
-    dispatch({ type: 'SET_USER', user: parsed.data.user });
-    return parsed.data.user;
+    dispatch({ type: 'SET_USER', user: parsed.data });
+    return parsed.data;
   };
 
   const logout = async (): Promise<void> => {

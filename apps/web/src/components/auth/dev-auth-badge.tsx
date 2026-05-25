@@ -6,9 +6,9 @@ import { useAuth, ROLE_HOME } from '@/contexts/auth-context';
 
 // À aligner avec le seed Oumar (Vague 02) dès que le backend est disponible
 const SEED_ACCOUNTS = [
-  { label: 'RP', email: 'rp@ism.sn', password: 'password123' },
-  { label: 'Enseignant', email: 'enseignant@ism.sn', password: 'password123' },
-  { label: 'Étudiant', email: 'etudiant@ism.sn', password: 'password123' },
+  { label: 'RP', email: 'aminata.diallo@planit.test', password: 'Test1234!' },
+  { label: 'Enseignant', email: 'oumar.ndiaye@planit.test', password: 'Test1234!' },
+  { label: 'Étudiant', email: 'ibrahima.sow@planit.test', password: 'Test1234!' },
 ] as const;
 
 function DevAuthBadgeInner() {
@@ -38,7 +38,7 @@ function DevAuthBadgeInner() {
               <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
                 Connecté
               </div>
-              <div className="px-3 pb-2 text-xs text-text">{state.user.nomComplet}</div>
+              <div className="px-3 pb-2 text-xs text-text">{state.user.fullName}</div>
               <div className="border-t border-border" />
               <button
                 type="button"

@@ -19,5 +19,5 @@ const HARDCODED_TEACHER: CurrentTeacher = {
 export function useCurrentTeacher(): CurrentTeacher {
   const { state } = useAuth();
   if (state.status !== 'authenticated') return HARDCODED_TEACHER;
-  return { id: state.user.id, fullName: state.user.nomComplet, role: 'ENSEIGNANT' };
+  return { id: state.user.id, fullName: state.user.fullName, role: 'ENSEIGNANT' };
 }
