@@ -1,4 +1,4 @@
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3001';
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3001/api';
 
 export interface ResponseParser<T> {
   safeParse(raw: unknown): { success: true; data: T } | { success: false; error: unknown };
