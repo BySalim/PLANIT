@@ -44,9 +44,11 @@ export function MobileShell({ children, unread = 0 }: MobileShellProps) {
       : null;
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col bg-bg">
+    <div className="mx-auto flex h-screen max-w-md flex-col bg-bg">
       <MobileHeader unread={unread} initials={initialsFor(student.fullName)} />
-      <main className="flex-1 overflow-y-auto pb-28">{children}</main>
+      {/* min-h-0 : force <main> à respecter sa hauteur flex pour devenir un vrai
+          conteneur de scroll — sinon position:sticky des enfants ne fonctionne pas. */}
+      <main className="min-h-0 flex-1 overflow-y-auto pb-28">{children}</main>
       <MobileTabBar activeId={activeId} unread={unread} />
     </div>
   );

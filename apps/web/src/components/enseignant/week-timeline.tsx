@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { addDays, format, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { SessionDto, SessionType } from '@planit/contracts';
@@ -264,7 +264,106 @@ function PlanningSessionBlock({ session, top, height, now, variant, onTap }: Blo
   );
 }
 
+// ── WeekDayHeader ─────────────────────────────────────────────────────────────
+// En-tête jours indépendant — à placer dans le même bloc sticky que la toolbar
+// (pattern PLANIT-Design : la toolbar + l'en-tête jours sticky ensemble).
+export interface WeekDayHeaderProps {
+  readonly weekStart: Date;
+  readonly selectedDate: Date;
+  readonly today: Date;
+  /** Décalage horizontal en pixels — synchronisé avec le scroll de la grille. */
+  readonly scrollX: number;
+  readonly onDaySelect?: (date: Date) => void;
+}
+
+export function WeekDayHeader({
+  weekStart,
+  selectedDate,
+  today,
+  scrollX,
+  onDaySelect,
+}: WeekDayHeaderProps) {
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  return (
+    <div className="flex border-b border-border bg-surface">
+      <div className="flex-shrink-0" style={{ width: TIME_COL_W }} />
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <div
+          className="flex"
+          style={{
+            width: 7 * COL_W,
+            transform: `translateX(-${scrollX}px)`,
+            willChange: 'transform',
+          }}
+        >
+          {weekDates.map((d, i) => {
+            const isToday = isSameDay(d, today);
+            const isSel = isSameDay(d, selectedDate);
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={onDaySelect ? () => onDaySelect(d) : undefined}
+                className="flex flex-shrink-0 flex-col items-center"
+                style={{ width: COL_W, padding: '5px 0' }}
+                aria-label={format(d, 'EEEE d MMMM', { locale: fr })}
+                aria-pressed={isSel}
+              >
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: isToday ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                    letterSpacing: '0.3px',
+                    fontFamily: 'Inter, system-ui',
+                    lineHeight: 1,
+                  }}
+                >
+                  {DAY_INITIALS[i]}
+                </span>
+                <div
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 2,
+                    background: isSel
+                      ? isToday
+                        ? 'var(--color-accent)'
+                        : 'var(--color-primary)'
+                      : isToday
+                        ? 'var(--color-accent-100)'
+                        : 'transparent',
+                    border: isToday && !isSel ? '1.5px solid var(--color-accent)' : 'none',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'Poppins, system-ui',
+                      fontSize: 11,
+                      fontWeight: isToday || isSel ? 700 : 500,
+                      color: isSel ? '#FFF' : isToday ? 'var(--color-accent)' : 'var(--color-text)',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {d.getDate()}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── WeekTimeline ──────────────────────────────────────────────────────────────
+// Grille semaine (axe horaire + colonnes jours) — sans en-tête (utiliser
+// <WeekDayHeader/> séparément pour qu'il puisse être placé dans la sticky toolbar).
 export interface WeekTimelineProps {
   readonly weekStart: Date;
   readonly selectedDate: Date;
@@ -273,17 +372,18 @@ export interface WeekTimelineProps {
   /** 'teacher' (défaut) : affiche classe · 'student' : affiche nom du prof */
   readonly variant?: 'teacher' | 'student';
   readonly onSessionTap?: (session: SessionDto) => void;
-  readonly onDaySelect?: (date: Date) => void;
+  /** Callback de scroll horizontal — sync avec <WeekDayHeader scrollX={...}/>. */
+  readonly onScrollXChange?: (x: number) => void;
 }
 
 export function WeekTimeline({
   weekStart,
-  selectedDate,
+  selectedDate: _selectedDate,
   sessions,
   now = nowDakar(),
   variant = 'teacher',
   onSessionTap,
-  onDaySelect,
+  onScrollXChange,
 }: WeekTimelineProps) {
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const totalHeight = TOTAL_H * HOUR_H;
@@ -294,96 +394,16 @@ export function WeekTimeline({
   const hasToday = weekDates.some((d) => isSameDay(d, now));
   const nowY = timeToY(now);
 
-  // Scroll horizontal de la grille — l'en-tête suit via transform pour rester aligné.
+  // Scroll horizontal de la grille — reset à 0 au changement de semaine.
   const gridRef = useRef<HTMLDivElement>(null);
-  const [scrollX, setScrollX] = useState(0);
   const weekStartTs = weekStart.getTime();
   useEffect(() => {
     if (gridRef.current) gridRef.current.scrollLeft = 0;
-    setScrollX(0);
-  }, [weekStartTs]);
+    onScrollXChange?.(0);
+  }, [weekStartTs, onScrollXChange]);
 
   return (
     <div className="flex flex-col">
-      {/* ── En-tête jours (sticky, scroll synchronisé via transform) ── */}
-      <div className="sticky top-[112px] z-10 flex border-b border-border bg-surface">
-        <div className="flex-shrink-0" style={{ width: TIME_COL_W }} />
-        <div className="flex-1 min-w-0 overflow-hidden">
-          <div
-            className="flex"
-            style={{
-              width: 7 * COL_W,
-              transform: `translateX(-${scrollX}px)`,
-              willChange: 'transform',
-            }}
-          >
-            {weekDates.map((d, i) => {
-              const isToday = isSameDay(d, now);
-              const isSel = isSameDay(d, selectedDate);
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={onDaySelect ? () => onDaySelect(d) : undefined}
-                  className="flex flex-shrink-0 flex-col items-center"
-                  style={{ width: COL_W, padding: '5px 0' }}
-                  aria-label={format(d, 'EEEE d MMMM', { locale: fr })}
-                  aria-pressed={isSel}
-                >
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: isToday ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                      letterSpacing: '0.3px',
-                      fontFamily: 'Inter, system-ui',
-                      lineHeight: 1,
-                    }}
-                  >
-                    {DAY_INITIALS[i]}
-                  </span>
-                  <div
-                    style={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginTop: 2,
-                      background: isSel
-                        ? isToday
-                          ? 'var(--color-accent)'
-                          : 'var(--color-primary)'
-                        : isToday
-                          ? 'var(--color-accent-100)'
-                          : 'transparent',
-                      border: isToday && !isSel ? '1.5px solid var(--color-accent)' : 'none',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: 'Poppins, system-ui',
-                        fontSize: 11,
-                        fontWeight: isToday || isSel ? 700 : 500,
-                        color: isSel
-                          ? '#FFF'
-                          : isToday
-                            ? 'var(--color-accent)'
-                            : 'var(--color-text)',
-                        lineHeight: 1,
-                      }}
-                    >
-                      {d.getDate()}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
       {/* ── Grille ── */}
       <div className="flex">
         {/* Axe horaire */}
@@ -420,7 +440,7 @@ export function WeekTimeline({
         <div
           ref={gridRef}
           className="flex-1 overflow-x-auto"
-          onScroll={(e) => setScrollX(e.currentTarget.scrollLeft)}
+          onScroll={(e) => onScrollXChange?.(e.currentTarget.scrollLeft)}
         >
           <div className="flex" style={{ width: 7 * COL_W }}>
             {weekDates.map((date, di) => {
