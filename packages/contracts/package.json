@@ -2,24 +2,24 @@
   "name": "@planit/contracts",
   "version": "0.0.1",
   "private": true,
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "default": "./dist/index.js"
     },
     "./auth": {
       "types": "./src/auth/index.ts",
-      "default": "./src/auth/index.ts"
+      "default": "./dist/auth/index.js"
     },
     "./planning": {
       "types": "./src/planning/index.ts",
-      "default": "./src/planning/index.ts"
+      "default": "./dist/planning/index.js"
     },
     "./notifications": {
       "types": "./src/notifications/index.ts",
-      "default": "./src/notifications/index.ts"
+      "default": "./dist/notifications/index.js"
     }
   },
   "scripts": {
