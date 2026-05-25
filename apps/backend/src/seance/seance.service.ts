@@ -1,5 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import type {
   CreateSessionDto,
   SessionDto,
@@ -30,6 +30,8 @@ export class SeanceService {
       where,
       include: seanceInclude,
       orderBy: { startAt: 'asc' },
+      take: query.take,
+      skip: query.skip,
     });
     return seances.map(toSessionDto);
   }
@@ -72,52 +74,44 @@ export class SeanceService {
 
   /** B.2 — create a session (always unpublished on creation). */
   async create(dto: CreateSessionDto): Promise<SessionDto> {
-    try {
-      const seance = await this.prisma.seance.create({
-        data: {
-          type: dto.type,
-          status: 'PROVISOIRE',
-          startAt: new Date(dto.startAt),
-          endAt: new Date(dto.endAt),
-          isPublished: false,
-          lastModifiedAt: new Date(),
-          lastPublishedAt: null,
-          classeId: dto.classeId,
-          moduleId: dto.moduleId,
-          salleId: dto.salleId,
-          teacherId: dto.teacherId,
-        },
-        include: seanceInclude,
-      });
-      return toSessionDto(seance);
-    } catch (error) {
-      this.rethrowPrismaError(error);
-    }
+    const seance = await this.prisma.seance.create({
+      data: {
+        type: dto.type,
+        status: 'PROVISOIRE',
+        startAt: new Date(dto.startAt),
+        endAt: new Date(dto.endAt),
+        isPublished: false,
+        lastModifiedAt: new Date(),
+        lastPublishedAt: null,
+        classeId: dto.classeId,
+        moduleId: dto.moduleId,
+        salleId: dto.salleId,
+        teacherId: dto.teacherId,
+      },
+      include: seanceInclude,
+    });
+    return toSessionDto(seance);
   }
 
   /** B.3 — update a session; any change reverts it to unpublished. */
   async update(id: string, dto: UpdateSessionDto): Promise<SessionDto> {
-    try {
-      const seance = await this.prisma.seance.update({
-        where: { id },
-        data: {
-          ...(dto.type !== undefined ? { type: dto.type } : {}),
-          ...(dto.classeId !== undefined ? { classeId: dto.classeId } : {}),
-          ...(dto.moduleId !== undefined ? { moduleId: dto.moduleId } : {}),
-          ...(dto.salleId !== undefined ? { salleId: dto.salleId } : {}),
-          ...(dto.teacherId !== undefined ? { teacherId: dto.teacherId } : {}),
-          ...(dto.startAt !== undefined ? { startAt: new Date(dto.startAt) } : {}),
-          ...(dto.endAt !== undefined ? { endAt: new Date(dto.endAt) } : {}),
-          isPublished: false,
-          status: 'PROVISOIRE',
-          lastModifiedAt: new Date(),
-        },
-        include: seanceInclude,
-      });
-      return toSessionDto(seance);
-    } catch (error) {
-      this.rethrowPrismaError(error);
-    }
+    const seance = await this.prisma.seance.update({
+      where: { id },
+      data: {
+        ...(dto.type !== undefined ? { type: dto.type } : {}),
+        ...(dto.classeId !== undefined ? { classeId: dto.classeId } : {}),
+        ...(dto.moduleId !== undefined ? { moduleId: dto.moduleId } : {}),
+        ...(dto.salleId !== undefined ? { salleId: dto.salleId } : {}),
+        ...(dto.teacherId !== undefined ? { teacherId: dto.teacherId } : {}),
+        ...(dto.startAt !== undefined ? { startAt: new Date(dto.startAt) } : {}),
+        ...(dto.endAt !== undefined ? { endAt: new Date(dto.endAt) } : {}),
+        isPublished: false,
+        status: 'PROVISOIRE',
+        lastModifiedAt: new Date(),
+      },
+      include: seanceInclude,
+    });
+    return toSessionDto(seance);
   }
 
   /**
@@ -178,18 +172,5 @@ export class SeanceService {
       select: { id: true },
     });
     return [...new Set([...teacherIds, ...students.map((student) => student.id)])];
-  }
-
-  /** Translate known Prisma errors into HTTP exceptions; rethrow the rest. */
-  private rethrowPrismaError(error: unknown): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') throw new NotFoundException('Séance introuvable');
-      if (error.code === 'P2003') {
-        throw new BadRequestException(
-          'Référence invalide : classe, module, salle ou enseignant inexistant',
-        );
-      }
-    }
-    throw error;
   }
 }
