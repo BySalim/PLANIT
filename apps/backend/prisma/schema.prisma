@@ -275,17 +275,21 @@ model Seance {
   hasUnpublishedChanges Boolean @default(true)
 
   // V01 — FK directes, conservées pour compatibilité.
+  // classeId/moduleId restent NOT NULL (toujours requis V01 ET V02).
+  // salleId/teacherId deviennent nullable en V02 LOT 2 : un EVENEMENT V02
+  // peut ne pas avoir de salle ni d'enseignant interne (intervenant externe).
+  // Le V01 service continue de les exiger via Zod (createSessionSchema).
   classeId String
   classe   Classe @relation(fields: [classeId], references: [id])
 
   moduleId String
   module   Module @relation(fields: [moduleId], references: [id])
 
-  salleId String
-  salle   Salle  @relation(fields: [salleId], references: [id])
+  salleId String?
+  salle   Salle?  @relation(fields: [salleId], references: [id], onDelete: SetNull)
 
-  teacherId String
-  teacher   User   @relation("SeanceTeacher", fields: [teacherId], references: [id])
+  teacherId String?
+  teacher   User?   @relation("SeanceTeacher", fields: [teacherId], references: [id])
 
   // V02 — Enseignant FK (optionnel, peuplé en LOT 2).
   enseignantId String?
