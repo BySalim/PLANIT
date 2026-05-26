@@ -137,15 +137,25 @@ export function useUesQuery() {
   });
 }
 
-// ── Classes (GET /api/classes — référentiel partagé tous rôles) ────────
-// Utilisé par <ClasseChipsPicker> (LOT 3 R.3). Liste statique sur la
-// durée d'une session — staleTime long.
+// ── Classes — référentiel temporaire frontend ──────────────────────────
+//
+// La spec V02-01 R.3 mentionne `GET /api/classes` "déjà disponible V01"
+// mais l'endpoint n'existe pas côté backend en V02. En attendant qu'il soit
+// créé (TD-V02-LOT3-A), on hardcode la liste seed V2 (`seed-data.ts`)
+// localement. Le hook garde la signature TanStack pour une migration
+// transparente quand l'endpoint arrivera.
+
+const SEED_CLASSES_V2: readonly ClasseRef[] = [
+  { id: 'seed-classe-gl3a', code: 'GL3-A', name: 'Génie Logiciel 3ème année A' },
+  { id: 'seed-classe-gl3b', code: 'GL3-B', name: 'Génie Logiciel 3ème année B' },
+  { id: 'seed-classe-gl2a', code: 'GL2-A', name: 'Génie Logiciel 2ème année A' },
+] as const;
 
 export function useClassesQuery() {
   return useQuery<ClasseRef[]>({
     queryKey: referentialKeys.classes,
-    queryFn: () => apiGet(`/classes`, classeRefListSchema),
-    staleTime: 5 * 60 * 1000,
+    queryFn: () => Promise.resolve([...SEED_CLASSES_V2]),
+    staleTime: Infinity,
   });
 }
 
