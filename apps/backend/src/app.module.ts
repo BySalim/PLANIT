@@ -7,6 +7,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { ClassesModule } from './classes/classes.module';
 import { LoggerModule } from './common/logger.module';
+import { SallesModule } from './salles/salles.module';
 import { PrismaModule } from './common/prisma.module';
 import { EnseignantsModule } from './enseignants/enseignants.module';
 import { FilieresModule } from './filieres/filieres.module';
@@ -43,6 +44,9 @@ const DEFAULT_LIMIT = isTest ? 10_000 : 100;
     SeanceV2Module,
     // LOT 3 V02 — référentiel classes pour les formulaires séance V2
     ClassesModule,
+    // V02 — référentiel salles (mirror de classes/), exposé pour combler
+    // TD-V02-LOT3-A (select Salle restait vide tant que l'endpoint manquait)
+    SallesModule,
   ],
   providers: [
     // Ordre important : throttler → auth → RBAC.

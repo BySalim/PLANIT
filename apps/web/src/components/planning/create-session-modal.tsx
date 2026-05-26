@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { format } from 'date-fns';
@@ -21,7 +21,12 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { useCreateSessionV2Mutation } from '@/lib/mutations-v2';
-import { useEnseignantsQuery, useSettingsQuery, useUesQuery } from '@/lib/queries-v2';
+import {
+  useEnseignantsQuery,
+  useSallesQuery,
+  useSettingsQuery,
+  useUesQuery,
+} from '@/lib/queries-v2';
 import { ClasseChipsPicker } from './classe-chips-picker';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -231,6 +236,7 @@ export function CreateSessionModal({ isOpen, onClose, initialValues }: CreateSes
   const settingsQuery = useSettingsQuery();
   const enseignantsQuery = useEnseignantsQuery();
   const uesQuery = useUesQuery();
+  const sallesQuery = useSallesQuery();
   const mutation = useCreateSessionV2Mutation();
 
   const formSchema = useMemo(() => makeFormSchema(settingsQuery.data), [settingsQuery.data]);
@@ -271,6 +277,7 @@ export function CreateSessionModal({ isOpen, onClose, initialValues }: CreateSes
   }, [uesQuery.data]);
 
   const enseignants = enseignantsQuery.data ?? [];
+  const salles = sallesQuery.data ?? [];
 
   // Au changement de type : reset propre des champs spécifiques (V2-D5).
   // Confirmation `confirm()` si des données sont déjà saisies dans les champs
@@ -325,6 +332,7 @@ export function CreateSessionModal({ isOpen, onClose, initialValues }: CreateSes
       isOpen={isOpen}
       onClose={onClose}
       title="Nouvelle séance"
+      size="lg"
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={mutation.isPending}>
@@ -341,107 +349,124 @@ export function CreateSessionModal({ isOpen, onClose, initialValues }: CreateSes
         </>
       }
     >
-      <form id="create-session-form" onSubmit={onSubmit} className="flex flex-col gap-3">
-        <FormField label="Libellé" required error={errors.libelle?.message}>
-          {({ id }) => (
-            <Input
-              id={id}
-              {...register('libelle')}
-              placeholder="ex. Algorithmique — Cours du lundi"
-            />
-          )}
-        </FormField>
+      <form id="create-session-form" onSubmit={onSubmit} className="space-y-6">
+        {/* ── Section : Identification ─────────────────────────────────── */}
+        <section className="space-y-3">
+          <SectionHeader>Identification</SectionHeader>
 
-        <FormField label="Type" required error={errors.type?.message}>
-          {({ id }) => (
-            <Controller
-              control={control}
-              name="type"
-              render={({ field }) => (
-                <Select
-                  id={id}
-                  value={field.value}
-                  onChange={(e) => {
-                    // Appel via handleTypeChange pour gérer la confirmation + reset.
-                    const next = e.target.value as SessionTypeV2;
-                    // On lit les values actuelles via `control._formValues` plutôt
-                    // que useWatch pour éviter une dépendance cyclique render.
-                    const current = control._formValues as FormValues;
-                    handleTypeChange(next, current);
-                  }}
-                >
-                  {sessionTypeV2Schema.options.map((t) => (
-                    <option key={t} value={t}>
-                      {TYPE_LABEL[t]}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            />
-          )}
-        </FormField>
-
-        {sousTypeOptions.length > 0 ? (
-          <FormField label="Sous-type" error={errors.sousType?.message} hint="Optionnel">
+          <FormField label="Libellé" required error={errors.libelle?.message}>
             {({ id }) => (
-              <Select id={id} {...register('sousType')}>
-                <option value="">— Aucun —</option>
-                {sousTypeOptions.map((st) => (
-                  <option key={st} value={st}>
-                    {SOUS_TYPE_LABEL[st] ?? st}
-                  </option>
-                ))}
-              </Select>
+              <Input
+                id={id}
+                {...register('libelle')}
+                placeholder="ex. Algorithmique — Cours du lundi"
+              />
             )}
           </FormField>
-        ) : null}
 
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FormField label="Type" required error={errors.type?.message}>
+              {({ id }) => (
+                <Controller
+                  control={control}
+                  name="type"
+                  render={({ field }) => (
+                    <Select
+                      id={id}
+                      value={field.value}
+                      onChange={(e) => {
+                        // Appel via handleTypeChange pour gérer la confirmation + reset.
+                        const next = e.target.value as SessionTypeV2;
+                        // On lit les values actuelles via `control._formValues` plutôt
+                        // que useWatch pour éviter une dépendance cyclique render.
+                        const current = control._formValues as FormValues;
+                        handleTypeChange(next, current);
+                      }}
+                    >
+                      {sessionTypeV2Schema.options.map((t) => (
+                        <option key={t} value={t}>
+                          {TYPE_LABEL[t]}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                />
+              )}
+            </FormField>
+
+            {sousTypeOptions.length > 0 ? (
+              <FormField label="Sous-type" error={errors.sousType?.message} hint="Optionnel">
+                {({ id }) => (
+                  <Select id={id} {...register('sousType')}>
+                    <option value="">— Aucun —</option>
+                    {sousTypeOptions.map((st) => (
+                      <option key={st} value={st}>
+                        {SOUS_TYPE_LABEL[st] ?? st}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </FormField>
+            ) : (
+              // Slot vide pour conserver l'alignement de la grille quand le
+              // sous-type n'est pas applicable (EVENEMENT).
+              <div aria-hidden className="hidden sm:block" />
+            )}
+          </div>
+        </section>
+
+        {/* ── Section : Cours (COURS/EVALUATION) ───────────────────────── */}
         {showModuleEnseignant ? (
-          <>
-            <FormField label="Module" required error={errors.moduleId?.message}>
-              {({ id }) => (
-                <Select
-                  id={id}
-                  {...register('moduleId')}
-                  disabled={uesQuery.isLoading}
-                  invalid={Boolean(errors.moduleId)}
-                >
-                  <option value="">
-                    {uesQuery.isLoading ? 'Chargement…' : '— Sélectionner —'}
-                  </option>
-                  {flatModules.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
+          <section className="space-y-3">
+            <SectionHeader>Cours</SectionHeader>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FormField label="Module" required error={errors.moduleId?.message}>
+                {({ id }) => (
+                  <Select
+                    id={id}
+                    {...register('moduleId')}
+                    disabled={uesQuery.isLoading}
+                    invalid={Boolean(errors.moduleId)}
+                  >
+                    <option value="">
+                      {uesQuery.isLoading ? 'Chargement…' : '— Sélectionner —'}
                     </option>
-                  ))}
-                </Select>
-              )}
-            </FormField>
+                    {flatModules.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </FormField>
 
-            <FormField label="Enseignant" required error={errors.enseignantId?.message}>
-              {({ id }) => (
-                <Select
-                  id={id}
-                  {...register('enseignantId')}
-                  disabled={enseignantsQuery.isLoading}
-                  invalid={Boolean(errors.enseignantId)}
-                >
-                  <option value="">
-                    {enseignantsQuery.isLoading ? 'Chargement…' : '— Sélectionner —'}
-                  </option>
-                  {enseignants.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nomComplet}
+              <FormField label="Enseignant" required error={errors.enseignantId?.message}>
+                {({ id }) => (
+                  <Select
+                    id={id}
+                    {...register('enseignantId')}
+                    disabled={enseignantsQuery.isLoading}
+                    invalid={Boolean(errors.enseignantId)}
+                  >
+                    <option value="">
+                      {enseignantsQuery.isLoading ? 'Chargement…' : '— Sélectionner —'}
                     </option>
-                  ))}
-                </Select>
-              )}
-            </FormField>
-          </>
+                    {enseignants.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.nomComplet}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </FormField>
+            </div>
+          </section>
         ) : null}
 
+        {/* ── Section : Détails événement (EVENEMENT) ──────────────────── */}
         {showEventFields ? (
-          <>
+          <section className="space-y-3">
+            <SectionHeader>Détails de l&apos;événement</SectionHeader>
             <FormField
               label="Intervenant"
               hint="Nom libre (optionnel)"
@@ -460,56 +485,71 @@ export function CreateSessionModal({ isOpen, onClose, initialValues }: CreateSes
                 <textarea
                   id={id}
                   {...register('description')}
-                  rows={3}
+                  rows={2}
                   maxLength={1000}
-                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   placeholder="Notes ou contexte de l'événement"
                 />
               )}
             </FormField>
-          </>
+          </section>
         ) : null}
 
-        <FormField label="Classes" required error={errors.classeIds?.message}>
-          {({ id }) => (
-            <Controller
-              control={control}
-              name="classeIds"
-              render={({ field }) => (
-                <ClasseChipsPicker
-                  id={id}
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.classeIds?.message}
-                  min={1}
-                />
-              )}
-            />
-          )}
-        </FormField>
+        {/* ── Section : Horaire ─────────────────────────────────────────── */}
+        <section className="space-y-3">
+          <SectionHeader>Horaire</SectionHeader>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <FormField label="Date" required error={errors.date?.message}>
+              {({ id }) => <Input id={id} type="date" {...register('date')} />}
+            </FormField>
+            <FormField label="Début" required error={errors.startTime?.message}>
+              {({ id }) => <Input id={id} type="time" {...register('startTime')} />}
+            </FormField>
+            <FormField label="Fin" required error={errors.endTime?.message}>
+              {({ id }) => <Input id={id} type="time" {...register('endTime')} />}
+            </FormField>
+          </div>
+        </section>
 
-        <FormField label="Salle" hint="Optionnel" error={errors.salleId?.message}>
-          {({ id }) => (
-            <Select id={id} {...register('salleId')}>
-              <option value="">— Aucune —</option>
-              {/* Source temporaire : pas d'endpoint /api/salles dédié — TODO V03. */}
-              {/* Les séances V2 acceptent salleId nullable, ce select reste vide tant que */}
-              {/* la liste backend n'est pas exposée. */}
-            </Select>
-          )}
-        </FormField>
+        {/* ── Section : Lieu et participants ───────────────────────────── */}
+        <section className="space-y-3">
+          <SectionHeader>Lieu et participants</SectionHeader>
+          <FormField label="Salle" hint="Optionnel" error={errors.salleId?.message}>
+            {({ id }) => (
+              <Select
+                id={id}
+                {...register('salleId')}
+                disabled={sallesQuery.isLoading}
+                invalid={Boolean(errors.salleId)}
+              >
+                <option value="">{sallesQuery.isLoading ? 'Chargement…' : '— Aucune —'}</option>
+                {salles.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
 
-        <div className="grid grid-cols-3 gap-3">
-          <FormField label="Date" required error={errors.date?.message}>
-            {({ id }) => <Input id={id} type="date" {...register('date')} />}
+          <FormField label="Classes" required error={errors.classeIds?.message}>
+            {({ id }) => (
+              <Controller
+                control={control}
+                name="classeIds"
+                render={({ field }) => (
+                  <ClasseChipsPicker
+                    id={id}
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.classeIds?.message}
+                    min={1}
+                  />
+                )}
+              />
+            )}
           </FormField>
-          <FormField label="Début" required error={errors.startTime?.message}>
-            {({ id }) => <Input id={id} type="time" {...register('startTime')} />}
-          </FormField>
-          <FormField label="Fin" required error={errors.endTime?.message}>
-            {({ id }) => <Input id={id} type="time" {...register('endTime')} />}
-          </FormField>
-        </div>
+        </section>
 
         {mutation.error ? (
           <p
@@ -521,5 +561,16 @@ export function CreateSessionModal({ isOpen, onClose, initialValues }: CreateSes
         ) : null}
       </form>
     </Modal>
+  );
+}
+
+// ── Sub-component ────────────────────────────────────────────────────
+// Petit intertitre discret pour structurer le formulaire en sections
+// logiques. Réutilisable si on factorise plus tard.
+function SectionHeader({ children }: { readonly children: ReactNode }) {
+  return (
+    <h3 className="border-b border-border pb-1.5 text-xs font-semibold uppercase tracking-wider text-text-muted">
+      {children}
+    </h3>
   );
 }

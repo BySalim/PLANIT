@@ -2,12 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import {
   type ClasseRef,
   type EnseignantDto,
+  type SalleRef,
   type SessionStatsDto,
   type SessionV2Dto,
   type SettingsDto,
   type UEDto,
   classeRefSchema,
   enseignantSchema,
+  salleRefSchema,
   sessionStatsSchema,
   sessionV2Schema,
   settingsSchema,
@@ -39,12 +41,13 @@ export const referentialKeys = {
   enseignants: ['enseignants'] as const,
   ues: ['ues'] as const,
   classes: ['classes'] as const,
+  salles: ['salles'] as const,
 };
 
 const sessionV2ListSchema = sessionV2Schema.array();
-const enseignantListSchema = enseignantSchema.array();
 const ueListSchema = ueSchema.array();
 const classeRefListSchema = classeRefSchema.array();
+const salleRefListSchema = salleRefSchema.array();
 
 // ── Séances V2 (GET /api/v2/sessions?weekStart=&classeId?&teacherId?&studentId?) ──
 
@@ -115,14 +118,27 @@ export function useSettingsQuery() {
 }
 
 // ── Enseignants (GET /api/enseignants — RP only) ───────────────────────
-// Côté backend la liste accepte des filtres (?statut, ?specialite) et une
-// pagination optionnelle. Pour le formulaire séance V2, on lit tout sans
-// filtre — la liste reste petite tant que la seed est < 50 enseignants.
+// Le backend renvoie une réponse paginée `{ items, total, page, pageSize }`
+// (cf. EnseignantsService.list). Pour le formulaire séance V2 on a besoin
+// de la liste complète : on demande `pageSize=200` (clamp serveur) et on
+// unwrap `items`. La liste reste petite tant que la seed est < 200
+// enseignants ; au-delà il faudra paginer côté UI ou exposer un endpoint
+// `/enseignants?all=true` (tech-debt à tracer le moment venu).
+
+const paginatedEnseignantsSchema = z.object({
+  items: enseignantSchema.array(),
+  total: z.number().int().min(0),
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1),
+});
 
 export function useEnseignantsQuery() {
   return useQuery<EnseignantDto[]>({
     queryKey: referentialKeys.enseignants,
-    queryFn: () => apiGet(`/enseignants`, enseignantListSchema),
+    queryFn: async () => {
+      const paginated = await apiGet(`/enseignants?pageSize=200`, paginatedEnseignantsSchema);
+      return paginated.items;
+    },
     staleTime: 60 * 1000,
   });
 }
@@ -145,6 +161,18 @@ export function useClassesQuery() {
   return useQuery<ClasseRef[]>({
     queryKey: referentialKeys.classes,
     queryFn: () => apiGet(`/classes`, classeRefListSchema),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ── Salles (GET /api/salles — référentiel partagé tous rôles) ──────────
+// Utilisé par le select Salle dans CreateSessionModal + SessionDetailDrawer.
+// Mirror exact de useClassesQuery : staleTime long, peu de churn attendu.
+
+export function useSallesQuery() {
+  return useQuery<SalleRef[]>({
+    queryKey: referentialKeys.salles,
+    queryFn: () => apiGet(`/salles`, salleRefListSchema),
     staleTime: 5 * 60 * 1000,
   });
 }
