@@ -1,4 +1,4 @@
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3001';
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3001/api';
 
 export interface ResponseParser<T> {
   safeParse(raw: unknown): { success: true; data: T } | { success: false; error: unknown };
@@ -16,11 +16,15 @@ export class ApiError extends Error {
   }
 }
 
+// Singleton anti-race : une seule tentative de refresh simultanée
+let pendingRefresh: Promise<void> | null = null;
+
 async function request<T>(
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: string,
   parser: ResponseParser<T>,
   body?: unknown,
+  retried = false,
 ): Promise<T> {
   const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
   const init: RequestInit = {
@@ -37,6 +41,34 @@ async function request<T>(
   const response = await fetch(url, init);
 
   if (!response.ok) {
+    // 401 : tente un refresh une fois, puis rejoue
+    if (response.status === 401 && !retried) {
+      if (pendingRefresh === null) {
+        pendingRefresh = fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        })
+          .then((r) => {
+            if (!r.ok) throw new Error('refresh_failed');
+          })
+          .finally(() => {
+            pendingRefresh = null;
+          });
+      }
+      try {
+        await pendingRefresh;
+        return request(method, path, parser, body, true);
+      } catch {
+        if (typeof window !== 'undefined') window.location.href = '/login';
+        throw new ApiError('Session expirée', 401);
+      }
+    }
+
+    // 403 : dispatch event capté par ForbiddenListener
+    if (response.status === 403 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('api:forbidden'));
+    }
+
     let detail: unknown;
     try {
       detail = await response.json();

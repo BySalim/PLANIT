@@ -18,7 +18,7 @@ function useInvalidatePlanning() {
 export function useCreateSessionMutation() {
   const invalidate = useInvalidatePlanning();
   return useMutation<SessionDto, Error, CreateSessionDto>({
-    mutationFn: (body) => apiPost('/api/sessions', sessionSchema, body),
+    mutationFn: (body) => apiPost('/sessions', sessionSchema, body),
     onSuccess: () => invalidate(),
   });
 }
@@ -26,7 +26,7 @@ export function useCreateSessionMutation() {
 export function useUpdateSessionMutation() {
   const invalidate = useInvalidatePlanning();
   return useMutation<SessionDto, Error, { id: string; body: UpdateSessionDto }>({
-    mutationFn: ({ id, body }) => apiPut(`/api/sessions/${id}`, sessionSchema, body),
+    mutationFn: ({ id, body }) => apiPut(`/sessions/${id}`, sessionSchema, body),
     onSuccess: () => invalidate(),
   });
 }
@@ -36,8 +36,8 @@ export function usePublishSessionsMutation() {
   return useMutation<SessionDto[], Error, { classeId?: string } | undefined>({
     mutationFn: (vars) => {
       const path = vars?.classeId
-        ? `/api/sessions/publish?classeId=${encodeURIComponent(vars.classeId)}`
-        : '/api/sessions/publish';
+        ? `/sessions/publish?classeId=${encodeURIComponent(vars.classeId)}`
+        : '/sessions/publish';
       return apiPost(path, sessionListSchema);
     },
     onSuccess: () => invalidate(),

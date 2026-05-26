@@ -37,7 +37,7 @@ export default function EtudiantHomePage() {
     setUpdateModal({ open: true, sessions: sessions ?? [] });
   }, []);
 
-  useRealtimeSessions(student.id, {
+  useRealtimeSessions(true, {
     onPublished: handlePublished,
     showToast: false,
   });
