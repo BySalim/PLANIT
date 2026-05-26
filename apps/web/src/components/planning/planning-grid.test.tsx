@@ -2,13 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
-import type { SessionDto } from '@planit/contracts';
+import type { SessionV2Dto } from '@planit/contracts';
 import { PlanningGrid } from './planning-grid';
 
 /**
- * Tests for PlanningGrid — rendu de la grille semaine (8h-20h × 7 jours),
- * positionnement vertical d'une séance et état d'erreur. Le drag/drop est
- * hors périmètre V01 (cf. plan de tests sprint B).
+ * Tests PlanningGrid V2 — rendu de la grille semaine (8h-20h × 7 jours),
+ * positionnement vertical d'une séance et état d'erreur. Le drag/drop reste
+ * hors périmètre des tests unitaires (couvert au smoke V01).
  */
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -20,20 +20,24 @@ function wrapper({ children }: { children: ReactNode }) {
 
 const WEEK_START = new Date('2026-05-25T00:00:00.000Z'); // Lundi.
 
-function buildSession(overrides: Partial<SessionDto> = {}): SessionDto {
+function buildSession(overrides: Partial<SessionV2Dto> = {}): SessionV2Dto {
   return {
     id: 'session-1',
-    type: 'CM',
-    status: 'PUBLIE',
+    libelle: 'Algorithmique',
+    type: 'COURS',
+    sousType: 'CM',
     startAt: '2026-05-26T10:00:00.000Z', // Mardi 10h.
     endAt: '2026-05-26T12:00:00.000Z',
+    intervenantNom: null,
+    description: null,
+    hasUnpublishedChanges: false,
     isPublished: true,
     lastModifiedAt: '2026-05-25T10:00:00.000Z',
     lastPublishedAt: '2026-05-25T10:00:00.000Z',
-    classe: { id: 'classe-1', code: 'GL3-A', name: 'GL3-A' },
     module: { id: 'module-1', code: 'ALGO', name: 'Algorithmique' },
+    enseignant: { id: 'teacher-1', nomComplet: 'M. Oumar Ndiaye' },
     salle: { id: 'salle-1', name: 'Amphi A' },
-    teacher: { id: 'teacher-1', fullName: 'M. Oumar Ndiaye' },
+    classes: [{ id: 'classe-1', code: 'GL3-A', name: 'GL3-A' }],
     ...overrides,
   };
 }
@@ -44,7 +48,6 @@ describe('PlanningGrid', () => {
       wrapper,
     });
 
-    // En-têtes formatés en français : lundi, mardi, …, dimanche.
     expect(screen.getByText(/lundi/i)).toBeInTheDocument();
     expect(screen.getByText(/mardi/i)).toBeInTheDocument();
     expect(screen.getByText(/mercredi/i)).toBeInTheDocument();
@@ -59,7 +62,6 @@ describe('PlanningGrid', () => {
       wrapper,
     });
 
-    // PLANIT-IA : seules les heures paires sont labellées (8h, 10h, …, 20h).
     expect(screen.getByText('8h')).toBeInTheDocument();
     expect(screen.getByText('10h')).toBeInTheDocument();
     expect(screen.getByText('20h')).toBeInTheDocument();
@@ -84,8 +86,8 @@ describe('PlanningGrid', () => {
       { wrapper },
     );
 
+    // L'aria-label est désormais construit à partir du `libelle` V2 (pas du nom module).
     const button = screen.getByRole('button', { name: /Séance Algorithmique/ });
-    // La séance est enveloppée dans un div positionné absolument.
     const wrap = button.parentElement;
     expect(wrap?.style.top).toBe('156px');
   });
