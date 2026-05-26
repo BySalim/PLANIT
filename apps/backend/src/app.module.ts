@@ -5,6 +5,7 @@ import { AcademicModule } from './academic/academic.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { ClassesModule } from './classes/classes.module';
 import { LoggerModule } from './common/logger.module';
 import { PrismaModule } from './common/prisma.module';
 import { EnseignantsModule } from './enseignants/enseignants.module';
@@ -40,6 +41,8 @@ const DEFAULT_LIMIT = isTest ? 10_000 : 100;
     AcademicModule,
     FilieresModule,
     SeanceV2Module,
+    // LOT 3 V02 — référentiel classes pour les formulaires séance V2
+    ClassesModule,
   ],
   providers: [
     // Ordre important : throttler → auth → RBAC.
