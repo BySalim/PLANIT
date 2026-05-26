@@ -2,8 +2,15 @@ import { useQuery } from '@tanstack/react-query';
 import {
   type SessionDto,
   type SessionStatsDto,
+  type EnseignantDto,
+  type UEDto,
+  type FiliereDto,
   sessionSchema,
   sessionStatsSchema,
+  enseignantSchema,
+  ueSchema,
+  filiereSchema,
+  z,
 } from '@planit/contracts';
 import { apiGet } from './api';
 import { toWeekStartParam } from './week';
@@ -60,5 +67,63 @@ export function useSessionDetailQuery(sessionId: string | null) {
     queryKey: planningKeys.session(sessionId ?? ''),
     queryFn: () => apiGet(`/sessions/${sessionId}`, sessionSchema),
     enabled: sessionId !== null,
+  });
+}
+
+// ── Enseignants ──────────────────────────────────────────────────────
+
+const enseignantPageSchema = z.object({
+  data: enseignantSchema.array(),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+});
+
+export type EnseignantPage = z.infer<typeof enseignantPageSchema>;
+
+export const enseignantKeys = {
+  all: ['enseignants'] as const,
+  list: (page: number, statut?: string | undefined) =>
+    [...enseignantKeys.all, 'list', page, statut ?? ''] as const,
+};
+
+export function useEnseignantsQuery(page: number = 1, statut?: string | undefined) {
+  const params = new URLSearchParams({ page: String(page), pageSize: '50' });
+  if (statut !== undefined && statut.length > 0) params.set('statut', statut);
+  return useQuery<EnseignantPage>({
+    queryKey: enseignantKeys.list(page, statut),
+    queryFn: () => apiGet(`/enseignants?${params.toString()}`, enseignantPageSchema),
+  });
+}
+
+// ── UE & Modules ─────────────────────────────────────────────────────
+
+const ueListSchema = ueSchema.array();
+
+export const ueKeys = {
+  all: ['ues'] as const,
+  list: () => [...ueKeys.all, 'list'] as const,
+};
+
+export function useUesQuery() {
+  return useQuery<UEDto[]>({
+    queryKey: ueKeys.list(),
+    queryFn: () => apiGet('/ues', ueListSchema),
+  });
+}
+
+// ── Filières ─────────────────────────────────────────────────────────
+
+const filiereListSchema = filiereSchema.array();
+
+export const filiereKeys = {
+  all: ['filieres'] as const,
+  list: () => [...filiereKeys.all, 'list'] as const,
+};
+
+export function useFilieresQuery() {
+  return useQuery<FiliereDto[]>({
+    queryKey: filiereKeys.list(),
+    queryFn: () => apiGet('/filieres', filiereListSchema),
   });
 }
