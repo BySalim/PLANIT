@@ -27,13 +27,23 @@ Stack : Next.js 15 + React 19 (web) · Expo (mobile) · NestJS (backend) · Post
 
 ## Règles équipe — non-négociables
 
-| Membre                        | Branche        | Spécialité                       |
+| Membre                        | Branche        | Spécialité **indicative**        |
 | ----------------------------- | -------------- | -------------------------------- |
 | Salim Ouedraogo (@BySalim)    | `feat/salim`   | Tech Lead — arbitrage, ADR, spec |
 | Oumy (@oumy-code)             | `feat/oumy`    | Frontend Web                     |
 | Libasse (@cheelee08)          | `feat/libasse` | Frontend Mobile + design         |
 | Oumar (@papiuzumaki)          | `feat/oumar`   | Backend (NestJS, Prisma)         |
 | Djibril (@pape-djibrilbousso) | `feat/djibril` | DevOps + intégrations            |
+
+> **⚠️ Les « spécialités » sont indicatives, pas contraignantes.** Ce qui détermine le travail d'un membre, c'est **le LOT qui lui est assigné**, pas son rôle nominal. La spécialité reflète juste l'expertise principale ; en pratique, **n'importe qui peut prendre n'importe quel LOT** (frontend, backend, devops, design) si la répartition de la vague le prévoit.
+>
+> **Le Tech Lead (Salim) décide qui fait quel LOT**, vague par vague, en fonction de la charge et des disponibilités. La répartition officielle se trouve dans `../PLANIT-Strategie-VibeCode/vagues/vague-XX-lots.md` (section « Répartition par membre »). Cette répartition fait foi.
+>
+> **Conséquence pour toi (Claude)** :
+>
+> - **NE PAS** flagger qu'un membre touche un fichier hors de sa spécialité nominale comme un problème (ex. Oumar qui code du frontend, Djibril qui touche au backend). Tant que c'est sur **sa propre branche** et que ça correspond à **son LOT assigné**, c'est légitime.
+> - Le seul cross-domain qui mérite alerte, c'est **modifier la branche d'un autre membre** ou **bypasser la répartition de la vague** sans accord du TL.
+> - En review, juger le travail sur ses mérites techniques (qualité, conformité spec, tests, conventions) — pas sur la corrélation rôle ↔ fichiers touchés.
 
 **À chaque démarrage de session, tu DOIS** :
 
