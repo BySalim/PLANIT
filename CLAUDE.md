@@ -158,6 +158,30 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 
 ---
 
+## Patterns émergés Vague 02 (LOT 1 + 2 + infra)
+
+### Auth backend (LOT 1)
+
+- **`@Public()` opt-in, `JwtAuthGuard` global fail-closed** via `APP_GUARD`. Tout endpoint est protégé par défaut — un endpoint public exige `@Public()` explicite (anti-oubli).
+- **`@Roles('RESPONSABLE_PROGRAMME', ...)`** au niveau contrôleur/route pour le RBAC backend. Le `role` est embarqué dans le JWT access (`{ sub, role, email }`) — pas de hit BD à chaque requête.
+- **`@CurrentUser()`** param decorator pour récupérer `{ id, role, email }` dans un controller. Ne pas accéder à `req.user` directement.
+- **Cookies HttpOnly + SameSite=Strict + 2 secrets séparés** (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`). Pas de CSRF token (cf. ADR-0007 §2). `Secure=false` en dev uniquement (sinon le browser refuse en `http://localhost`).
+- **Rotation refresh atomique + révocation de famille** : `prisma.$transaction([update old, create new])` ; si refresh révoqué rejoué → `updateMany` sur tous les tokens de la `familyId` (cf. ADR-0005 §5).
+- **Throttle login** : `5/min/IP` en prod, `10000` en test (sinon `loginAs` enchaînés bloquent les tests). Pattern aligné sur `ThrottlerModule.forRoot`.
+
+### Packaging des packages internes
+
+- **Packages consommés à l'exécution par Node (`@planit/contracts`, `@planit/utils`)** : **compilés en CJS dans `./dist/`**, exports pointent vers ces builds. Node v24 ESM strict refuse les directory imports (`export * from './date'`) en source TS — d'où l'obligation de builder un JS standard.
+- **Packages consommés uniquement par bundlers (`@planit/ui`, `@planit/design-tokens`)** : peuvent rester en source TS direct (Vite/Next.js transpilent).
+- **`postinstall`** racine build automatiquement `contracts` + `utils` après chaque `pnpm install` — pas besoin de build manuel après un clone.
+- **CI** : step `Build internal packages` avant lint/typecheck/test pour garantir que `dist/` existe.
+
+### Orchestration scripts racine
+
+- **`pnpm -r --parallel`** au lieu de `turbo` dans les scripts racine (`dev`, `build`, `lint`, `typecheck`, `test`). Smart App Control (Win11 22H2+) bloque `turbo.exe` non signé. Trade-off : pas de cache turbo (acceptable à cette taille). Réactivation tracée en tech-debt `TD-031`.
+
+---
+
 ## Sécurité — règles dès jour 1
 
 - Aucun secret en dur — `.env.example` documenté, `.env` gitignored, gitleaks actif

@@ -69,10 +69,11 @@ et des guards de rôles.
 
 ## Nice-to-have (sans vague-cible)
 
-| ID           | Description                                                                            | Impact                                                                     | Priorité |
-| ------------ | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------- |
-| TD-012       | LOT 2 — Sidebar : drag-resize partiel vs proto                                         | Resize sidebar livré (iter. B), écarts résiduels vs `PLANIT-IA/` à affiner | Faible   |
-| DISK-CLEANUP | Script de nettoyage `pnpm-store` + `node_modules` orphelins (incident Oumy 2026-05-22) | 5+ GB récupérables, libère le disque dev Windows                           | Faible   |
+| ID           | Description                                                                                 | Impact                                                                                                                                                                                                                                  | Priorité |
+| ------------ | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| TD-012       | LOT 2 — Sidebar : drag-resize partiel vs proto                                              | Resize sidebar livré (iter. B), écarts résiduels vs `PLANIT-IA/` à affiner                                                                                                                                                              | Faible   |
+| DISK-CLEANUP | Script de nettoyage `pnpm-store` + `node_modules` orphelins (incident Oumy 2026-05-22)      | 5+ GB récupérables, libère le disque dev Windows                                                                                                                                                                                        | Faible   |
+| TD-031       | Réactiver le cache `turbo` sur les scripts racine (`dev`/`build`/`lint`/`typecheck`/`test`) | Aujourd'hui `pnpm -r --parallel` (Smart App Control Win11 bloque `turbo.exe` non signé). À revisiter si la lenteur des builds CI devient un problème — soit Turbo signe ses binaires, soit on isole `turbo` en step CI Linux uniquement | Faible   |
 
 ---
 
