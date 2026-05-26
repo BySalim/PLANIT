@@ -63,9 +63,9 @@ const NAV: NavGroup[] = [
   {
     group: 'OFFRE DE FORMATION',
     items: [
-      { id: 'filieres', label: 'Filières', href: '#', icon: GraduationCapIcon },
+      { id: 'filieres', label: 'Filières', href: '/rp/filieres', icon: GraduationCapIcon },
       { id: 'formations', label: 'Formations', href: '#', icon: BookStackIcon },
-      { id: 'modules', label: 'UE & Modules', href: '#', icon: BookOpenIcon },
+      { id: 'modules', label: 'UE & Modules', href: '/rp/ue-modules', icon: BookOpenIcon },
       { id: 'maquettes', label: 'Maquettes de formation', href: '#', icon: BookStackIcon },
     ],
   },
@@ -74,7 +74,7 @@ const NAV: NavGroup[] = [
     items: [
       { id: 'students', label: 'Étudiants', href: '#', icon: UsersIcon },
       { id: 'classes', label: 'Classes', href: '#', icon: LayersIcon },
-      { id: 'teachers', label: 'Enseignants', href: '#', icon: UserCogIcon },
+      { id: 'teachers', label: 'Enseignants', href: '/rp/enseignants', icon: UserCogIcon },
       { id: 'personnel', label: 'Personnel', href: '#', icon: UserIcon },
       { id: 'rooms', label: 'Salles', href: '#', icon: DoorIcon },
     ],

@@ -105,3 +105,18 @@ export function apiPost<T>(path: string, parser: ResponseParser<T>, body?: unkno
 export function apiPut<T>(path: string, parser: ResponseParser<T>, body?: unknown): Promise<T> {
   return request('PUT', path, parser, body);
 }
+
+export async function apiDelete(path: string): Promise<void> {
+  const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    if (response.status === 403 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('api:forbidden'));
+    }
+    throw new ApiError(`DELETE ${path} failed`, response.status);
+  }
+}
