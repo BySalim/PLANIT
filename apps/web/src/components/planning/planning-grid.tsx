@@ -4,20 +4,20 @@ import { useEffect, useRef, useState } from 'react';
 import { addDays, differenceInMinutes, format, getHours, getMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { BarChartIcon } from '@planit/ui';
-import type { SessionDto } from '@planit/contracts';
+import type { CreateSessionV2Dto, SessionV2Dto } from '@planit/contracts';
 import { Button } from '@/components/ui/button';
-import { useCreateSessionMutation, useUpdateSessionMutation } from '@/lib/mutations';
-import { paletteForSession } from '@/lib/module-palette';
+import { useCreateSessionV2Mutation, useUpdateSessionV2Mutation } from '@/lib/mutations-v2';
+import { paletteForSessionV2 } from '@/lib/module-palette';
 import { cn } from '@/lib/utils';
 import { SessionCard } from './session-card';
 
 interface PlanningGridProps {
   weekStart: Date;
-  sessions: SessionDto[];
+  sessions: readonly SessionV2Dto[];
   isLoading: boolean;
   error: Error | null;
   /** Ouverture du détail d'une séance (double-clic). */
-  onSessionOpen?: ((session: SessionDto) => void) | undefined;
+  onSessionOpen?: ((session: SessionV2Dto) => void) | undefined;
   onRetry?: (() => void) | undefined;
 }
 
@@ -29,19 +29,17 @@ const SNAP_HOURS = 0.5; // pas de calage du drag = 30 min
 // 30 min de "gouffre" sous le dernier créneau pour la respiration visuelle.
 const BOTTOM_PAD = HOUR_HEIGHT / 2;
 const GRID_HEIGHT = (DAY_END - DAY_START) * HOUR_HEIGHT + BOTTOM_PAD;
-// Largeur min d'une colonne jour — voir `grid-cols-[64px_repeat(7,minmax(250px,2fr))]`.
-// Proto COL_MIN_W = 150 ; 250 px retenu en LOT 2 iter. D pour la lisibilité des cartes.
 const HOURS = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => DAY_START + i);
 
 interface PositionedSession {
-  session: SessionDto;
+  session: SessionV2Dto;
   dayIndex: number;
   top: number;
   height: number;
 }
 
 interface DragState {
-  session: SessionDto;
+  session: SessionV2Dto;
   /** Décalage vertical (px) entre le curseur et le haut de la carte saisie. */
   grabOffsetY: number;
 }
@@ -68,7 +66,7 @@ interface ResizePreview {
   endHour: number;
 }
 
-function sessionDurationHours(session: SessionDto): number {
+function sessionDurationHours(session: SessionV2Dto): number {
   return differenceInMinutes(new Date(session.endAt), new Date(session.startAt)) / 60;
 }
 
@@ -87,7 +85,7 @@ function fmtHour(hour: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function positionSession(session: SessionDto): PositionedSession | null {
+function positionSession(session: SessionV2Dto): PositionedSession | null {
   const start = new Date(session.startAt);
   const end = new Date(session.endAt);
   // date-fns getDay: Sun=0, Mon=1, ..., Sat=6
@@ -107,6 +105,57 @@ function positionSession(session: SessionDto): PositionedSession | null {
   };
 }
 
+/**
+ * Construit un payload CreateSessionV2Dto à partir d'une SessionV2Dto existante
+ * (utilisé par le copier-coller Ctrl+V). Respecte la discriminated union sur
+ * `type` — les champs spécifiques (module/enseignant pour Cours/Eval,
+ * intervenant/description pour Event) sont passés depuis la source.
+ */
+function buildCopyPayload(
+  source: SessionV2Dto,
+  startAt: string,
+  endAt: string,
+): CreateSessionV2Dto | null {
+  const classeIds = source.classes.map((c) => c.id);
+  const salleId = source.salle?.id ?? null;
+  const base = {
+    libelle: source.libelle,
+    classeIds,
+    salleId,
+    startAt,
+    endAt,
+  } as const;
+
+  if (source.type === 'EVENEMENT') {
+    return {
+      type: 'EVENEMENT',
+      intervenantNom: source.intervenantNom,
+      description: source.description,
+      ...base,
+    };
+  }
+
+  // Cours / Evaluation : module + enseignant doivent exister sur la source.
+  if (!source.module || !source.enseignant) return null;
+  if (source.type === 'COURS') {
+    return {
+      type: 'COURS',
+      ...(source.sousType !== null ? { sousType: source.sousType as 'CM' | 'TD' | 'TP' } : {}),
+      moduleId: source.module.id,
+      enseignantId: source.enseignant.id,
+      ...base,
+    };
+  }
+  // EVALUATION — sousType requis (V2-D4). Si null sur la source, fallback EXAMEN.
+  return {
+    type: 'EVALUATION',
+    sousType: (source.sousType ?? 'EXAMEN') as 'EXAMEN' | 'RATTRAPAGE' | 'DEVOIR',
+    moduleId: source.module.id,
+    enseignantId: source.enseignant.id,
+    ...base,
+  };
+}
+
 export function PlanningGrid({
   weekStart,
   sessions,
@@ -118,10 +167,10 @@ export function PlanningGrid({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
-  const [copiedSession, setCopiedSession] = useState<SessionDto | null>(null);
+  const [copiedSession, setCopiedSession] = useState<SessionV2Dto | null>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
-  const { mutate: updateSession } = useUpdateSessionMutation();
-  const { mutate: pasteSession } = useCreateSessionMutation();
+  const { mutate: updateSession } = useUpdateSessionV2Mutation();
+  const { mutate: pasteSession } = useCreateSessionV2Mutation();
   // Dernière position du curseur sur la grille — base du collage Ctrl+V.
   const lastMousePosRef = useRef<{ dayIndex: number; y: number } | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
@@ -175,7 +224,7 @@ export function PlanningGrid({
 
   // Démarre un redimensionnement depuis une poignée haut/bas d'une séance.
   function startResize(
-    session: SessionDto,
+    session: SessionV2Dto,
     edge: 'top' | 'bottom',
     dayIndex: number,
     event: React.MouseEvent,
@@ -301,15 +350,10 @@ export function PlanningGrid({
       const start = addDays(weekStart, pos.dayIndex);
       start.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
       const end = new Date(start.getTime() + durationMs);
-      pasteSession({
-        type: copiedSession.type,
-        classeId: copiedSession.classe.id,
-        moduleId: copiedSession.module.id,
-        salleId: copiedSession.salle.id,
-        teacherId: copiedSession.teacher.id,
-        startAt: start.toISOString(),
-        endAt: end.toISOString(),
-      });
+      const payload = buildCopyPayload(copiedSession, start.toISOString(), end.toISOString());
+      if (payload !== null) {
+        pasteSession(payload);
+      }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -442,7 +486,10 @@ export function PlanningGrid({
                     const height = rp
                       ? Math.max(28, (rp.endHour - rp.startHour) * HOUR_HEIGHT - 4)
                       : p.height;
-                    const barColor = paletteForSession(p.session.module.id, p.session.type).bar;
+                    const barColor = paletteForSessionV2(
+                      p.session.module?.id ?? null,
+                      p.session.type,
+                    ).bar;
                     return (
                       <div
                         key={p.session.id}

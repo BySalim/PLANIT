@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { SessionDto } from '@planit/contracts';
+import type { SessionV2Dto } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
 import { CreateSessionModal } from '@/components/planning/create-session-modal';
 import { HolidayBanner } from '@/components/planning/holiday-banner';
@@ -12,7 +12,7 @@ import { PlanningToolbar } from '@/components/planning/planning-toolbar';
 import { SessionDetailDrawer } from '@/components/planning/session-detail-drawer';
 import { ViewScopeToggle, type ViewScope } from '@/components/planning/view-scope-toggle';
 import type { ViewMode } from '@/components/planning/view-mode-tabs';
-import { useWeekSessionsQuery } from '@/lib/queries';
+import { useV2WeekSessionsQuery } from '@/lib/queries-v2';
 import { getCurrentWeekStart } from '@/lib/week';
 
 // V1-D2 hardcoded demo counters (matchent les compteurs PLANIT-IA D.kpis).
@@ -29,11 +29,11 @@ export default function RpPlanningPage() {
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('classique');
   const [scope, setScope] = useState<ViewScope>('week');
-  const sessionsQuery = useWeekSessionsQuery(weekStart);
+  const sessionsQuery = useV2WeekSessionsQuery(weekStart);
   const sessions = sessionsQuery.data ?? [];
 
   // Double-clic sur une séance → ouverture du drawer de détail.
-  const handleSessionOpen = (session: SessionDto) => {
+  const handleSessionOpen = (session: SessionV2Dto) => {
     setDetailSessionId(session.id);
   };
 
