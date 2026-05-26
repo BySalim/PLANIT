@@ -4,7 +4,7 @@ import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import type { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import type { Logger } from 'pino';
 import type { Server, Socket } from 'socket.io';
-import type { SessionDto } from '@planit/contracts';
+import type { SessionDto, SessionV2Dto } from '@planit/contracts';
 import { ACCESS_COOKIE_NAME } from '../auth/cookies';
 import { corsOrigin } from '../common/cors';
 import { PINO_LOGGER } from '../common/logger.module';
@@ -87,8 +87,12 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /**
    * Emit `session:published` to the given users only (one room per user id).
    * No-op when there is no recipient.
+   *
+   * Accepte SessionDto V01 et SessionV2Dto V02 — le client (web/mobile)
+   * fait sa propre validation Zod sur le payload reçu (cf. ADR-0004 §note
+   * sur le payload non-typé côté wire).
    */
-  emitSessionPublished(userIds: string[], sessions: SessionDto[]): void {
+  emitSessionPublished(userIds: string[], sessions: (SessionDto | SessionV2Dto)[]): void {
     if (userIds.length === 0) return;
     const rooms = userIds.map((id) => WsGateway.room(id));
     this.server.to(rooms).emit('session:published', { sessions });

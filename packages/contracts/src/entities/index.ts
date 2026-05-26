@@ -34,8 +34,31 @@ export const enseignantSchema = z.object({
   specialite: z.string().min(1).max(120),
 });
 
-export const createEnseignantSchema = enseignantSchema.omit({ id: true });
-export const updateEnseignantSchema = createEnseignantSchema.partial();
+/**
+ * Création atomique : un Enseignant porte 1-1 un User (rôle ENSEIGNANT).
+ * Le RP fournit l'email institutionnel + un mot de passe temporaire ; le
+ * backend crée le User (passwordHash argon2id) puis l'Enseignant dans une
+ * transaction. `userId` n'est jamais fourni par le client.
+ */
+export const createEnseignantSchema = z.object({
+  nomComplet: z.string().min(1).max(120),
+  emailInstitutionnel: z.string().email(),
+  password: z.string().min(8).max(72),
+  whatsapp: z.string().max(30).nullable().optional(),
+  statut: enseignantStatutSchema,
+  specialite: z.string().min(1).max(120),
+});
+
+/**
+ * Update — les champs `userId`/`emailInstitutionnel` et `password` ne sont pas
+ * modifiables ici (un changement d'email passe par un flow auth dédié V03+).
+ */
+export const updateEnseignantSchema = z.object({
+  nomComplet: z.string().min(1).max(120).optional(),
+  whatsapp: z.string().max(30).nullable().optional(),
+  statut: enseignantStatutSchema.optional(),
+  specialite: z.string().min(1).max(120).optional(),
+});
 
 export type EnseignantDto = z.infer<typeof enseignantSchema>;
 export type CreateEnseignantDto = z.infer<typeof createEnseignantSchema>;

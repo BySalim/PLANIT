@@ -10,17 +10,18 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "lint": "turbo lint",
-    "typecheck": "turbo typecheck",
-    "test": "turbo test",
+    "dev": "pnpm -r --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
     "db:migrate": "pnpm --filter @planit/backend db:migrate",
     "db:seed": "pnpm --filter @planit/backend db:seed",
     "db:reset": "pnpm --filter @planit/backend db:reset",
     "test:e2e": "playwright test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "pnpm --filter @planit/contracts build && pnpm --filter @planit/utils build"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",

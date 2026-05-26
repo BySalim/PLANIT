@@ -2,24 +2,32 @@
   "name": "@planit/utils",
   "version": "0.0.1",
   "private": true,
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "default": "./dist/index.js"
     },
     "./date": {
       "types": "./src/date/index.ts",
-      "default": "./src/date/index.ts"
+      "default": "./dist/date/index.js"
     },
     "./result": {
       "types": "./src/result/index.ts",
-      "default": "./src/result/index.ts"
+      "default": "./dist/result/index.js"
+    },
+    "./json-stable": {
+      "types": "./src/json-stable.ts",
+      "default": "./dist/json-stable.js"
     }
   },
   "scripts": {
+    "build": "tsc",
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
+    "@planit/config": "workspace:*",
     "typescript": "^5.8.3",
     "vitest": "^3.2.1"
   }
