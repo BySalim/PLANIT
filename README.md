@@ -2,7 +2,7 @@
 
 > Plateforme de gestion des emplois du temps -- ISM Dakar
 
-Monorepo Turborepo + pnpm developpe en vibe-code autonome par une equipe de 5 etudiants ISM.
+Monorepo pnpm workspaces developpe en vibe-code autonome par une equipe de 5 etudiants ISM.
 
 ## Stack
 
@@ -15,7 +15,7 @@ Monorepo Turborepo + pnpm developpe en vibe-code autonome par une equipe de 5 et
 | Base de donnees | PostgreSQL 16 + Prisma                          |
 | Cache           | Redis 7 + BullMQ                                |
 | Fichiers        | MinIO                                           |
-| Build           | Turborepo + pnpm                                |
+| Build           | pnpm workspaces + `pnpm -r --parallel`          |
 
 ## Demarrage rapide
 
@@ -29,6 +29,8 @@ Monorepo Turborepo + pnpm developpe en vibe-code autonome par une equipe de 5 et
 
 ```bash
 # 1. Installer les dependances
+# (le postinstall build @planit/contracts et @planit/utils en CJS dist/
+#  -- requis car le backend Node v24 les consomme via require())
 pnpm install
 
 # 2. Configurer l environnement
@@ -72,14 +74,16 @@ pnpm format      # Prettier
 Problemes recurrents rencontres par l'equipe pendant la Vague 01. Version
 detaillee dans [docs/runbooks/local-setup-faq.md](docs/runbooks/local-setup-faq.md).
 
-| Symptome                                             | Cause                                      | Solution                                                                      |
-| ---------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------- |
-| `pnpm install` qui timeout (depuis Dakar)            | Latence registry npm vers l'Europe         | `pnpm install --fetch-timeout=180000 --fetch-retries=5`                       |
-| `pnpm db:reset` echoue avec `connection refused`     | Docker pas demarre                         | `docker compose -f infra/docker-compose.dev.yml up -d postgres redis`         |
-| `pg_isready` timeout en boucle                       | Postgres pas pret ou port deja pris        | Verifier `docker ps` ; tuer un autre Postgres local (`lsof -i :5432`)         |
-| Glob WSL qui timeout (Windows)                       | Acces via UNC (`\\wsl.localhost\...`)      | Travailler depuis le filesystem ext4 natif WSL (`/home/user/...`), pas en UNC |
-| `chmod` / `EACCES` sur fichiers en pre-commit        | Permissions read-only laisses par un build | `chmod u+w <fichier>` puis retenter le commit                                 |
-| `EPERM` Prisma sur Windows lors de `prisma generate` | Process `node`/`tsc` qui locke `dist/`     | Tuer le watch (`Ctrl+C` sur `pnpm dev`) puis relancer `pnpm db:generate`      |
+| Symptome                                             | Cause                                                                                                | Solution                                                                                                                                                  |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install` qui timeout (depuis Dakar)            | Latence registry npm vers l'Europe                                                                   | `pnpm install --fetch-timeout=180000 --fetch-retries=5`                                                                                                   |
+| `pnpm db:reset` echoue avec `connection refused`     | Docker pas demarre                                                                                   | `docker compose -f infra/docker-compose.dev.yml up -d postgres redis`                                                                                     |
+| `pg_isready` timeout en boucle                       | Postgres pas pret ou port deja pris                                                                  | Verifier `docker ps` ; tuer un autre Postgres local (`lsof -i :5432`)                                                                                     |
+| Glob WSL qui timeout (Windows)                       | Acces via UNC (`\\wsl.localhost\...`)                                                                | Travailler depuis le filesystem ext4 natif WSL (`/home/user/...`), pas en UNC                                                                             |
+| `chmod` / `EACCES` sur fichiers en pre-commit        | Permissions read-only laisses par un build                                                           | `chmod u+w <fichier>` puis retenter le commit                                                                                                             |
+| `EPERM` Prisma sur Windows lors de `prisma generate` | Process `node`/`tsc` qui locke `dist/`                                                               | Tuer le watch (`Ctrl+C` sur `pnpm dev`) puis relancer `pnpm db:generate`                                                                                  |
+| `ERR_UNSUPPORTED_DIR_IMPORT` au demarrage du backend | `packages/{contracts,utils}/dist/` manquant (Node v24 ESM refuse les directory imports en source TS) | `pnpm install` -- le `postinstall` rebuild contracts + utils. Sinon manuel : `pnpm --filter @planit/contracts build && pnpm --filter @planit/utils build` |
+| `spawn UNKNOWN` sur `pnpm dev` (Windows 11 22H2+)    | Smart App Control bloque `turbo.exe` non signe                                                       | Les scripts racine utilisent desormais `pnpm -r` (cf. `package.json`) -- plus de turbo invoque                                                            |
 
 ## Secrets en production
 
