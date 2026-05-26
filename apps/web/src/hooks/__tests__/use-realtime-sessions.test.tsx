@@ -74,16 +74,16 @@ afterEach(() => {
 });
 
 describe('useRealtimeSessions', () => {
-  it("n'ouvre pas de socket quand userId est null", () => {
+  it("n'ouvre pas de socket quand enabled est false", () => {
     const client = new QueryClient();
-    renderHook(() => useRealtimeSessions(null), { wrapper: wrapper(client) });
+    renderHook(() => useRealtimeSessions(false), { wrapper: wrapper(client) });
 
     expect(mockSocket.on).not.toHaveBeenCalled();
   });
 
-  it("s'abonne à session:published quand un userId est fourni", () => {
+  it("s'abonne à session:published quand enabled est true", () => {
     const client = new QueryClient();
-    renderHook(() => useRealtimeSessions('user-1'), { wrapper: wrapper(client) });
+    renderHook(() => useRealtimeSessions(true), { wrapper: wrapper(client) });
 
     expect(mockSocket.on).toHaveBeenCalledWith('session:published', expect.any(Function));
   });
@@ -91,7 +91,7 @@ describe('useRealtimeSessions', () => {
   it('déclenche onPublished avec le payload reçu', () => {
     const client = new QueryClient();
     const onPublished = vi.fn();
-    renderHook(() => useRealtimeSessions('user-1', { onPublished, showToast: false }), {
+    renderHook(() => useRealtimeSessions(true, { onPublished, showToast: false }), {
       wrapper: wrapper(client),
     });
 
@@ -107,7 +107,7 @@ describe('useRealtimeSessions', () => {
   it('invalide les query keys impactées par les sessions reçues', () => {
     const client = new QueryClient();
     const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
-    renderHook(() => useRealtimeSessions('user-1', { showToast: false }), {
+    renderHook(() => useRealtimeSessions(true, { showToast: false }), {
       wrapper: wrapper(client),
     });
 
@@ -130,7 +130,7 @@ describe('useRealtimeSessions', () => {
   it('fallback : invalide planningKeys.all quand le payload est vide', () => {
     const client = new QueryClient();
     const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
-    renderHook(() => useRealtimeSessions('user-1', { showToast: false }), {
+    renderHook(() => useRealtimeSessions(true, { showToast: false }), {
       wrapper: wrapper(client),
     });
 
@@ -144,7 +144,7 @@ describe('useRealtimeSessions', () => {
 
   it("déconnecte la socket à l'unmount", () => {
     const client = new QueryClient();
-    const { unmount } = renderHook(() => useRealtimeSessions('user-1', { showToast: false }), {
+    const { unmount } = renderHook(() => useRealtimeSessions(true, { showToast: false }), {
       wrapper: wrapper(client),
     });
 

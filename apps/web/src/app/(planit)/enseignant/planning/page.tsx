@@ -71,7 +71,7 @@ function EnseignantPlanningPageInner() {
     setUpdateModal({ open: true, sessions: sessions ?? [] });
   }, []);
 
-  useRealtimeSessions(teacher.id, {
+  useRealtimeSessions(true, {
     onPublished: handlePublished,
     showToast: false,
   });

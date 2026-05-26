@@ -65,7 +65,7 @@ function buildInvalidationKeys(sessions: readonly SessionDto[]): ReadonlyArray<r
 }
 
 export function useRealtimeSessions(
-  userId: string | null,
+  enabled: boolean,
   options: UseRealtimeSessionsOptions = {},
 ): void {
   const { onPublished, showToast = true } = options;
@@ -73,7 +73,7 @@ export function useRealtimeSessions(
   const toast = useToast();
 
   useEffect(() => {
-    if (userId === null) {
+    if (!enabled) {
       return;
     }
 
@@ -108,5 +108,5 @@ export function useRealtimeSessions(
     return () => {
       socket.disconnect();
     };
-  }, [userId, queryClient, toast, onPublished, showToast]);
+  }, [enabled, queryClient, toast, onPublished, showToast]);
 }
