@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import {
+  type ClasseRef,
   type EnseignantDto,
   type SessionStatsDto,
   type SessionV2Dto,
   type SettingsDto,
   type UEDto,
+  classeRefSchema,
   enseignantSchema,
   sessionStatsSchema,
   sessionV2Schema,
@@ -36,11 +38,13 @@ export const referentialKeys = {
   settings: ['settings'] as const,
   enseignants: ['enseignants'] as const,
   ues: ['ues'] as const,
+  classes: ['classes'] as const,
 };
 
 const sessionV2ListSchema = sessionV2Schema.array();
 const enseignantListSchema = enseignantSchema.array();
 const ueListSchema = ueSchema.array();
+const classeRefListSchema = classeRefSchema.array();
 
 // ── Séances V2 (GET /api/v2/sessions?weekStart=&classeId?&teacherId?&studentId?) ──
 
@@ -130,6 +134,18 @@ export function useUesQuery() {
     queryKey: referentialKeys.ues,
     queryFn: () => apiGet(`/ues`, ueListSchema),
     staleTime: 60 * 1000,
+  });
+}
+
+// ── Classes (GET /api/classes — référentiel partagé tous rôles) ────────
+// Utilisé par <ClasseChipsPicker> (LOT 3 R.3). Liste statique sur la
+// durée d'une session — staleTime long.
+
+export function useClassesQuery() {
+  return useQuery<ClasseRef[]>({
+    queryKey: referentialKeys.classes,
+    queryFn: () => apiGet(`/classes`, classeRefListSchema),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
