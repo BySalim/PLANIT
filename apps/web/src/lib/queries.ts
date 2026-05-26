@@ -73,7 +73,7 @@ export function useSessionDetailQuery(sessionId: string | null) {
 // ── Enseignants ──────────────────────────────────────────────────────
 
 const enseignantPageSchema = z.object({
-  data: enseignantSchema.array(),
+  items: enseignantSchema.array(),
   total: z.number(),
   page: z.number(),
   pageSize: z.number(),

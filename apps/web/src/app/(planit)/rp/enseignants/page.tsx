@@ -118,14 +118,14 @@ export default function EnseignantsPage() {
                 </tr>
               </thead>
               <tbody>
-                {(data?.data.length ?? 0) === 0 ? (
+                {(data?.items.length ?? 0) === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-text-muted">
                       Aucun enseignant trouvé.
                     </td>
                   </tr>
                 ) : (
-                  (data?.data ?? []).map((enseignant: EnseignantDto) => (
+                  (data?.items ?? []).map((enseignant: EnseignantDto) => (
                     <tr
                       key={enseignant.id}
                       className="border-b border-border-soft last:border-b-0 hover:bg-bg"
