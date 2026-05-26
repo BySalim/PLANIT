@@ -21,7 +21,12 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { useCreateSessionV2Mutation } from '@/lib/mutations-v2';
-import { useEnseignantsQuery, useSettingsQuery, useUesQuery } from '@/lib/queries-v2';
+import {
+  useEnseignantsQuery,
+  useSallesQuery,
+  useSettingsQuery,
+  useUesQuery,
+} from '@/lib/queries-v2';
 import { ClasseChipsPicker } from './classe-chips-picker';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -231,6 +236,7 @@ export function CreateSessionModal({ isOpen, onClose, initialValues }: CreateSes
   const settingsQuery = useSettingsQuery();
   const enseignantsQuery = useEnseignantsQuery();
   const uesQuery = useUesQuery();
+  const sallesQuery = useSallesQuery();
   const mutation = useCreateSessionV2Mutation();
 
   const formSchema = useMemo(() => makeFormSchema(settingsQuery.data), [settingsQuery.data]);
@@ -271,6 +277,7 @@ export function CreateSessionModal({ isOpen, onClose, initialValues }: CreateSes
   }, [uesQuery.data]);
 
   const enseignants = enseignantsQuery.data ?? [];
+  const salles = sallesQuery.data ?? [];
 
   // Au changement de type : reset propre des champs spécifiques (V2-D5).
   // Confirmation `confirm()` si des données sont déjà saisies dans les champs
@@ -509,11 +516,18 @@ export function CreateSessionModal({ isOpen, onClose, initialValues }: CreateSes
           <SectionHeader>Lieu et participants</SectionHeader>
           <FormField label="Salle" hint="Optionnel" error={errors.salleId?.message}>
             {({ id }) => (
-              <Select id={id} {...register('salleId')}>
-                <option value="">— Aucune —</option>
-                {/* Source temporaire : pas d'endpoint /api/salles dédié — TODO V03. */}
-                {/* Les séances V2 acceptent salleId nullable, ce select reste vide tant que */}
-                {/* la liste backend n'est pas exposée. */}
+              <Select
+                id={id}
+                {...register('salleId')}
+                disabled={sallesQuery.isLoading}
+                invalid={Boolean(errors.salleId)}
+              >
+                <option value="">{sallesQuery.isLoading ? 'Chargement…' : '— Aucune —'}</option>
+                {salles.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
               </Select>
             )}
           </FormField>

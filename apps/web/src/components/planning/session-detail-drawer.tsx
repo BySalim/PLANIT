@@ -22,6 +22,7 @@ import { Select } from '@/components/ui/select';
 import { useUpdateSessionV2Mutation } from '@/lib/mutations-v2';
 import {
   useEnseignantsQuery,
+  useSallesQuery,
   useSettingsQuery,
   useUesQuery,
   useV2SessionDetailQuery,
@@ -210,6 +211,7 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
   const settingsQuery = useSettingsQuery();
   const enseignantsQuery = useEnseignantsQuery();
   const uesQuery = useUesQuery();
+  const sallesQuery = useSallesQuery();
   const mutation = useUpdateSessionV2Mutation();
   const [isEditing, setIsEditing] = useState(false);
 
@@ -256,6 +258,7 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
   }, [uesQuery.data]);
 
   const enseignants = enseignantsQuery.data ?? [];
+  const salles = sallesQuery.data ?? [];
 
   const onSubmit = handleSubmit(async (values) => {
     if (!session) return;
@@ -446,9 +449,13 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
 
             <FormField label="Salle" hint="Optionnel">
               {({ id }) => (
-                <Select id={id} {...register('salleId')}>
-                  <option value="">— Aucune —</option>
-                  {/* TODO V03 — endpoint /api/salles à exposer côté backend */}
+                <Select id={id} {...register('salleId')} disabled={sallesQuery.isLoading}>
+                  <option value="">{sallesQuery.isLoading ? 'Chargement…' : '— Aucune —'}</option>
+                  {salles.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
                 </Select>
               )}
             </FormField>

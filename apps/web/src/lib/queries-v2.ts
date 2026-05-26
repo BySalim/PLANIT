@@ -2,12 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import {
   type ClasseRef,
   type EnseignantDto,
+  type SalleRef,
   type SessionStatsDto,
   type SessionV2Dto,
   type SettingsDto,
   type UEDto,
   classeRefSchema,
   enseignantSchema,
+  salleRefSchema,
   sessionStatsSchema,
   sessionV2Schema,
   settingsSchema,
@@ -39,11 +41,13 @@ export const referentialKeys = {
   enseignants: ['enseignants'] as const,
   ues: ['ues'] as const,
   classes: ['classes'] as const,
+  salles: ['salles'] as const,
 };
 
 const sessionV2ListSchema = sessionV2Schema.array();
 const ueListSchema = ueSchema.array();
 const classeRefListSchema = classeRefSchema.array();
+const salleRefListSchema = salleRefSchema.array();
 
 // ── Séances V2 (GET /api/v2/sessions?weekStart=&classeId?&teacherId?&studentId?) ──
 
@@ -157,6 +161,18 @@ export function useClassesQuery() {
   return useQuery<ClasseRef[]>({
     queryKey: referentialKeys.classes,
     queryFn: () => apiGet(`/classes`, classeRefListSchema),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ── Salles (GET /api/salles — référentiel partagé tous rôles) ──────────
+// Utilisé par le select Salle dans CreateSessionModal + SessionDetailDrawer.
+// Mirror exact de useClassesQuery : staleTime long, peu de churn attendu.
+
+export function useSallesQuery() {
+  return useQuery<SalleRef[]>({
+    queryKey: referentialKeys.salles,
+    queryFn: () => apiGet(`/salles`, salleRefListSchema),
     staleTime: 5 * 60 * 1000,
   });
 }

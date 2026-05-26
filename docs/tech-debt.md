@@ -58,15 +58,14 @@ et des guards de rôles.
 
 ## Vague 04 — Mobile + WhatsApp + SMS
 
-| ID            | Description                                                                                   | Impact                                                                                                                                                                   | Priorité |
-| ------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
-| TD-001        | `apps/mobile` squelette — Expo non configuré                                                  | Aucun dev mobile possible                                                                                                                                                | Haute    |
-| TD-002        | `apps/whatsapp-bot` squelette — Baileys non intégré                                           | Pas de diffusion WhatsApp                                                                                                                                                | Haute    |
-| MOBILE-DEPS   | `apps/mobile` ne consomme pas encore `@planit/design-tokens` ni `@planit/utils`               | Une fois Expo bootstrappé, brancher les packages partagés (tokens + helpers date)                                                                                        | Haute    |
-| CI-MOBILE     | Pas de step build mobile en CI                                                                | Aucun garde-fou TS/lint pour `apps/mobile` une fois activé                                                                                                               | Haute    |
-| TD-V02-LOT3-A | Pas d'endpoint `/api/salles` côté backend (le select Salle reste vide dans modal + drawer V2) | UX dégradée — RP ne peut pas affecter de salle aux séances depuis le formulaire ; `salleId` reste null à la création. Mini-module backend identique à `classes/` à créer | Haute    |
-| TD-V02-LOT3-B | Date du drawer V2 en mode read-only affichée en anglais ("Monday 25 May 2026")                | Cosmétique — manque `{ locale: fr }` sur le `format()` dans `session-detail-drawer.tsx`. 5 min à fixer                                                                   | Faible   |
-| TD-V02-LOT3-C | `SOUS_TYPE_LABEL` dupliqué entre `create-session-modal.tsx` et `session-detail-drawer.tsx`    | Source unique de vérité manquante — à extraire dans `@planit/contracts` (libellés métier) ou un fichier UI partagé                                                       | Faible   |
+| ID            | Description                                                                                | Impact                                                                                                             | Priorité |
+| ------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | -------- |
+| TD-001        | `apps/mobile` squelette — Expo non configuré                                               | Aucun dev mobile possible                                                                                          | Haute    |
+| TD-002        | `apps/whatsapp-bot` squelette — Baileys non intégré                                        | Pas de diffusion WhatsApp                                                                                          | Haute    |
+| MOBILE-DEPS   | `apps/mobile` ne consomme pas encore `@planit/design-tokens` ni `@planit/utils`            | Une fois Expo bootstrappé, brancher les packages partagés (tokens + helpers date)                                  | Haute    |
+| CI-MOBILE     | Pas de step build mobile en CI                                                             | Aucun garde-fou TS/lint pour `apps/mobile` une fois activé                                                         | Haute    |
+| TD-V02-LOT3-B | Date du drawer V2 en mode read-only affichée en anglais ("Monday 25 May 2026")             | Cosmétique — manque `{ locale: fr }` sur le `format()` dans `session-detail-drawer.tsx`. 5 min à fixer             | Faible   |
+| TD-V02-LOT3-C | `SOUS_TYPE_LABEL` dupliqué entre `create-session-modal.tsx` et `session-detail-drawer.tsx` | Source unique de vérité manquante — à extraire dans `@planit/contracts` (libellés métier) ou un fichier UI partagé | Faible   |
 
 ---
 
