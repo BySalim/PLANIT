@@ -25,9 +25,17 @@ const DEMO_UNREAD_NOTIFS = 3;
 
 // Next.js App Router requires default export for page
 // eslint-disable-next-line no-restricted-syntax
+interface CreateInit {
+  readonly date: Date;
+  readonly startTime: string;
+  readonly endTime: string;
+}
+
 export default function RpPlanningPage() {
   const [weekStart, setWeekStart] = useState<Date>(() => getCurrentWeekStart());
   const [createOpen, setCreateOpen] = useState(false);
+  // I.1 / I.2 — pré-remplissage de la modale depuis un clic/drag sur slot vide.
+  const [createInit, setCreateInit] = useState<CreateInit | null>(null);
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('classique');
   const [scope, setScope] = useState<ViewScope>('week');
@@ -42,6 +50,16 @@ export default function RpPlanningPage() {
   // Double-clic sur une séance → ouverture du drawer de détail.
   const handleSessionOpen = (session: SessionV2Dto) => {
     setDetailSessionId(session.id);
+  };
+
+  // I.1 / I.2 — ouvre la modale avec la plage cliquée/glissée.
+  const handleCreateAtSlot = (init: CreateInit) => {
+    setCreateInit(init);
+    setCreateOpen(true);
+  };
+  const handleCloseCreate = () => {
+    setCreateOpen(false);
+    setCreateInit(null);
   };
 
   return (
@@ -88,6 +106,7 @@ export default function RpPlanningPage() {
               onSessionOpen={handleSessionOpen}
               onRetry={() => sessionsQuery.refetch()}
               onPushUndo={undoStack.push}
+              onCreateAtSlot={handleCreateAtSlot}
             />
           )}
         </div>
@@ -101,7 +120,19 @@ export default function RpPlanningPage() {
         />
       </div>
 
-      <CreateSessionModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateSessionModal
+        isOpen={createOpen}
+        onClose={handleCloseCreate}
+        {...(createInit
+          ? {
+              initialValues: {
+                date: createInit.date,
+                startTime: createInit.startTime,
+                endTime: createInit.endTime,
+              },
+            }
+          : {})}
+      />
       <SessionDetailDrawer sessionId={detailSessionId} onClose={() => setDetailSessionId(null)} />
     </Shell>
   );
