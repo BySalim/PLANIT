@@ -1,3 +1,5 @@
+'use client';
+
 import { createContext, useCallback, useContext, useEffect, useReducer } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { colors, spacing } from '@planit/design-tokens';

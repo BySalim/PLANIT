@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import type { SessionV2Dto } from '@planit/contracts';
+import { FlashProvider } from '@planit/ui';
 import { PlanningGrid } from './planning-grid';
 
 /**
@@ -15,7 +16,11 @@ function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <FlashProvider>
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    </FlashProvider>
+  );
 }
 
 const WEEK_START = new Date('2026-05-25T00:00:00.000Z'); // Lundi.

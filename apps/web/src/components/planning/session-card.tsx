@@ -8,7 +8,9 @@ interface SessionCardProps {
   session: SessionV2Dto;
   selected?: boolean | undefined;
   isDragging?: boolean | undefined;
-  onSelect?: ((session: SessionV2Dto) => void) | undefined;
+  onSelect?:
+    | ((session: SessionV2Dto, event: React.MouseEvent<HTMLButtonElement>) => void)
+    | undefined;
   onOpen?: ((session: SessionV2Dto) => void) | undefined;
   onDragStart?:
     | ((session: SessionV2Dto, event: React.DragEvent<HTMLButtonElement>) => void)
@@ -90,7 +92,7 @@ export function SessionCard({
         onSelect
           ? (event) => {
               event.stopPropagation();
-              onSelect(session);
+              onSelect(session, event);
             }
           : undefined
       }

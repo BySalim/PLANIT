@@ -5,6 +5,7 @@ import {
   type UpdateSessionV2Dto,
   sessionV2Schema,
 } from '@planit/contracts';
+import { useFlash } from '@planit/ui';
 import { apiPost, apiPut } from './api';
 import { planningV2Keys } from './queries-v2';
 
@@ -12,6 +13,10 @@ import { planningV2Keys } from './queries-v2';
 // Mutations Vague 02 — séances V2 (create / update / publish)
 // Toutes les invalidations ciblent `planningV2Keys.all` pour rester
 // indépendantes du jeu V01 tant que la page /rp n'est pas basculée.
+//
+// I.7 — chaque mutation push un flash succès/erreur via `useFlash()`. Le
+// caller peut quand même override via `mutate(vars, { onSuccess, onError })`
+// pour des comportements spécifiques (ex : fermer une modale).
 // ─────────────────────────────────────────────────────────────────────
 
 const sessionV2ListSchema = sessionV2Schema.array();
@@ -27,9 +32,16 @@ function useInvalidatePlanningV2() {
 
 export function useCreateSessionV2Mutation() {
   const invalidate = useInvalidatePlanningV2();
+  const flash = useFlash();
   return useMutation<SessionV2Dto, Error, CreateSessionV2Dto>({
     mutationFn: (body) => apiPost(`/v2/sessions`, sessionV2Schema, body),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      invalidate();
+      flash.push('success', 'Séance créée');
+    },
+    onError: (err) => {
+      flash.push('error', `Création de la séance impossible : ${err.message}`);
+    },
   });
 }
 
@@ -39,9 +51,16 @@ export function useCreateSessionV2Mutation() {
 
 export function useUpdateSessionV2Mutation() {
   const invalidate = useInvalidatePlanningV2();
+  const flash = useFlash();
   return useMutation<SessionV2Dto, Error, { id: string; body: UpdateSessionV2Dto }>({
     mutationFn: ({ id, body }) => apiPut(`/v2/sessions/${id}`, sessionV2Schema, body),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      invalidate();
+      flash.push('success', 'Séance mise à jour');
+    },
+    onError: (err) => {
+      flash.push('error', `Mise à jour impossible : ${err.message}`);
+    },
   });
 }
 
@@ -51,6 +70,7 @@ export function useUpdateSessionV2Mutation() {
 
 export function usePublishSessionsV2Mutation() {
   const invalidate = useInvalidatePlanningV2();
+  const flash = useFlash();
   return useMutation<SessionV2Dto[], Error, { classeId?: string } | undefined>({
     mutationFn: (vars) => {
       const path =
@@ -59,6 +79,20 @@ export function usePublishSessionsV2Mutation() {
           : `/v2/sessions/publish`;
       return apiPost(path, sessionV2ListSchema);
     },
-    onSuccess: () => invalidate(),
+    onSuccess: (published) => {
+      invalidate();
+      const count = published.length;
+      flash.push(
+        'success',
+        count === 0
+          ? 'Rien à publier'
+          : count === 1
+            ? '1 séance publiée'
+            : `${count} séances publiées`,
+      );
+    },
+    onError: (err) => {
+      flash.push('error', `Publication impossible : ${err.message}`);
+    },
   });
 }

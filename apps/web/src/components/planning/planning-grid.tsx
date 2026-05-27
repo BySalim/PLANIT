@@ -19,6 +19,29 @@ interface PlanningGridProps {
   /** Ouverture du détail d'une séance (double-clic). */
   onSessionOpen?: ((session: SessionV2Dto) => void) | undefined;
   onRetry?: (() => void) | undefined;
+  /**
+   * I.6 — push une entrée undo après une mutation réussie (drag / resize).
+   * Le paste (Ctrl+V) reste hors undo en V02 (pas de mutation delete).
+   */
+  onPushUndo?:
+    | ((entry: {
+        readonly label: string;
+        readonly undo: () => Promise<void> | void;
+        readonly redo: () => Promise<void> | void;
+      }) => void)
+    | undefined;
+  /**
+   * I.1 / I.2 — création d'une séance depuis un créneau vide. Reçoit la date
+   * (du jour cliqué) + plage horaire (snap 30 min). Le parent passe ça à
+   * `<CreateSessionModal initialValues={...}>`.
+   */
+  onCreateAtSlot?:
+    | ((init: {
+        readonly date: Date;
+        readonly startTime: string;
+        readonly endTime: string;
+      }) => void)
+    | undefined;
 }
 
 const DAY_START = 8;
@@ -163,12 +186,75 @@ export function PlanningGrid({
   error,
   onSessionOpen,
   onRetry,
+  onPushUndo,
+  onCreateAtSlot,
 }: PlanningGridProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // I.3 — multi-sélection : `selectedIds` est un Set immuable. Ctrl/Meta+clic
+  // toggle l'appartenance ; clic simple réduit la sélection à 1 élément.
+  // Click hors d'une séance → vide la sélection.
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
-  const [copiedSession, setCopiedSession] = useState<SessionV2Dto | null>(null);
+  // I.5 — snapshot du Set sélectionné au Ctrl+C. Ctrl+V crée N séances
+  // décalées par rapport à la position du curseur (le 1ᵉʳ élément = anchor).
+  const [copiedSessions, setCopiedSessions] = useState<readonly SessionV2Dto[]>([]);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
+  // I.1 — slot survolé (snap 30 min), null si curseur hors d'un slot libre.
+  const [hoverSlot, setHoverSlot] = useState<{ dayIndex: number; startHour: number } | null>(null);
+  // I.2 — drag-select sur fond vide : ancrage initial + curseur courant.
+  const [emptyDrag, setEmptyDrag] = useState<{
+    dayIndex: number;
+    startHour: number;
+    endHour: number;
+  } | null>(null);
+
+  function handleSelect(session: SessionV2Dto, event: React.MouseEvent) {
+    const isAdditive = event.ctrlKey || event.metaKey;
+    setSelectedIds((prev) => {
+      if (isAdditive) {
+        const next = new Set(prev);
+        if (next.has(session.id)) next.delete(session.id);
+        else next.add(session.id);
+        return next;
+      }
+      return new Set([session.id]);
+    });
+  }
+  function clearSelection() {
+    setSelectedIds((prev) => (prev.size === 0 ? prev : new Set()));
+  }
+
+  // Escape désélectionne tout (V2 LOT 4 I.3) + annule un drag-select en cours.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      clearSelection();
+      setEmptyDrag(null);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // I.1 — vérifie qu'un slot 30 min (`dayIndex`, `startHour`) est libre :
+  // aucune séance ne l'occupe pour ≥ 50 % de sa hauteur.
+  function isSlotFree(dayIndex: number, startHour: number): boolean {
+    const slotEnd = startHour + SNAP_HOURS;
+    for (const s of sessions) {
+      const sStart = new Date(s.startAt);
+      const sDayIdx = sStart.getDay() === 0 ? 6 : sStart.getDay() - 1;
+      if (sDayIdx !== dayIndex) continue;
+      const sStartH = getHours(sStart) + getMinutes(sStart) / 60;
+      const sEndH = sStartH + sessionDurationHours(s);
+      const overlap = Math.max(0, Math.min(sEndH, slotEnd) - Math.max(sStartH, startHour));
+      if (overlap / SNAP_HOURS >= 0.5) return false;
+    }
+    return true;
+  }
+
+  // Convertit la position curseur (Y dans la colonne) en heure snap 30 min.
+  function hourFromY(y: number): number {
+    return clamp(snap(DAY_START + y / HOUR_HEIGHT), DAY_START, DAY_END - SNAP_HOURS);
+  }
   const { mutate: updateSession } = useUpdateSessionV2Mutation();
   const { mutate: pasteSession } = useCreateSessionV2Mutation();
   // Dernière position du curseur sur la grille — base du collage Ctrl+V.
@@ -198,23 +284,86 @@ export function PlanningGrid({
     if (!drag) return;
     event.preventDefault();
     const startHour = startHourFromEvent(event, drag);
-    const { session } = drag;
-    const oldStart = new Date(session.startAt);
-    const durationMs = new Date(session.endAt).getTime() - oldStart.getTime();
+    const { session: anchor } = drag;
+    const anchorOldStart = new Date(anchor.startAt);
+    const anchorOldStartMs = anchorOldStart.getTime();
+    const anchorOldDayIndex = anchorOldStart.getDay() === 0 ? 6 : anchorOldStart.getDay() - 1;
 
-    const newStart = addDays(weekStart, dayIndex);
-    newStart.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
-    const newEnd = new Date(newStart.getTime() + durationMs);
+    const anchorNewStart = addDays(weekStart, dayIndex);
+    anchorNewStart.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
+    const anchorNewStartMs = anchorNewStart.getTime();
 
     setDrag(null);
     setDropPreview(null);
     // Pas de mutation si la séance est relâchée exactement à sa place initiale.
-    if (newStart.getTime() === oldStart.getTime()) return;
+    if (anchorNewStartMs === anchorOldStartMs) return;
 
-    updateSession({
-      id: session.id,
-      body: { startAt: newStart.toISOString(), endAt: newEnd.toISOString() },
+    // I.4 — batch : si l'anchor est dans la sélection multi, on déplace tout
+    // le groupe en préservant les offsets relatifs (temps + jour). Sinon, on
+    // déplace uniquement l'anchor (comportement V01).
+    const group =
+      selectedIds.has(anchor.id) && selectedIds.size > 1
+        ? sessions.filter((s) => selectedIds.has(s.id))
+        : [anchor];
+
+    const deltaMs = anchorNewStartMs - anchorOldStartMs;
+    const deltaDay = dayIndex - anchorOldDayIndex;
+
+    // Snapshot avant/après pour undo.
+    const moves = group.map((s) => {
+      const oldStart = new Date(s.startAt);
+      const oldEnd = new Date(s.endAt);
+      const durationMs = oldEnd.getTime() - oldStart.getTime();
+      const newStart = new Date(oldStart.getTime() + deltaMs);
+      // Si le drag changeait de jour, propager le delta de jour à chaque membre.
+      if (deltaDay !== 0) newStart.setDate(newStart.getDate() + deltaDay - 0); // déjà inclus dans deltaMs si même semaine
+      const newEnd = new Date(newStart.getTime() + durationMs);
+      return {
+        id: s.id,
+        oldStartIso: s.startAt,
+        oldEndIso: s.endAt,
+        newStartIso: newStart.toISOString(),
+        newEndIso: newEnd.toISOString(),
+      };
     });
+
+    moves.forEach((m) => {
+      updateSession({ id: m.id, body: { startAt: m.newStartIso, endAt: m.newEndIso } });
+    });
+
+    if (onPushUndo) {
+      const label =
+        moves.length === 1 ? 'Déplacement de séance' : `Déplacement de ${moves.length} séances`;
+      onPushUndo({
+        label,
+        undo: async () => {
+          await Promise.all(
+            moves.map(
+              (m) =>
+                new Promise<void>((resolve) => {
+                  updateSession(
+                    { id: m.id, body: { startAt: m.oldStartIso, endAt: m.oldEndIso } },
+                    { onSettled: () => resolve() },
+                  );
+                }),
+            ),
+          );
+        },
+        redo: async () => {
+          await Promise.all(
+            moves.map(
+              (m) =>
+                new Promise<void>((resolve) => {
+                  updateSession(
+                    { id: m.id, body: { startAt: m.newStartIso, endAt: m.newEndIso } },
+                    { onSettled: () => resolve() },
+                  );
+                }),
+            ),
+          );
+        },
+      });
+    }
   }
 
   function endDrag() {
@@ -294,10 +443,42 @@ export function PlanningGrid({
       );
       const newEnd = new Date(r.startDate);
       newEnd.setHours(Math.floor(preview.endHour), Math.round((preview.endHour % 1) * 60), 0, 0);
+      const newStartIso = newStart.toISOString();
+      const newEndIso = newEnd.toISOString();
+
+      // Capture l'ancien créneau pour pouvoir undo (avant la mutation).
+      const oldStart = new Date(r.startDate);
+      oldStart.setHours(Math.floor(r.baseStartHour), Math.round((r.baseStartHour % 1) * 60), 0, 0);
+      const oldEnd = new Date(r.startDate);
+      oldEnd.setHours(Math.floor(r.baseEndHour), Math.round((r.baseEndHour % 1) * 60), 0, 0);
+      const oldStartIso = oldStart.toISOString();
+      const oldEndIso = oldEnd.toISOString();
+      const sessionId = r.sessionId;
+
       updateSession({
-        id: r.sessionId,
-        body: { startAt: newStart.toISOString(), endAt: newEnd.toISOString() },
+        id: sessionId,
+        body: { startAt: newStartIso, endAt: newEndIso },
       });
+
+      if (onPushUndo) {
+        onPushUndo({
+          label: 'Redimensionnement de séance',
+          undo: () =>
+            new Promise<void>((resolve) => {
+              updateSession(
+                { id: sessionId, body: { startAt: oldStartIso, endAt: oldEndIso } },
+                { onSettled: () => resolve() },
+              );
+            }),
+          redo: () =>
+            new Promise<void>((resolve) => {
+              updateSession(
+                { id: sessionId, body: { startAt: newStartIso, endAt: newEndIso } },
+                { onSettled: () => resolve() },
+              );
+            }),
+        });
+      }
     }
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -305,7 +486,7 @@ export function PlanningGrid({
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };
-  }, [updateSession]);
+  }, [updateSession, onPushUndo]);
 
   // Lignes-guides d'une colonne : positions calées pendant resize ET déplacement.
   function columnGuideLines(dayIndex: number): { key: string; hour: number }[] {
@@ -331,33 +512,50 @@ export function PlanningGrid({
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
       if (key === 'c') {
-        const found = sessions.find((s) => s.id === selectedId);
-        if (found) setCopiedSession(found);
+        // I.5 — capture le snapshot du Set sélectionné (préserve l'ordre par
+        // index dans `sessions` pour stabilité).
+        const selected = sessions.filter((s) => selectedIds.has(s.id));
+        if (selected.length > 0) setCopiedSessions(selected);
         return;
       }
       if (key !== 'v') return;
       const pos = lastMousePosRef.current;
-      if (!copiedSession || !pos) return;
+      if (copiedSessions.length === 0 || !pos) return;
       event.preventDefault();
-      const startMs = new Date(copiedSession.startAt).getTime();
-      const durationMs = new Date(copiedSession.endAt).getTime() - startMs;
-      const durationH = durationMs / 3600000;
-      const startHour = clamp(
+
+      // L'anchor = 1ʳᵉ séance copiée (le plus tôt dans la semaine source).
+      const anchor = copiedSessions[0]!;
+      const anchorOldStart = new Date(anchor.startAt);
+      const anchorOldDayIndex = anchorOldStart.getDay() === 0 ? 6 : anchorOldStart.getDay() - 1;
+
+      const anchorNewHour = clamp(
         snap(DAY_START + pos.y / HOUR_HEIGHT),
         DAY_START,
-        DAY_END - durationH,
+        DAY_END - sessionDurationHours(anchor),
       );
-      const start = addDays(weekStart, pos.dayIndex);
-      start.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
-      const end = new Date(start.getTime() + durationMs);
-      const payload = buildCopyPayload(copiedSession, start.toISOString(), end.toISOString());
-      if (payload !== null) {
-        pasteSession(payload);
-      }
+      const anchorNewStart = addDays(weekStart, pos.dayIndex);
+      anchorNewStart.setHours(
+        Math.floor(anchorNewHour),
+        Math.round((anchorNewHour % 1) * 60),
+        0,
+        0,
+      );
+      const deltaMs = anchorNewStart.getTime() - anchorOldStart.getTime();
+      const deltaDay = pos.dayIndex - anchorOldDayIndex;
+
+      copiedSessions.forEach((s) => {
+        const oldStart = new Date(s.startAt);
+        const durationMs = new Date(s.endAt).getTime() - oldStart.getTime();
+        const newStart = new Date(oldStart.getTime() + deltaMs);
+        if (deltaDay !== 0) newStart.setDate(newStart.getDate());
+        const newEnd = new Date(newStart.getTime() + durationMs);
+        const payload = buildCopyPayload(s, newStart.toISOString(), newEnd.toISOString());
+        if (payload !== null) pasteSession(payload);
+      });
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sessions, selectedId, copiedSession, weekStart, pasteSession]);
+  }, [sessions, selectedIds, copiedSessions, weekStart, pasteSession]);
 
   if (error) {
     return (
@@ -381,10 +579,7 @@ export function PlanningGrid({
     // Clic hors d'une séance → désélection (les cartes stoppent la propagation).
     // Calqué sur PLANIT-IA/rp/planning-canvas.jsx : rail heures 44px, en-tête
     // 42px non-capitalisé, scrollbars masquées (UX desktop pro).
-    <div
-      className="scrollbar-hide h-full overflow-auto bg-surface"
-      onClick={() => setSelectedId(null)}
-    >
+    <div className="scrollbar-hide h-full overflow-auto bg-surface" onClick={clearSelection}>
       <div className="grid grid-cols-[44px_repeat(7,minmax(250px,2fr))]">
         {/* Header row : sticky corner + day labels (fond blanc, calqué PLANIT-IA) */}
         <div className="sticky left-0 top-0 z-30 flex h-[42px] items-center justify-center border-b border-r border-border-soft bg-surface text-text-faint">
@@ -439,7 +634,66 @@ export function PlanningGrid({
               onDrop={(event) => handleDrop(event, dayIndex)}
               onMouseMove={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
-                lastMousePosRef.current = { dayIndex, y: event.clientY - rect.top };
+                const y = event.clientY - rect.top;
+                lastMousePosRef.current = { dayIndex, y };
+
+                // I.2 — drag-select empty range : étend la fin tant qu'on reste
+                // sur le même jour. Si changement de jour → annule (drag horiz).
+                if (emptyDrag) {
+                  if (emptyDrag.dayIndex !== dayIndex) {
+                    setEmptyDrag(null);
+                    return;
+                  }
+                  const cursorHour = hourFromY(y);
+                  const endHour = clamp(
+                    Math.max(cursorHour + SNAP_HOURS, emptyDrag.startHour + SNAP_HOURS),
+                    emptyDrag.startHour + SNAP_HOURS,
+                    DAY_END,
+                  );
+                  setEmptyDrag({ ...emptyDrag, endHour });
+                  return;
+                }
+
+                // I.1 — hover sur slot libre : affiche le bouton « + ».
+                // N'apparaît que si aucun drag/resize en cours.
+                if (drag || resizePreview) {
+                  if (hoverSlot !== null) setHoverSlot(null);
+                  return;
+                }
+                const slot = hourFromY(y);
+                if (!isSlotFree(dayIndex, slot)) {
+                  if (hoverSlot !== null) setHoverSlot(null);
+                  return;
+                }
+                if (!hoverSlot || hoverSlot.dayIndex !== dayIndex || hoverSlot.startHour !== slot) {
+                  setHoverSlot({ dayIndex, startHour: slot });
+                }
+              }}
+              onMouseLeave={() => {
+                if (hoverSlot?.dayIndex === dayIndex) setHoverSlot(null);
+              }}
+              onMouseDown={(event) => {
+                // I.2 — démarre un drag-select UNIQUEMENT si l'event vient du
+                // fond de la colonne (pas d'une SessionCard, qui stopPropagation).
+                if (event.target !== event.currentTarget) return;
+                const rect = event.currentTarget.getBoundingClientRect();
+                const startHour = hourFromY(event.clientY - rect.top);
+                setEmptyDrag({ dayIndex, startHour, endHour: startHour + SNAP_HOURS });
+                setHoverSlot(null);
+              }}
+              onMouseUp={(event) => {
+                // I.1 — clic simple sur slot libre (pas de drag) → ouvre modale 30 min.
+                // I.2 — fin de drag-select : ouvre modale avec la plage agrégée.
+                if (!emptyDrag || emptyDrag.dayIndex !== dayIndex) return;
+                event.stopPropagation();
+                const slotDate = addDays(weekStart, dayIndex);
+                const init = {
+                  date: slotDate,
+                  startTime: fmtHour(emptyDrag.startHour),
+                  endTime: fmtHour(emptyDrag.endHour),
+                };
+                setEmptyDrag(null);
+                onCreateAtSlot?.(init);
               }}
             >
               {HOURS.slice(0, -1).map((hour) => (
@@ -464,6 +718,51 @@ export function PlanningGrid({
                   }}
                   aria-hidden
                 />
+              ) : null}
+
+              {/* I.2 — preview de la plage drag-sélectionnée */}
+              {emptyDrag && emptyDrag.dayIndex === dayIndex ? (
+                <div
+                  className="pointer-events-none absolute inset-x-1 rounded-[10px] border-2 border-dashed border-accent bg-accent-100/70"
+                  style={{
+                    top: (emptyDrag.startHour - DAY_START) * HOUR_HEIGHT,
+                    height: (emptyDrag.endHour - emptyDrag.startHour) * HOUR_HEIGHT,
+                  }}
+                  aria-hidden
+                />
+              ) : null}
+
+              {/* I.1 — bouton « + » flottant au hover sur slot libre */}
+              {!emptyDrag && hoverSlot && hoverSlot.dayIndex === dayIndex ? (
+                <button
+                  type="button"
+                  aria-label={`Créer une séance à ${fmtHour(hoverSlot.startHour)}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    const slotDate = addDays(weekStart, dayIndex);
+                    onCreateAtSlot?.({
+                      date: slotDate,
+                      startTime: fmtHour(hoverSlot.startHour),
+                      endTime: fmtHour(hoverSlot.startHour + SNAP_HOURS),
+                    });
+                    setHoverSlot(null);
+                  }}
+                  className="absolute right-1.5 z-20 inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-white shadow-md transition-transform hover:scale-110"
+                  style={{ top: (hoverSlot.startHour - DAY_START) * HOUR_HEIGHT + 2 }}
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </button>
               ) : null}
 
               {/* Lignes-guides en pointillés (resize + déplacement) avec l'heure */}
@@ -499,9 +798,9 @@ export function PlanningGrid({
                       >
                         <SessionCard
                           session={p.session}
-                          selected={selectedId === p.session.id}
+                          selected={selectedIds.has(p.session.id)}
                           isDragging={drag?.session.id === p.session.id}
-                          onSelect={(s) => setSelectedId(s.id)}
+                          onSelect={handleSelect}
                           onOpen={onSessionOpen}
                           onDragStart={(s, event) => {
                             const rect = event.currentTarget.getBoundingClientRect();
