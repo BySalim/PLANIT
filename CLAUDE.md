@@ -190,6 +190,17 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 
 - **`pnpm -r --parallel`** au lieu de `turbo` dans les scripts racine (`dev`, `build`, `lint`, `typecheck`, `test`). Smart App Control (Win11 22H2+) bloque `turbo.exe` non signé. Trade-off : pas de cache turbo (acceptable à cette taille). Réactivation tracée en tech-debt `TD-031`.
 
+### Lighthouse CI — signal partout, gating à deux niveaux
+
+- **Le job `lighthouse` tourne sur toutes les PRs** ciblant `develop`/`main`. Chaque dev voit l'impact perf/a11y/SEO de ses changements dès l'ouverture de la PR, via les artefacts uploadés (rapports HTML accessibles depuis Actions et via les liens `storage.googleapis.com` postés dans les logs).
+- **Gating à deux niveaux** :
+  - PR ciblant `main` (release `develop → main`) → **toujours bloquante**, auto-strict, pas besoin de label. C'est le moment où on garantit la qualité officielle.
+  - PR ciblant `develop` → bloquante **uniquement si** la PR porte le label `lighthouse-strict`. Sinon `continue-on-error: true` — annotations warning mais job vert.
+- **Les seuils dans `.github/lighthouserc.json` restent stricts** (preset `lighthouse:no-pwa` + `categories:performance` ≥ 0.85, `categories:accessibility` ≥ 0.9). Aucun audit downgradé à `warn`. La sévérité reste accurate ; seul le **gating** est paramétrable.
+- **Conséquence pour la première release vers main** : les 4 dettes Lighthouse existantes (`TD-LH-CSP`, `TD-LH-CONSOLE`, `TD-LH-LANDMARK`, `TD-LH-WEIGHT`) doivent être adressées avant la PR `develop → main`. C'est le bon levier — sans ça elles traîneraient indéfiniment.
+- **Usage du label** : pose `lighthouse-strict` sur une PR feature pour une responsabilisation ponctuelle ou un sprint perf. Pas par défaut sur develop — sinon on retombe dans l'effet « Lighthouse rouge récurrent ignoré ».
+- Détails dans `docs/runbooks/ci-lighthouse.md`.
+
 ---
 
 ## Sécurité — règles dès jour 1
