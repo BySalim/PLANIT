@@ -91,17 +91,30 @@ jobs:
         env:
           DATABASE_URL: postgresql://planit:planit@localhost:5432/planit_ci
 
-  # LOT 0.7 / LOT 7 V02 — Lighthouse mobile audit on /etudiant and
-  # /enseignant. Conditional: only runs on PRs labeled `lighthouse` or
-  # coming from `feat/libasse` (LOT 7 owner). Avoids false failures on
-  # backend / contracts PRs during LOTs 0–6.
+  # Lighthouse mobile audit (/etudiant + /enseignant).
+  #
+  # Politique :
+  # - **Tourne sur toutes les PRs** ciblant develop/main (et seulement
+  #   les PRs : pas les push sur feat/*). Chaque dev voit ainsi l'impact
+  #   perf/a11y/best-practices/SEO de ses changements via les artefacts
+  #   uploadés (rapports HTML accessibles depuis l'onglet Actions du run
+  #   et via les liens `storage.googleapis.com` postés dans les logs).
+  # - **Le job bloque le merge uniquement si la PR porte le label
+  #   `lighthouse-strict`**. Sans ce label, le step Lighthouse est en
+  #   `continue-on-error` : les assertions qui échouent annotent le run
+  #   en warning mais le job reste `success` (donc CI verte).
+  #
+  # Ce double mode (signal partout, gate opt-in) évite que des dettes
+  # pré-existantes hors scope d'une PR ne bloquent inutilement, tout en
+  # gardant la possibilité d'imposer un seuil strict quand on le veut
+  # explicitement (release notable, sprint perf, etc.).
+  #
+  # Voir `docs/runbooks/ci-lighthouse.md` pour les détails d'usage.
   lighthouse:
     name: Lighthouse mobile (Étudiant + Enseignant)
     runs-on: ubuntu-latest
     needs: build
-    if: |
-      contains(github.event.pull_request.labels.*.name, 'lighthouse') ||
-      github.head_ref == 'feat/libasse'
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
 
@@ -129,6 +142,10 @@ jobs:
         run: npx --yes wait-on http://localhost:3000 --timeout 60000
 
       - name: Run Lighthouse CI (mobile)
+        # Gating opt-in : sans label `lighthouse-strict`, les échecs
+        # d'assertions sont informationnels (annotation warning, mais
+        # le job reste success). Avec le label, le job devient bloquant.
+        continue-on-error: ${{ !contains(github.event.pull_request.labels.*.name, 'lighthouse-strict') }}
         uses: treosh/lighthouse-ci-action@v11
         with:
           urls: |

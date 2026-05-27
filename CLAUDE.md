@@ -190,6 +190,14 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 
 - **`pnpm -r --parallel`** au lieu de `turbo` dans les scripts racine (`dev`, `build`, `lint`, `typecheck`, `test`). Smart App Control (Win11 22H2+) bloque `turbo.exe` non signé. Trade-off : pas de cache turbo (acceptable à cette taille). Réactivation tracée en tech-debt `TD-031`.
 
+### Lighthouse CI — signal partout, gating opt-in
+
+- **Le job `lighthouse` tourne sur toutes les PRs** ciblant `develop`/`main`. Chaque dev voit l'impact perf/a11y/SEO de ses changements dès l'ouverture de la PR, via les artefacts uploadés (rapports HTML accessibles depuis Actions et via les liens `storage.googleapis.com` postés dans les logs).
+- **Le job ne bloque le merge que si la PR porte le label `lighthouse-strict`**. Sans ce label, le step Lighthouse est en `continue-on-error: true` — les assertions qui échouent annotent le run en warning mais le job reste `success`.
+- **Les seuils dans `.github/lighthouserc.json` restent stricts** (preset `lighthouse:no-pwa` + `categories:performance` ≥ 0.85, `categories:accessibility` ≥ 0.9). Aucun audit downgradé à `warn`. La sévérité reste accurate ; seul le **gating** est paramétrable via le label.
+- **Usage** : pose le label sur une PR pour une release notable, un sprint perf, ou pour responsabiliser un auteur sur une régression. Pas par défaut — sinon on retombe dans l'effet « Lighthouse rouge récurrent ignoré ».
+- Détails dans `docs/runbooks/ci-lighthouse.md`.
+
 ---
 
 ## Sécurité — règles dès jour 1
