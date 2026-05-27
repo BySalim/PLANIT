@@ -19,7 +19,7 @@ import { Drawer } from '@/components/ui/drawer';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { useUpdateSessionV2Mutation } from '@/lib/mutations-v2';
+import { useDeleteSessionV2Mutation, useUpdateSessionV2Mutation } from '@/lib/mutations-v2';
 import {
   useEnseignantsQuery,
   useSallesQuery,
@@ -213,7 +213,23 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
   const uesQuery = useUesQuery();
   const sallesQuery = useSallesQuery();
   const mutation = useUpdateSessionV2Mutation();
+  const deleteMutation = useDeleteSessionV2Mutation();
   const [isEditing, setIsEditing] = useState(false);
+
+  /**
+   * LOT 4 V2 — supprime la séance courante. Visible UNIQUEMENT si la séance
+   * n'a jamais été publiée (`lastPublishedAt === null`). Le backend rejette
+   * 400 sinon (failsafe).
+   */
+  const handleDelete = () => {
+    if (!session) return;
+    if (session.lastPublishedAt !== null) return; // failsafe : bouton caché normalement
+    const confirmed = window.confirm(
+      `Supprimer la séance « ${session.libelle} » ? Cette action est irréversible.`,
+    );
+    if (!confirmed) return;
+    deleteMutation.mutate({ id: session.id }, { onSuccess: () => onClose() });
+  };
 
   // Schéma reconstruit quand le type figé ou les settings changent.
   const lockedType: SessionTypeV2 = session?.type ?? 'COURS';
@@ -310,9 +326,19 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
               </Button>
             </>
           ) : (
-            <Button variant="primary" onClick={() => setIsEditing(true)}>
-              Modifier
-            </Button>
+            <>
+              {/* LOT 4 V2 — bouton supprimer, visible UNIQUEMENT si la séance
+                  n'a jamais été publiée. Une séance déjà publiée ne peut pas
+                  être supprimée via ce flow (le backend refuse 400). */}
+              {session.lastPublishedAt === null ? (
+                <Button variant="danger" onClick={handleDelete} disabled={deleteMutation.isPending}>
+                  {deleteMutation.isPending ? 'Suppression…' : 'Supprimer'}
+                </Button>
+              ) : null}
+              <Button variant="primary" onClick={() => setIsEditing(true)}>
+                Modifier
+              </Button>
+            </>
           )
         ) : undefined
       }
