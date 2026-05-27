@@ -7,12 +7,13 @@
 
 ## TL;DR
 
-| Tu veux                                                   | Tu fais                                                                                                                                         |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Auditer ta PR (par défaut)                                | Rien. Le job tourne sur chaque PR vers `develop`/`main`. Rapport dispo dans les artefacts                                                       |
-| Que le job **bloque** ta PR si elle régresse la perf/a11y | Pose le label **`lighthouse-strict`** sur la PR                                                                                                 |
-| Voir le rapport HTML détaillé                             | Onglet **Actions** → run de la PR → step `Run Lighthouse CI` → liens `storage.googleapis.com/lighthouse-infrastructure...` postés dans les logs |
-| Désactiver Lighthouse sur une PR ponctuelle               | Tu ne peux pas (et tu ne dois pas). Le job est informationnel par défaut, il ne bloque rien                                                     |
+| Tu veux                                                        | Tu fais                                                                                                                                         |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auditer ta PR (par défaut)                                     | Rien. Le job tourne sur chaque PR vers `develop`/`main`. Rapport dispo dans les artefacts                                                       |
+| Que le job **bloque** ta PR feature → develop si elle régresse | Pose le label **`lighthouse-strict`** sur la PR                                                                                                 |
+| Auditer strictement une **release** `develop → main`           | Rien — c'est **automatiquement strict** sur les PRs ciblant `main`                                                                              |
+| Voir le rapport HTML détaillé                                  | Onglet **Actions** → run de la PR → step `Run Lighthouse CI` → liens `storage.googleapis.com/lighthouse-infrastructure...` postés dans les logs |
+| Désactiver Lighthouse sur une PR ponctuelle                    | Tu ne peux pas (et tu ne dois pas). Sur les PR vers `develop`, il est déjà informationnel par défaut                                            |
 
 ---
 
@@ -24,29 +25,41 @@ Pas de condition sur la branche source, pas de label requis. L'idée : chaque de
 
 Pas de Lighthouse sur les push directs sur `feat/*` (économie de temps CI — les push intermédiaires ne sont pas relus).
 
-### 2. Le job est **informationnel par défaut**, bloquant **opt-in**
+### 2. Le gating dépend de la cible de la PR
 
 Concrètement, dans `.github/workflows/ci.yml` :
 
 ```yaml
 - name: Run Lighthouse CI (mobile)
-  continue-on-error: ${{ !contains(github.event.pull_request.labels.*.name, 'lighthouse-strict') }}
+  continue-on-error: ${{ github.base_ref != 'main' && !contains(github.event.pull_request.labels.*.name, 'lighthouse-strict') }}
 ```
 
-| Label sur la PR     | Comportement du step       | Comportement du job                               |
-| ------------------- | -------------------------- | ------------------------------------------------- |
-| (aucun)             | `continue-on-error: true`  | Toujours `success` même si assertions failent     |
-| `lighthouse-strict` | `continue-on-error: false` | `failure` si assertions failent — bloque le merge |
+L'expression évalue à `true` (step non bloquant) **uniquement si** la PR cible `develop` ET n'a pas le label strict. Sinon le step est bloquant.
 
-Quand le step est en `continue-on-error`, GitHub annote quand même les échecs avec une icône ⚠️ jaune dans l'UI — le signal reste visible, on ne le cache pas. Mais la branch protection ne bloque pas.
+Matrice complète :
 
-### 3. Quand utiliser `lighthouse-strict`
+| Cible PR  | Label `lighthouse-strict` | Comportement                                       |
+| --------- | ------------------------- | -------------------------------------------------- |
+| `develop` | non                       | **Informationnel** — annotations warning, job vert |
+| `develop` | oui                       | **Bloquant** — failure si assertions échouent      |
+| `main`    | non                       | **Bloquant automatiquement** — pas besoin de label |
+| `main`    | oui                       | **Bloquant** — redondant mais OK                   |
+
+Quand le step est en mode informationnel, GitHub annote quand même les échecs avec une icône ⚠️ jaune dans l'UI — le signal reste visible, on ne le cache pas. Mais la branch protection ne bloque pas.
+
+### 3. Pourquoi auto-strict sur `main`
+
+Une PR `develop → main` est une **release officielle**. C'est le moment où on garantit la qualité du build avant de toucher la branche que la production suit. Pas de mode laxiste à ce niveau : si Lighthouse fail, on fixe avant de releaser.
+
+Conséquence pratique : les 4 dettes Lighthouse existantes (`TD-LH-*`) doivent être adressées **avant la première release vers main**. Sinon impossible de cliquer Merge sur la PR de release. C'est le bon levier — sans ça, ces dettes traîneraient indéfiniment.
+
+### 4. Quand utiliser `lighthouse-strict` sur une PR develop
 
 - **Sprint perf dédié** : on veut forcer l'équipe à ne pas régresser pendant qu'on travaille sur l'optim
-- **Release majeure** : avant un tag `vX.Y.Z`, on impose le seuil pour garantir la qualité du build
-- **PR responsabilisante** : Salim peut le poser sur n'importe quelle PR s'il considère que l'auteur doit prendre les rapports au sérieux avant le merge
+- **PR responsabilisante** : Salim peut le poser sur n'importe quelle PR feature s'il considère que l'auteur doit prendre les rapports au sérieux avant le merge
+- **Pre-release** : sur une PR develop juste avant d'enchaîner avec une PR develop → main, pour anticiper
 
-Ne pas l'utiliser comme défaut. Le défaut est volontairement permissif pour éviter le "Lighthouse rouge" récurrent qui fait que personne ne regarde plus.
+Ne pas l'utiliser comme défaut sur les PRs feature. Le défaut est volontairement permissif pour éviter le "Lighthouse rouge" récurrent qui fait que personne ne regarde plus.
 
 ---
 
@@ -89,9 +102,11 @@ L'onglet **Actions** → ton run → section **Artifacts** → télécharge le Z
 
 ### « Ma PR est rouge à cause de Lighthouse »
 
-Sans label `lighthouse-strict` ? **Elle n'est pas rouge.** Le step est annoté warning mais le job final est vert. Vérifie le rollup global de la PR.
+Vérifie d'abord la cible de la PR :
 
-Avec le label ? Regarde le rapport pour comprendre quel audit a régressé, fixe, repush. Si le seuil est intenable parce que ta PR est hors scope perf, **enlève le label** (Salim peut l'enlever) et ouvre une tech-debt dédiée.
+- **PR → `develop` sans label** : elle n'est **pas** rouge à cause de Lighthouse. Le step est annoté warning mais le job final est vert. Vérifie le rollup global de la PR — c'est probablement un autre check.
+- **PR → `develop` avec `lighthouse-strict`** : Lighthouse bloque. Regarde le rapport, fixe, repush. Si le seuil est intenable parce que ta PR est hors scope perf, **enlève le label** (Salim peut l'enlever) et ouvre une tech-debt dédiée.
+- **PR → `main`** : Lighthouse est **toujours strict**. Tu ne peux pas l'esquiver — c'est une release. Si les 4 dettes Lighthouse pré-existantes ne sont pas résolues, ta PR develop → main est bloquée jusqu'à ce qu'elles le soient.
 
 ### « Je veux savoir si ma PR fait baisser les perfs »
 
@@ -119,6 +134,7 @@ Si tu vois un audit qui fail et qui n'est pas tracé en tech-debt, **trace-le to
 | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Lighthouse uniquement sur `feat/libasse` (état précédent)                         | Distribution injuste de la responsabilité : seul Libasse voyait les régressions, les autres dev pouvaient dégrader la perf sans le savoir |
 | Lighthouse bloquant sur toutes les PRs                                            | Trop sévère : les dettes pré-existantes (4 audits) bloquaient les PRs sans rapport avec elles                                             |
+| Lighthouse bloquant manuel via label uniquement (sans auto-strict sur main)       | Risque d'oubli au moment d'une release develop → main. La PR de release pourrait passer sans audit strict si on oublie le label           |
 | Downgrade des 4 audits problématiques à `warn` permanent dans `lighthouserc.json` | Perte du levier futur : impossible de gating strict sans repasser à `error` ailleurs                                                      |
 | `continue-on-error: true` inconditionnel                                          | Aveuglement : impossible de gating strict tout court. La barre ne peut jamais monter sans modifier le workflow                            |
 | Action custom avec post-step qui re-vérifie les assertions selon label            | Sur-ingénierie : le natif `continue-on-error` avec expression GitHub est plus simple et fait le job                                       |

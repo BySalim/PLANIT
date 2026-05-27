@@ -99,15 +99,18 @@ jobs:
   #   perf/a11y/best-practices/SEO de ses changements via les artefacts
   #   uploadés (rapports HTML accessibles depuis l'onglet Actions du run
   #   et via les liens `storage.googleapis.com` postés dans les logs).
-  # - **Le job bloque le merge uniquement si la PR porte le label
-  #   `lighthouse-strict`**. Sans ce label, le step Lighthouse est en
-  #   `continue-on-error` : les assertions qui échouent annotent le run
-  #   en warning mais le job reste `success` (donc CI verte).
+  # - **Gating à deux niveaux** :
+  #   1. PR ciblant `main` (release develop → main) → **toujours bloquant**.
+  #      C'est le moment où on garantit la qualité officielle, pas
+  #      d'option laxiste.
+  #   2. PR ciblant `develop` → bloquant **uniquement** si la PR porte
+  #      le label `lighthouse-strict`. Sinon informationnel (assertions
+  #      annotées en warning, job vert).
   #
-  # Ce double mode (signal partout, gate opt-in) évite que des dettes
-  # pré-existantes hors scope d'une PR ne bloquent inutilement, tout en
-  # gardant la possibilité d'imposer un seuil strict quand on le veut
-  # explicitement (release notable, sprint perf, etc.).
+  # Ce mode (signal partout, gate auto-release + opt-in feature) évite
+  # que des dettes pré-existantes hors scope d'une PR feature ne bloquent
+  # inutilement, tout en garantissant qu'aucune release vers main ne
+  # passe sans audit strict.
   #
   # Voir `docs/runbooks/ci-lighthouse.md` pour les détails d'usage.
   lighthouse:
@@ -142,10 +145,12 @@ jobs:
         run: npx --yes wait-on http://localhost:3000 --timeout 60000
 
       - name: Run Lighthouse CI (mobile)
-        # Gating opt-in : sans label `lighthouse-strict`, les échecs
-        # d'assertions sont informationnels (annotation warning, mais
-        # le job reste success). Avec le label, le job devient bloquant.
-        continue-on-error: ${{ !contains(github.event.pull_request.labels.*.name, 'lighthouse-strict') }}
+        # Gating à deux niveaux (cf. commentaire au-dessus du job) :
+        # - target = main → toujours bloquant (release officielle)
+        # - target = develop → bloquant uniquement si label `lighthouse-strict`
+        # `continue-on-error` est `true` (non bloquant) seulement si on est
+        # vers develop ET pas de label strict.
+        continue-on-error: ${{ github.base_ref != 'main' && !contains(github.event.pull_request.labels.*.name, 'lighthouse-strict') }}
         uses: treosh/lighthouse-ci-action@v11
         with:
           urls: |
