@@ -182,7 +182,9 @@ export function PlanningGrid({
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
-  const [copiedSession, setCopiedSession] = useState<SessionV2Dto | null>(null);
+  // I.5 — snapshot du Set sélectionné au Ctrl+C. Ctrl+V crée N séances
+  // décalées par rapport à la position du curseur (le 1ᵉʳ élément = anchor).
+  const [copiedSessions, setCopiedSessions] = useState<readonly SessionV2Dto[]>([]);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
 
   function handleSelect(session: SessionV2Dto, event: React.MouseEvent) {
@@ -239,46 +241,84 @@ export function PlanningGrid({
     if (!drag) return;
     event.preventDefault();
     const startHour = startHourFromEvent(event, drag);
-    const { session } = drag;
-    const oldStart = new Date(session.startAt);
-    const oldStartIso = session.startAt;
-    const oldEndIso = session.endAt;
-    const durationMs = new Date(session.endAt).getTime() - oldStart.getTime();
+    const { session: anchor } = drag;
+    const anchorOldStart = new Date(anchor.startAt);
+    const anchorOldStartMs = anchorOldStart.getTime();
+    const anchorOldDayIndex = anchorOldStart.getDay() === 0 ? 6 : anchorOldStart.getDay() - 1;
 
-    const newStart = addDays(weekStart, dayIndex);
-    newStart.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
-    const newEnd = new Date(newStart.getTime() + durationMs);
-    const newStartIso = newStart.toISOString();
-    const newEndIso = newEnd.toISOString();
+    const anchorNewStart = addDays(weekStart, dayIndex);
+    anchorNewStart.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
+    const anchorNewStartMs = anchorNewStart.getTime();
 
     setDrag(null);
     setDropPreview(null);
     // Pas de mutation si la séance est relâchée exactement à sa place initiale.
-    if (newStart.getTime() === oldStart.getTime()) return;
+    if (anchorNewStartMs === anchorOldStartMs) return;
 
-    updateSession({
-      id: session.id,
-      body: { startAt: newStartIso, endAt: newEndIso },
+    // I.4 — batch : si l'anchor est dans la sélection multi, on déplace tout
+    // le groupe en préservant les offsets relatifs (temps + jour). Sinon, on
+    // déplace uniquement l'anchor (comportement V01).
+    const group =
+      selectedIds.has(anchor.id) && selectedIds.size > 1
+        ? sessions.filter((s) => selectedIds.has(s.id))
+        : [anchor];
+
+    const deltaMs = anchorNewStartMs - anchorOldStartMs;
+    const deltaDay = dayIndex - anchorOldDayIndex;
+
+    // Snapshot avant/après pour undo.
+    const moves = group.map((s) => {
+      const oldStart = new Date(s.startAt);
+      const oldEnd = new Date(s.endAt);
+      const durationMs = oldEnd.getTime() - oldStart.getTime();
+      const newStart = new Date(oldStart.getTime() + deltaMs);
+      // Si le drag changeait de jour, propager le delta de jour à chaque membre.
+      if (deltaDay !== 0) newStart.setDate(newStart.getDate() + deltaDay - 0); // déjà inclus dans deltaMs si même semaine
+      const newEnd = new Date(newStart.getTime() + durationMs);
+      return {
+        id: s.id,
+        oldStartIso: s.startAt,
+        oldEndIso: s.endAt,
+        newStartIso: newStart.toISOString(),
+        newEndIso: newEnd.toISOString(),
+      };
     });
 
-    // I.6 — push une entry undo : restaurer l'ancien créneau via PUT.
+    moves.forEach((m) => {
+      updateSession({ id: m.id, body: { startAt: m.newStartIso, endAt: m.newEndIso } });
+    });
+
     if (onPushUndo) {
+      const label =
+        moves.length === 1 ? 'Déplacement de séance' : `Déplacement de ${moves.length} séances`;
       onPushUndo({
-        label: 'Déplacement de séance',
-        undo: () =>
-          new Promise<void>((resolve) => {
-            updateSession(
-              { id: session.id, body: { startAt: oldStartIso, endAt: oldEndIso } },
-              { onSettled: () => resolve() },
-            );
-          }),
-        redo: () =>
-          new Promise<void>((resolve) => {
-            updateSession(
-              { id: session.id, body: { startAt: newStartIso, endAt: newEndIso } },
-              { onSettled: () => resolve() },
-            );
-          }),
+        label,
+        undo: async () => {
+          await Promise.all(
+            moves.map(
+              (m) =>
+                new Promise<void>((resolve) => {
+                  updateSession(
+                    { id: m.id, body: { startAt: m.oldStartIso, endAt: m.oldEndIso } },
+                    { onSettled: () => resolve() },
+                  );
+                }),
+            ),
+          );
+        },
+        redo: async () => {
+          await Promise.all(
+            moves.map(
+              (m) =>
+                new Promise<void>((resolve) => {
+                  updateSession(
+                    { id: m.id, body: { startAt: m.newStartIso, endAt: m.newEndIso } },
+                    { onSettled: () => resolve() },
+                  );
+                }),
+            ),
+          );
+        },
       });
     }
   }
@@ -429,35 +469,50 @@ export function PlanningGrid({
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
       if (key === 'c') {
-        // I.5 single — PR4 étendra à `selectedIds` (batch copy).
-        const firstSelected = selectedIds.values().next().value;
-        const found = firstSelected ? sessions.find((s) => s.id === firstSelected) : undefined;
-        if (found) setCopiedSession(found);
+        // I.5 — capture le snapshot du Set sélectionné (préserve l'ordre par
+        // index dans `sessions` pour stabilité).
+        const selected = sessions.filter((s) => selectedIds.has(s.id));
+        if (selected.length > 0) setCopiedSessions(selected);
         return;
       }
       if (key !== 'v') return;
       const pos = lastMousePosRef.current;
-      if (!copiedSession || !pos) return;
+      if (copiedSessions.length === 0 || !pos) return;
       event.preventDefault();
-      const startMs = new Date(copiedSession.startAt).getTime();
-      const durationMs = new Date(copiedSession.endAt).getTime() - startMs;
-      const durationH = durationMs / 3600000;
-      const startHour = clamp(
+
+      // L'anchor = 1ʳᵉ séance copiée (le plus tôt dans la semaine source).
+      const anchor = copiedSessions[0]!;
+      const anchorOldStart = new Date(anchor.startAt);
+      const anchorOldDayIndex = anchorOldStart.getDay() === 0 ? 6 : anchorOldStart.getDay() - 1;
+
+      const anchorNewHour = clamp(
         snap(DAY_START + pos.y / HOUR_HEIGHT),
         DAY_START,
-        DAY_END - durationH,
+        DAY_END - sessionDurationHours(anchor),
       );
-      const start = addDays(weekStart, pos.dayIndex);
-      start.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
-      const end = new Date(start.getTime() + durationMs);
-      const payload = buildCopyPayload(copiedSession, start.toISOString(), end.toISOString());
-      if (payload !== null) {
-        pasteSession(payload);
-      }
+      const anchorNewStart = addDays(weekStart, pos.dayIndex);
+      anchorNewStart.setHours(
+        Math.floor(anchorNewHour),
+        Math.round((anchorNewHour % 1) * 60),
+        0,
+        0,
+      );
+      const deltaMs = anchorNewStart.getTime() - anchorOldStart.getTime();
+      const deltaDay = pos.dayIndex - anchorOldDayIndex;
+
+      copiedSessions.forEach((s) => {
+        const oldStart = new Date(s.startAt);
+        const durationMs = new Date(s.endAt).getTime() - oldStart.getTime();
+        const newStart = new Date(oldStart.getTime() + deltaMs);
+        if (deltaDay !== 0) newStart.setDate(newStart.getDate());
+        const newEnd = new Date(newStart.getTime() + durationMs);
+        const payload = buildCopyPayload(s, newStart.toISOString(), newEnd.toISOString());
+        if (payload !== null) pasteSession(payload);
+      });
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sessions, selectedIds, copiedSession, weekStart, pasteSession]);
+  }, [sessions, selectedIds, copiedSessions, weekStart, pasteSession]);
 
   if (error) {
     return (
