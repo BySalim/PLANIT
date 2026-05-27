@@ -48,20 +48,20 @@ const DAY_START = 8;
 const DAY_END = 20;
 const HOUR_HEIGHT = 78; // px/heure — calqué sur PLANIT-IA/rp (HOUR_H)
 const DAY_COUNT = 7; // Lundi → Dimanche
-const SNAP_HOURS = 0.5; // pas de calage du drag/resize/select = 30 min
-// Bloc visuel = créneau de 2h aligné sur 8h/10h/12h/14h/16h/18h.
-// Au survol on illumine ce bloc entier ; le bouton + apparaît en son centre.
-// Le drag-select démarre lui sur double-clic et avance par tranches de 30 min.
-const HOVER_BLOCK_HOURS = 2;
+const SNAP_HOURS = 0.5; // pas de calage du drag/resize général = 30 min
+// Bloc visuel = créneau d'1h aligné sur 8h/9h/10h/.../19h. Au survol on
+// illumine la case 1h sous le curseur ; on peut l'agrandir par drag (snap
+// 1h aussi : la sélection s'étend par tranches de 1h).
+const SLOT_BLOCK_HOURS = 1;
 // 30 min de "gouffre" sous le dernier créneau pour la respiration visuelle.
 const BOTTOM_PAD = HOUR_HEIGHT / 2;
 const GRID_HEIGHT = (DAY_END - DAY_START) * HOUR_HEIGHT + BOTTOM_PAD;
 const HOURS = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => DAY_START + i);
 
-/** Retourne le bloc 2h aligné qui contient `hour` (ex: 9.5 → 8, 11 → 10). */
+/** Retourne le début de la case 1h qui contient `hour` (ex: 9.5 → 9, 11.2 → 11). */
 function blockStartFor(hour: number): number {
   const offset = hour - DAY_START;
-  return DAY_START + Math.floor(offset / HOVER_BLOCK_HOURS) * HOVER_BLOCK_HOURS;
+  return DAY_START + Math.floor(offset / SLOT_BLOCK_HOURS) * SLOT_BLOCK_HOURS;
 }
 
 interface PositionedSession {
@@ -209,22 +209,17 @@ export function PlanningGrid({
   // décalées par rapport à la position du curseur (le 1ᵉʳ élément = anchor).
   const [copiedSessions, setCopiedSessions] = useState<readonly SessionV2Dto[]>([]);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
-  // LOT 4 V2 — état unifié pour la sélection « créneau vide » :
-  //  - hover (transient) : survol passif d'un bloc 2h libre, disparaît au mouseleave
-  //  - pending (persistant) : sélection figée après un double-clic+drag ; reste
-  //    visible jusqu'à un clic explicite (sur la zone = ouvre la modale, ailleurs
-  //    = annule). Snap interne du drag-select = 30 min.
+  // LOT 4 V2 — état unifié de la sélection « créneau vide » :
+  //  - hover     : transient, suit le curseur sur la case 1h libre survolée
+  //  - extending : drag actif (mouseDown sur le hover en cours), endHour suit
+  //                le curseur par tranches de 1h
+  //  - pending   : figé après lâcher, reste visible jusqu'à un clic explicite
+  //                (sur la zone = ouvre la modale, ailleurs = annule)
   type SlotSelection =
     | { kind: 'hover'; dayIndex: number; startHour: number; endHour: number }
+    | { kind: 'extending'; dayIndex: number; startHour: number; endHour: number }
     | { kind: 'pending'; dayIndex: number; startHour: number; endHour: number };
   const [slotSelection, setSlotSelection] = useState<SlotSelection | null>(null);
-  // Drag-select actif : `null` quand on n'est pas en train de glisser. Démarre
-  // sur `onDoubleClick` (mouseDown propre) puis suit la souris jusqu'au mouseUp.
-  const [activeDrag, setActiveDrag] = useState<{
-    dayIndex: number;
-    anchorHour: number;
-    endHour: number;
-  } | null>(null);
 
   function handleSelect(session: SessionV2Dto, event: React.MouseEvent) {
     const isAdditive = event.ctrlKey || event.metaKey;
@@ -242,13 +237,12 @@ export function PlanningGrid({
     setSelectedIds((prev) => (prev.size === 0 ? prev : new Set()));
   }
 
-  // Escape désélectionne tout (V2 LOT 4 I.3) + annule un drag-select en cours
-  // + annule une sélection pending de bloc vide.
+  // Escape désélectionne tout (V2 LOT 4 I.3) + annule la sélection courante
+  // de bloc vide (hover, extending ou pending).
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
       clearSelection();
-      setActiveDrag(null);
       setSlotSelection(null);
     }
     window.addEventListener('keydown', onKey);
@@ -660,21 +654,26 @@ export function PlanningGrid({
                 const y = event.clientY - rect.top;
                 lastMousePosRef.current = { dayIndex, y };
 
-                // Drag-select actif (déclenché par double-clic) : étend la plage
-                // tant qu'on reste sur le même jour. Snap interne 30 min. Si
-                // changement de jour → annule (V2 spec I.2).
-                if (activeDrag) {
-                  if (activeDrag.dayIndex !== dayIndex) {
-                    setActiveDrag(null);
+                // Drag d'extension actif (mouseDown sur le hover en cours) :
+                // étend la plage par tranches de 1h. Si changement de jour →
+                // annule (limite à un seul jour, V2 spec I.2).
+                if (slotSelection?.kind === 'extending') {
+                  if (slotSelection.dayIndex !== dayIndex) {
+                    setSlotSelection(null);
                     return;
                   }
-                  const cursorHour = hourFromY(y);
-                  const endHour = clamp(
-                    Math.max(cursorHour + SNAP_HOURS, activeDrag.anchorHour + SNAP_HOURS),
-                    activeDrag.anchorHour + SNAP_HOURS,
+                  const cursorBlock = blockStartFor(DAY_START + y / HOUR_HEIGHT);
+                  const newEnd = clamp(
+                    Math.max(
+                      cursorBlock + SLOT_BLOCK_HOURS,
+                      slotSelection.startHour + SLOT_BLOCK_HOURS,
+                    ),
+                    slotSelection.startHour + SLOT_BLOCK_HOURS,
                     DAY_END,
                   );
-                  setActiveDrag({ ...activeDrag, endHour });
+                  if (newEnd !== slotSelection.endHour) {
+                    setSlotSelection({ ...slotSelection, endHour: newEnd });
+                  }
                   return;
                 }
 
@@ -682,16 +681,15 @@ export function PlanningGrid({
                 // touche pas tant que l'utilisateur ne clique pas ailleurs.
                 if (slotSelection?.kind === 'pending') return;
 
-                // Hover passif : illumine le bloc 2h sous le curseur s'il est
-                // libre. Aucun bouton + tant qu'on est en drag/resize de
+                // Hover passif : illumine la case 1h sous le curseur si elle
+                // est libre. Aucun bouton + tant qu'on est en drag/resize de
                 // séance existante.
                 if (drag || resizePreview) {
                   if (slotSelection !== null) setSlotSelection(null);
                   return;
                 }
-                const cursorHour = hourFromY(y);
-                const blockStart = blockStartFor(cursorHour);
-                const blockEnd = Math.min(blockStart + HOVER_BLOCK_HOURS, DAY_END);
+                const blockStart = blockStartFor(DAY_START + y / HOUR_HEIGHT);
+                const blockEnd = Math.min(blockStart + SLOT_BLOCK_HOURS, DAY_END);
                 if (!isRangeFree(dayIndex, blockStart, blockEnd)) {
                   if (slotSelection !== null) setSlotSelection(null);
                   return;
@@ -715,52 +713,46 @@ export function PlanningGrid({
                 // ou Escape).
                 setSlotSelection((prev) => (prev?.kind === 'hover' ? null : prev));
               }}
-              onDoubleClick={(event) => {
-                // Démarre un drag-select : double-clic sur le fond d'une colonne
-                // (pas sur une SessionCard, qui stopPropagation). L'ancre du drag
-                // = position curseur snappée à 30 min.
+              onMouseDown={(event) => {
+                // mouseDown sur fond colonne (pas sur une SessionCard, pas sur
+                // le bouton + du SlotPreview qui stopPropagation) → démarre
+                // un drag d'extension à partir de la case 1h sous le curseur.
+                // Un simple clic-relâche sans bouger → la sélection passe
+                // direct en `pending` (= équivaut à cliquer dans la case hover).
                 if (event.target !== event.currentTarget) return;
+                if (drag || resizePreview) return;
                 const rect = event.currentTarget.getBoundingClientRect();
-                const anchor = hourFromY(event.clientY - rect.top);
-                setActiveDrag({ dayIndex, anchorHour: anchor, endHour: anchor + SNAP_HOURS });
-                setSlotSelection(null);
-              }}
-              onMouseUp={(event) => {
-                // Fin de drag-select : on passe la sélection en mode `pending`
-                // et on attend un clic explicite (sur la zone) pour ouvrir la
-                // modale. Aucune ouverture auto.
-                if (!activeDrag || activeDrag.dayIndex !== dayIndex) return;
-                event.stopPropagation();
+                const y = event.clientY - rect.top;
+                const blockStart = blockStartFor(DAY_START + y / HOUR_HEIGHT);
+                const blockEnd = Math.min(blockStart + SLOT_BLOCK_HOURS, DAY_END);
+                if (!isRangeFree(dayIndex, blockStart, blockEnd)) return;
                 setSlotSelection({
-                  kind: 'pending',
+                  kind: 'extending',
                   dayIndex,
-                  startHour: activeDrag.anchorHour,
-                  endHour: activeDrag.endHour,
+                  startHour: blockStart,
+                  endHour: blockEnd,
                 });
-                setActiveDrag(null);
+              }}
+              onMouseUp={() => {
+                // Fin du drag d'extension : fige la sélection en `pending`.
+                // Le curseur peut bouger ailleurs, la sélection reste visible
+                // tant qu'on ne clique pas ailleurs.
+                setSlotSelection((prev) =>
+                  prev?.kind === 'extending'
+                    ? {
+                        kind: 'pending',
+                        dayIndex: prev.dayIndex,
+                        startHour: prev.startHour,
+                        endHour: prev.endHour,
+                      }
+                    : prev,
+                );
               }}
               onClick={(event) => {
-                // Clic sur le fond d'une colonne (pas sur une SessionCard) :
-                //  - s'il y a une sélection pending sur ce jour ET le clic est
-                //    DANS la zone → ouvre la modale (commit de la sélection).
-                //  - sinon, annule la sélection pending.
+                // Clic sur le fond d'une colonne (pas sur une SessionCard, pas
+                // sur le SlotPreview pending qui stopPropagation pour ouvrir
+                // la modale) → annule la sélection pending courante.
                 if (event.target !== event.currentTarget) return;
-                if (slotSelection?.kind === 'pending' && slotSelection.dayIndex === dayIndex) {
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  const clickHour = DAY_START + (event.clientY - rect.top) / HOUR_HEIGHT;
-                  if (clickHour >= slotSelection.startHour && clickHour <= slotSelection.endHour) {
-                    event.stopPropagation();
-                    const slotDate = addDays(weekStart, dayIndex);
-                    onCreateAtSlot?.({
-                      date: slotDate,
-                      startTime: fmtHour(slotSelection.startHour),
-                      endTime: fmtHour(slotSelection.endHour),
-                    });
-                    setSlotSelection(null);
-                    return;
-                  }
-                }
-                // Clic ailleurs : on vide la sélection pending.
                 if (slotSelection?.kind === 'pending') setSlotSelection(null);
               }}
             >
@@ -788,23 +780,12 @@ export function PlanningGrid({
                 />
               ) : null}
 
-              {/* Drag-select en cours (double-clic + drag) — preview pointillé */}
-              {activeDrag && activeDrag.dayIndex === dayIndex ? (
-                <div
-                  className="pointer-events-none absolute inset-x-1 rounded-[10px] border-2 border-dashed border-accent bg-accent-100/70 transition-colors"
-                  style={{
-                    top: (activeDrag.anchorHour - DAY_START) * HOUR_HEIGHT,
-                    height: (activeDrag.endHour - activeDrag.anchorHour) * HOUR_HEIGHT,
-                  }}
-                  aria-hidden
-                />
-              ) : null}
-
-              {/* Sélection bloc 2h (hover passif ou pending) + bouton « + »
-                  au centre. Le visuel adopte un style différent selon l'état :
-                   - hover → halo doux primary-50, bordure dashed, bouton + petit
-                   - pending → fond plus prononcé, bordure pleine accent, bouton + grand */}
-              {!activeDrag && slotSelection && slotSelection.dayIndex === dayIndex ? (
+              {/* Sélection case (hover/extending/pending) + bouton « + » au
+                  centre. Le visuel s'adapte au `kind` :
+                   - hover     → halo doux primary-50, bordure dashed, bouton + compact
+                   - extending → bordure dashed accent, fond accent-100/70 (drag visible)
+                   - pending   → bordure pleine accent, bouton + grand, étiquette horaire */}
+              {slotSelection && slotSelection.dayIndex === dayIndex ? (
                 <SlotPreview
                   selection={slotSelection}
                   onCommit={(event) => {
@@ -919,18 +900,22 @@ function GuideLine({ hour }: { hour: number }) {
   );
 }
 
-// Aperçu d'un bloc créneau (hover ou pending) avec bouton « + » au centre.
-// Distinction UX :
-//  - `hover` (transient) : halo discret, bordure dashed, bouton + compact.
-//    Suggère que la zone est cliquable sans bloquer la grille.
-//  - `pending` (figé après double-clic+drag) : bordure pleine et bouton +
-//    plus présent. Indique clairement qu'un clic dans la zone validera.
+// Aperçu d'un créneau libre (hover / extending / pending) avec bouton « + »
+// au centre. Distinction UX :
+//  - `hover` (transient, suit le curseur) : halo doux primary, bordure dashed,
+//    bouton + compact. Le wrapper est pointer-events-none pour laisser le
+//    mouseMove/mouseDown atteindre la grille (drag d'extension).
+//  - `extending` (drag actif) : bordure dashed accent, fond plus prononcé,
+//    pas de bouton + visible (un drag est en cours, le commit se fera au
+//    mouseUp). Wrapper non-cliquable.
+//  - `pending` (figé après lâcher) : bordure pleine accent, bouton + grand,
+//    zone cliquable (un clic dans la zone OU sur le bouton ouvre la modale).
 function SlotPreview({
   selection,
   onCommit,
 }: {
   selection: {
-    kind: 'hover' | 'pending';
+    kind: 'hover' | 'extending' | 'pending';
     dayIndex: number;
     startHour: number;
     endHour: number;
@@ -940,49 +925,76 @@ function SlotPreview({
   const top = (selection.startHour - DAY_START) * HOUR_HEIGHT;
   const height = (selection.endHour - selection.startHour) * HOUR_HEIGHT;
   const isPending = selection.kind === 'pending';
+  const isExtending = selection.kind === 'extending';
+
+  // Le wrapper est cliquable UNIQUEMENT en mode pending — un clic ouvre la
+  // modale via `onCommit`. `stopPropagation` évite que le clic remonte au
+  // fond de la colonne (qui annulerait la sélection).
+  const wrapperPointerEvents = isPending ? 'pointer-events-auto' : 'pointer-events-none';
+  const wrapperOnClick = isPending ? onCommit : undefined;
+  const wrapperRole = isPending ? 'button' : undefined;
+  const wrapperTabIndex = isPending ? 0 : undefined;
+
   return (
     <div
-      // pointerEvents=none pour `hover` (laisse la grille gérer le mouseMove) ;
-      // pointerEvents=auto pour `pending` (le bouton interne capture le clic).
       className={cn(
         'absolute inset-x-1 rounded-[10px] transition-all duration-150',
-        isPending
-          ? 'pointer-events-none border-2 border-accent bg-accent-100/50 shadow-[0_2px_8px_rgba(232,98,10,0.18)]'
-          : 'pointer-events-none border border-dashed border-primary-200 bg-primary-50/50',
+        wrapperPointerEvents,
+        isPending &&
+          'cursor-pointer border-2 border-accent bg-accent-100/50 shadow-[0_2px_8px_rgba(232,98,10,0.18)]',
+        isExtending && 'border-2 border-dashed border-accent bg-accent-100/70',
+        !isPending && !isExtending && 'border border-dashed border-primary-200 bg-primary-50/50',
       )}
       style={{ top, height }}
-      aria-hidden
+      onClick={wrapperOnClick}
+      role={wrapperRole}
+      tabIndex={wrapperTabIndex}
+      aria-label={
+        isPending
+          ? `Créer une séance de ${fmtHour(selection.startHour)} à ${fmtHour(selection.endHour)}`
+          : undefined
+      }
     >
-      <button
-        type="button"
-        aria-label={`Créer une séance de ${fmtHour(selection.startHour)} à ${fmtHour(selection.endHour)}`}
-        onClick={onCommit}
-        className={cn(
-          'pointer-events-auto absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-white shadow-lg ring-2 ring-white transition-all hover:scale-110',
-          isPending
-            ? 'h-12 w-12 bg-accent shadow-[0_6px_20px_rgba(232,98,10,0.35)]'
-            : 'h-9 w-9 bg-accent/90 opacity-90 hover:opacity-100',
-        )}
-      >
-        <svg
-          width={isPending ? '22' : '16'}
-          height={isPending ? '22' : '16'}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
+      {/* Bouton + au centre — masqué pendant l'extension (drag en cours).
+          stopPropagation sur mouseDown : évite que mouseDown sur le bouton
+          déclenche un drag-select sur la colonne en dessous. */}
+      {!isExtending ? (
+        <button
+          type="button"
+          aria-label={`Créer une séance de ${fmtHour(selection.startHour)} à ${fmtHour(selection.endHour)}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onCommit(event);
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          className={cn(
+            'pointer-events-auto absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-white shadow-lg ring-2 ring-white transition-all hover:scale-110',
+            isPending
+              ? 'h-12 w-12 bg-accent shadow-[0_6px_20px_rgba(232,98,10,0.35)]'
+              : 'h-9 w-9 bg-accent/90 opacity-90 hover:opacity-100',
+          )}
         >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </button>
+          <svg
+            width={isPending ? '22' : '16'}
+            height={isPending ? '22' : '16'}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+      ) : null}
+
       {/* Étiquette horaire en haut du bloc pour confirmer la plage choisie. */}
       <span
         className={cn(
-          'absolute left-2 top-1.5 rounded-full bg-white/90 px-1.5 py-px text-[10px] font-semibold tabular-nums text-accent-800',
-          isPending ? 'opacity-100' : 'opacity-80',
+          'pointer-events-none absolute left-2 top-1.5 rounded-full bg-white/90 px-1.5 py-px text-[10px] font-semibold tabular-nums text-accent-800',
+          isPending || isExtending ? 'opacity-100' : 'opacity-80',
         )}
       >
         {fmtHour(selection.startHour)} – {fmtHour(selection.endHour)}
