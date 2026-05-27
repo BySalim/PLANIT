@@ -220,6 +220,12 @@ export function PlanningGrid({
     | { kind: 'extending'; dayIndex: number; startHour: number; endHour: number }
     | { kind: 'pending'; dayIndex: number; startHour: number; endHour: number };
   const [slotSelection, setSlotSelection] = useState<SlotSelection | null>(null);
+  // Flag posé au mouseUp d'un drag d'extension : le onClick top-level qui
+  // suit immédiatement (même geste) ne doit pas annuler la pending fraîche.
+  // Un mouseUp en React déclenche aussi un onClick → sans ce flag, la
+  // sélection disparaîtrait dès le lâcher (le clic est interprété comme
+  // « clic ailleurs »). Reset au prochain top-level click.
+  const justFinishedSlotDragRef = useRef(false);
 
   function handleSelect(session: SessionV2Dto, event: React.MouseEvent) {
     const isAdditive = event.ctrlKey || event.metaKey;
@@ -235,6 +241,21 @@ export function PlanningGrid({
   }
   function clearSelection() {
     setSelectedIds((prev) => (prev.size === 0 ? prev : new Set()));
+  }
+
+  /**
+   * Handler du clic top-level (wrapper de la grille). Annule la sélection
+   * de séances ET la sélection de créneau, sauf si on vient juste de
+   * terminer un drag d'extension (le click implicite émis par React après
+   * un mouseUp serait sinon interprété comme « clic ailleurs »).
+   */
+  function handleRootClick() {
+    if (justFinishedSlotDragRef.current) {
+      justFinishedSlotDragRef.current = false;
+      return;
+    }
+    clearSelection();
+    setSlotSelection((prev) => (prev?.kind === 'pending' ? null : prev));
   }
 
   // Escape désélectionne tout (V2 LOT 4 I.3) + annule la sélection courante
@@ -278,6 +299,74 @@ export function PlanningGrid({
   const lastMousePosRef = useRef<{ dayIndex: number; y: number } | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
   const resizePreviewRef = useRef<ResizePreview | null>(null);
+  /**
+   * Drag d'extension depuis une sélection pending. Posé au mouseDown sur le
+   * wrapper SlotPreview pending ; consommé par un effect global qui écoute
+   * mousemove + mouseup window. Permet d'agrandir la sélection sans repartir
+   * de zéro. Si l'utilisateur lâche sans bouger (< 4 px), le onClick du
+   * wrapper ouvre la modale (comportement normal).
+   */
+  const pendingDragRef = useRef<{
+    startY: number;
+    startHour: number;
+    initialEndHour: number;
+    dayIndex: number;
+    moved: boolean;
+  } | null>(null);
+
+  // Effect global pour le drag depuis pending. Activé quand pendingDragRef
+  // est posée (au mouseDown sur SlotPreview pending). Convertit le deltaY
+  // pixel en heures (snap 1h) et passe la sélection en `extending`. Au
+  // mouseUp, repasse en `pending` avec le flag justFinishedSlotDragRef.
+  useEffect(() => {
+    function onMove(event: MouseEvent) {
+      const drag = pendingDragRef.current;
+      if (!drag) return;
+      const dy = event.clientY - drag.startY;
+      // Tolérance avant de considérer qu'il s'agit d'un drag (vs clic simple).
+      if (!drag.moved && Math.abs(dy) < 4) return;
+      drag.moved = true;
+      // Convertit le déplacement en heures puis snap à la case 1h cible.
+      const deltaH = dy / HOUR_HEIGHT;
+      const targetEnd = drag.initialEndHour + deltaH;
+      const snappedEnd = blockStartFor(targetEnd) + SLOT_BLOCK_HOURS;
+      const finalEnd = clamp(snappedEnd, drag.startHour + SLOT_BLOCK_HOURS, DAY_END);
+      setSlotSelection({
+        kind: 'extending',
+        dayIndex: drag.dayIndex,
+        startHour: drag.startHour,
+        endHour: finalEnd,
+      });
+    }
+    function onUp() {
+      const drag = pendingDragRef.current;
+      if (!drag) return;
+      pendingDragRef.current = null;
+      if (drag.moved) {
+        // Un drag a eu lieu → figer en pending avec la nouvelle fin.
+        // Le flag empêche le onClick implicite d'annuler la sélection.
+        justFinishedSlotDragRef.current = true;
+        setSlotSelection((prev) =>
+          prev?.kind === 'extending'
+            ? {
+                kind: 'pending',
+                dayIndex: prev.dayIndex,
+                startHour: prev.startHour,
+                endHour: prev.endHour,
+              }
+            : prev,
+        );
+      }
+      // Si !moved, c'est un clic simple → le onClick du wrapper SlotPreview
+      // se déclenchera ensuite et ouvrira la modale via onCommit.
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
 
   // Calcule l'heure de début calée à partir d'un événement de drag sur une colonne.
   function startHourFromEvent(
@@ -596,7 +685,7 @@ export function PlanningGrid({
     // Clic hors d'une séance → désélection (les cartes stoppent la propagation).
     // Calqué sur PLANIT-IA/rp/planning-canvas.jsx : rail heures 44px, en-tête
     // 42px non-capitalisé, scrollbars masquées (UX desktop pro).
-    <div className="scrollbar-hide h-full overflow-auto bg-surface" onClick={clearSelection}>
+    <div className="scrollbar-hide h-full overflow-auto bg-surface" onClick={handleRootClick}>
       <div className="grid grid-cols-[44px_repeat(7,minmax(250px,2fr))]">
         {/* Header row : sticky corner + day labels (fond blanc, calqué PLANIT-IA) */}
         <div className="sticky left-0 top-0 z-30 flex h-[42px] items-center justify-center border-b border-r border-border-soft bg-surface text-text-faint">
@@ -736,24 +825,20 @@ export function PlanningGrid({
               onMouseUp={() => {
                 // Fin du drag d'extension : fige la sélection en `pending`.
                 // Le curseur peut bouger ailleurs, la sélection reste visible
-                // tant qu'on ne clique pas ailleurs.
-                setSlotSelection((prev) =>
-                  prev?.kind === 'extending'
-                    ? {
-                        kind: 'pending',
-                        dayIndex: prev.dayIndex,
-                        startHour: prev.startHour,
-                        endHour: prev.endHour,
-                      }
-                    : prev,
-                );
-              }}
-              onClick={(event) => {
-                // Clic sur le fond d'une colonne (pas sur une SessionCard, pas
-                // sur le SlotPreview pending qui stopPropagation pour ouvrir
-                // la modale) → annule la sélection pending courante.
-                if (event.target !== event.currentTarget) return;
-                if (slotSelection?.kind === 'pending') setSlotSelection(null);
+                // tant qu'on ne clique pas ailleurs. Le flag `justFinishedSlotDragRef`
+                // empêche le click implicite (émis par React après ce mouseUp)
+                // d'être interprété comme « clic ailleurs » et d'annuler la
+                // sélection juste créée.
+                setSlotSelection((prev) => {
+                  if (prev?.kind !== 'extending') return prev;
+                  justFinishedSlotDragRef.current = true;
+                  return {
+                    kind: 'pending',
+                    dayIndex: prev.dayIndex,
+                    startHour: prev.startHour,
+                    endHour: prev.endHour,
+                  };
+                });
               }}
             >
               {HOURS.slice(0, -1).map((hour) => (
@@ -789,6 +874,10 @@ export function PlanningGrid({
                 <SlotPreview
                   selection={slotSelection}
                   onCommit={(event) => {
+                    // Si ce click suit immédiatement un drag d'extension
+                    // depuis pending, on l'ignore (le drag agrandit la
+                    // sélection, il ne doit pas ouvrir la modale).
+                    if (justFinishedSlotDragRef.current) return;
                     event.stopPropagation();
                     const slotDate = addDays(weekStart, dayIndex);
                     onCreateAtSlot?.({
@@ -797,6 +886,20 @@ export function PlanningGrid({
                       endTime: fmtHour(slotSelection.endHour),
                     });
                     setSlotSelection(null);
+                  }}
+                  onStartDragFromPending={(event) => {
+                    // mouseDown sur la pending : prépare un éventuel drag
+                    // d'extension. Si l'utilisateur bouge la souris (> 4 px),
+                    // l'effect global passera en `extending`. Sinon (clic
+                    // simple), le onClick du wrapper ouvrira la modale.
+                    if (slotSelection.kind !== 'pending') return;
+                    pendingDragRef.current = {
+                      startY: event.clientY,
+                      startHour: slotSelection.startHour,
+                      initialEndHour: slotSelection.endHour,
+                      dayIndex: slotSelection.dayIndex,
+                      moved: false,
+                    };
                   }}
                 />
               ) : null}
@@ -913,6 +1016,7 @@ function GuideLine({ hour }: { hour: number }) {
 function SlotPreview({
   selection,
   onCommit,
+  onStartDragFromPending,
 }: {
   selection: {
     kind: 'hover' | 'extending' | 'pending';
@@ -921,17 +1025,25 @@ function SlotPreview({
     endHour: number;
   };
   onCommit: (event: React.MouseEvent) => void;
+  onStartDragFromPending?: (event: React.MouseEvent) => void;
 }) {
   const top = (selection.startHour - DAY_START) * HOUR_HEIGHT;
   const height = (selection.endHour - selection.startHour) * HOUR_HEIGHT;
   const isPending = selection.kind === 'pending';
   const isExtending = selection.kind === 'extending';
 
-  // Le wrapper est cliquable UNIQUEMENT en mode pending — un clic ouvre la
-  // modale via `onCommit`. `stopPropagation` évite que le clic remonte au
-  // fond de la colonne (qui annulerait la sélection).
+  // Le wrapper est cliquable UNIQUEMENT en mode pending — un clic simple
+  // ouvre la modale via `onCommit` ; un mouseDown+drag permet d'agrandir
+  // la sélection (géré par le parent via `onStartDragFromPending` qui
+  // arme un effect global sur mousemove/mouseup).
   const wrapperPointerEvents = isPending ? 'pointer-events-auto' : 'pointer-events-none';
   const wrapperOnClick = isPending ? onCommit : undefined;
+  const wrapperOnMouseDown = isPending
+    ? (event: React.MouseEvent) => {
+        event.stopPropagation();
+        onStartDragFromPending?.(event);
+      }
+    : undefined;
   const wrapperRole = isPending ? 'button' : undefined;
   const wrapperTabIndex = isPending ? 0 : undefined;
 
@@ -947,6 +1059,7 @@ function SlotPreview({
       )}
       style={{ top, height }}
       onClick={wrapperOnClick}
+      onMouseDown={wrapperOnMouseDown}
       role={wrapperRole}
       tabIndex={wrapperTabIndex}
       aria-label={
