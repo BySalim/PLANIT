@@ -235,6 +235,37 @@ describe('PUT /api/v2/sessions/:id (B.2 + smart dirty)', () => {
   });
 });
 
+describe('DELETE /api/v2/sessions/:id (LOT 4 V2)', () => {
+  it('supprime une séance non publiée (draft)', async () => {
+    const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
+    const res = await api()
+      .delete('/api/v2/sessions/seed-seance-09-draft')
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(204);
+    // Vérifie l'absence
+    const after = await api()
+      .get('/api/v2/sessions/seed-seance-09-draft')
+      .set('Cookie', session.cookieHeader);
+    expect(after.status).toBe(404);
+  });
+
+  it('refuse 400 si la séance a déjà été publiée', async () => {
+    const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
+    const res = await api()
+      .delete('/api/v2/sessions/seed-seance-01') // publiée en seed
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(400);
+  });
+
+  it('refuse 403 pour un étudiant', async () => {
+    const session = await loginAs(app, 'ETUDIANT');
+    const res = await api()
+      .delete('/api/v2/sessions/seed-seance-09-draft')
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('POST /api/v2/sessions/publish (B.4 + B.11 WS)', () => {
   it('publie les 2 drafts seed et émet WS aux destinataires multi-classes', async () => {
     const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
