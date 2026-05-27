@@ -6,7 +6,7 @@ import {
   sessionV2Schema,
 } from '@planit/contracts';
 import { useFlash } from '@planit/ui';
-import { apiPost, apiPut } from './api';
+import { apiDelete, apiPost, apiPut } from './api';
 import { planningV2Keys } from './queries-v2';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -60,6 +60,28 @@ export function useUpdateSessionV2Mutation() {
     },
     onError: (err) => {
       flash.push('error', `Mise à jour impossible : ${err.message}`);
+    },
+  });
+}
+
+// ── DELETE /api/v2/sessions/:id ───────────────────────────────────────
+// LOT 4 V2 — supprime une séance V02 jamais publiée. Utilisé par :
+//  - le bouton « Supprimer » du drawer détail (visible si lastPublishedAt === null)
+//  - l'undo d'une création (la pile undo appelle ce hook avec l'id de la
+//    séance à supprimer)
+// Le backend refuse 400 si la séance a déjà été publiée.
+
+export function useDeleteSessionV2Mutation() {
+  const invalidate = useInvalidatePlanningV2();
+  const flash = useFlash();
+  return useMutation<void, Error, { id: string; silent?: boolean }>({
+    mutationFn: ({ id }) => apiDelete(`/v2/sessions/${id}`),
+    onSuccess: (_, vars) => {
+      invalidate();
+      if (!vars.silent) flash.push('success', 'Séance supprimée');
+    },
+    onError: (err) => {
+      flash.push('error', `Suppression impossible : ${err.message}`);
     },
   });
 }

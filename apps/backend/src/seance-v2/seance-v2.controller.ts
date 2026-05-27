@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { createSessionV2Schema, updateSessionV2Schema, z } from '@planit/contracts';
@@ -102,6 +102,24 @@ export class SeanceV2Controller {
     @Body(new ZodValidationPipe(updateSessionV2Schema)) dto: UpdateSessionV2Dto,
   ): Promise<SessionV2Dto> {
     return this.seances.update(id, dto);
+  }
+
+  /**
+   * LOT 4 V2 — supprime une séance V02 si jamais publiée. Permet l'undo
+   * des créations + le bouton supprimer dans le drawer côté front. Refuse
+   * 400 si la séance a déjà été publiée au moins une fois.
+   */
+  @Delete(':id')
+  @HttpCode(204)
+  @Roles('RESPONSABLE_PROGRAMME')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Supprimer une séance V02 (non publiée)' })
+  @ApiResponse({ status: 204, description: 'Séance supprimée' })
+  @ApiResponse({ status: 400, description: 'Séance déjà publiée — non supprimable' })
+  @ApiResponse({ status: 403, description: 'Rôle insuffisant' })
+  @ApiResponse({ status: 404, description: 'Séance introuvable' })
+  async remove(@Param('id') id: string): Promise<void> {
+    await this.seances.remove(id);
   }
 
   /** B.4 — publish (smart-dirty snapshot + B.11 multi-classes WS). */

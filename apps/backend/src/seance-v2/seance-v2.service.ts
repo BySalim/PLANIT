@@ -299,6 +299,34 @@ export class SeanceV2Service {
     return this.findOne(id);
   }
 
+  /**
+   * Supprime une séance V02. Refuse 409 si la séance a déjà été publiée au
+   * moins une fois (`lastPublishedAt !== null`) — dans ce cas, le RP doit
+   * passer par une « dépublication » dédiée (V03+). Permet l'undo des
+   * créations + un bouton supprimer dans le drawer pour les séances
+   * jamais publiées (cf. LOT 4 V2).
+   */
+  async remove(id: string): Promise<void> {
+    const existing = await this.prisma.seance.findUnique({
+      where: { id },
+      select: { id: true, lastPublishedAt: true, typeV2: true },
+    });
+    if (!existing) throw new NotFoundException(`Séance ${id} introuvable`);
+    if (!existing.typeV2) {
+      throw new NotFoundException(`Séance ${id} non disponible en V02 (legacy)`);
+    }
+    if (existing.lastPublishedAt !== null) {
+      throw new BadRequestException({
+        message: 'Validation failed',
+        errors: {
+          id: ["Impossible de supprimer une séance déjà publiée. Dépubliez-la d'abord (V03+)."],
+        },
+      });
+    }
+    // Cascade supprime SeanceClasse via la FK (onDelete: Cascade).
+    await this.prisma.seance.delete({ where: { id } });
+  }
+
   async publish(query: PublishV2Query): Promise<SessionV2Dto[]> {
     const where: Prisma.SeanceWhereInput = {
       hasUnpublishedChanges: true,

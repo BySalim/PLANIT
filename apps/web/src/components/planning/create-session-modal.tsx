@@ -9,6 +9,7 @@ import {
   EVALUATION_SOUS_TYPES,
   type CreateSessionV2Dto,
   type SessionTypeV2,
+  type SessionV2Dto,
   type SettingsDto,
   sessionSousTypeSchema,
   sessionTypeV2Schema,
@@ -49,6 +50,12 @@ interface CreateSessionModalProps {
     readonly endTime?: string;
     readonly classeIds?: readonly string[];
   };
+  /**
+   * LOT 4 V2 — callback invoqué après création réussie. Le parent (page RP)
+   * l'utilise pour pousser une entrée undo (undo = DELETE de la séance créée,
+   * redo = recreate avec le même payload).
+   */
+  readonly onCreated?: ((created: SessionV2Dto, original: CreateSessionV2Dto) => void) | undefined;
 }
 
 // ── Schema de formulaire (form-level, transformé en V2 DTO au submit) ──
@@ -232,7 +239,12 @@ function toCreatePayload(values: FormValues): CreateSessionV2Dto {
 
 // ── Composant ────────────────────────────────────────────────────────
 
-export function CreateSessionModal({ isOpen, onClose, initialValues }: CreateSessionModalProps) {
+export function CreateSessionModal({
+  isOpen,
+  onClose,
+  initialValues,
+  onCreated,
+}: CreateSessionModalProps) {
   const settingsQuery = useSettingsQuery();
   const enseignantsQuery = useEnseignantsQuery();
   const uesQuery = useUesQuery();
@@ -314,7 +326,8 @@ export function CreateSessionModal({ isOpen, onClose, initialValues }: CreateSes
 
   const onSubmit = handleSubmit(async (values) => {
     const payload = toCreatePayload(values);
-    await mutation.mutateAsync(payload);
+    const created = await mutation.mutateAsync(payload);
+    onCreated?.(created, payload);
     onClose();
   });
 
