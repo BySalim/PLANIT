@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { SessionV2Dto } from '@planit/contracts';
+import type { CreateSessionV2Dto, SessionV2Dto } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
 import { CreateSessionModal } from '@/components/planning/create-session-modal';
 import { HolidayBanner } from '@/components/planning/holiday-banner';
@@ -13,6 +13,7 @@ import { SessionDetailDrawer } from '@/components/planning/session-detail-drawer
 import { ViewScopeToggle, type ViewScope } from '@/components/planning/view-scope-toggle';
 import type { ViewMode } from '@/components/planning/view-mode-tabs';
 import { useGlobalShortcut } from '@/lib/keyboard';
+import { useCreateSessionV2Mutation, useDeleteSessionV2Mutation } from '@/lib/mutations-v2';
 import { useV2WeekSessionsQuery } from '@/lib/queries-v2';
 import { usePlanningUndoStack } from '@/lib/undo-stack';
 import { getCurrentWeekStart } from '@/lib/week';
@@ -46,6 +47,31 @@ export default function RpPlanningPage() {
   const undoStack = usePlanningUndoStack();
   useGlobalShortcut('z', { ctrl: true, shift: false }, undoStack.undo);
   useGlobalShortcut('z', { ctrl: true, shift: true }, undoStack.redo);
+
+  // LOT 4 V2 — mutations pour push une entrée undo après une création.
+  const { mutateAsync: createSession } = useCreateSessionV2Mutation();
+  const { mutateAsync: deleteSession } = useDeleteSessionV2Mutation();
+
+  /**
+   * Push une entrée undo après chaque création :
+   *  - undo = supprime la séance créée (DELETE /api/v2/sessions/:id)
+   *  - redo = recrée la séance avec le payload original
+   * La nouvelle séance créée par redo a un id différent ; on suit le dernier
+   * id connu via une ref locale (`currentIdRef`) capturée dans la closure.
+   */
+  const pushCreateUndo = (created: SessionV2Dto, original: CreateSessionV2Dto) => {
+    const currentIdRef = { id: created.id };
+    undoStack.push({
+      label: 'Création de séance',
+      undo: async () => {
+        await deleteSession({ id: currentIdRef.id, silent: true });
+      },
+      redo: async () => {
+        const recreated = await createSession(original);
+        currentIdRef.id = recreated.id;
+      },
+    });
+  };
 
   // Double-clic sur une séance → ouverture du drawer de détail.
   const handleSessionOpen = (session: SessionV2Dto) => {
@@ -123,6 +149,7 @@ export default function RpPlanningPage() {
       <CreateSessionModal
         isOpen={createOpen}
         onClose={handleCloseCreate}
+        onCreated={pushCreateUndo}
         {...(createInit
           ? {
               initialValues: {
