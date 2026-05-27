@@ -176,11 +176,40 @@ export function PlanningGrid({
   onRetry,
   onPushUndo,
 }: PlanningGridProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // I.3 — multi-sélection : `selectedIds` est un Set immuable. Ctrl/Meta+clic
+  // toggle l'appartenance ; clic simple réduit la sélection à 1 élément.
+  // Click hors d'une séance → vide la sélection.
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
   const [copiedSession, setCopiedSession] = useState<SessionV2Dto | null>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
+
+  function handleSelect(session: SessionV2Dto, event: React.MouseEvent) {
+    const isAdditive = event.ctrlKey || event.metaKey;
+    setSelectedIds((prev) => {
+      if (isAdditive) {
+        const next = new Set(prev);
+        if (next.has(session.id)) next.delete(session.id);
+        else next.add(session.id);
+        return next;
+      }
+      return new Set([session.id]);
+    });
+  }
+  function clearSelection() {
+    setSelectedIds((prev) => (prev.size === 0 ? prev : new Set()));
+  }
+
+  // Escape désélectionne tout (V2 LOT 4 I.3).
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      clearSelection();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const { mutate: updateSession } = useUpdateSessionV2Mutation();
   const { mutate: pasteSession } = useCreateSessionV2Mutation();
   // Dernière position du curseur sur la grille — base du collage Ctrl+V.
@@ -400,7 +429,9 @@ export function PlanningGrid({
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
       if (key === 'c') {
-        const found = sessions.find((s) => s.id === selectedId);
+        // I.5 single — PR4 étendra à `selectedIds` (batch copy).
+        const firstSelected = selectedIds.values().next().value;
+        const found = firstSelected ? sessions.find((s) => s.id === firstSelected) : undefined;
         if (found) setCopiedSession(found);
         return;
       }
@@ -426,7 +457,7 @@ export function PlanningGrid({
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sessions, selectedId, copiedSession, weekStart, pasteSession]);
+  }, [sessions, selectedIds, copiedSession, weekStart, pasteSession]);
 
   if (error) {
     return (
@@ -450,10 +481,7 @@ export function PlanningGrid({
     // Clic hors d'une séance → désélection (les cartes stoppent la propagation).
     // Calqué sur PLANIT-IA/rp/planning-canvas.jsx : rail heures 44px, en-tête
     // 42px non-capitalisé, scrollbars masquées (UX desktop pro).
-    <div
-      className="scrollbar-hide h-full overflow-auto bg-surface"
-      onClick={() => setSelectedId(null)}
-    >
+    <div className="scrollbar-hide h-full overflow-auto bg-surface" onClick={clearSelection}>
       <div className="grid grid-cols-[44px_repeat(7,minmax(250px,2fr))]">
         {/* Header row : sticky corner + day labels (fond blanc, calqué PLANIT-IA) */}
         <div className="sticky left-0 top-0 z-30 flex h-[42px] items-center justify-center border-b border-r border-border-soft bg-surface text-text-faint">
@@ -568,9 +596,9 @@ export function PlanningGrid({
                       >
                         <SessionCard
                           session={p.session}
-                          selected={selectedId === p.session.id}
+                          selected={selectedIds.has(p.session.id)}
                           isDragging={drag?.session.id === p.session.id}
-                          onSelect={(s) => setSelectedId(s.id)}
+                          onSelect={handleSelect}
                           onOpen={onSessionOpen}
                           onDragStart={(s, event) => {
                             const rect = event.currentTarget.getBoundingClientRect();
