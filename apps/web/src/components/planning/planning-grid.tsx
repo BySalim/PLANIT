@@ -271,6 +271,34 @@ export function PlanningGrid({
   }, []);
 
   /**
+   * « Click-outside » sur la sélection pending : tout mousedown qui ne vise
+   * pas la zone pending (ni un de ses descendants — bouton + ou étiquette)
+   * annule la sélection. Marqué via `data-slot-pending` sur le wrapper.
+   *
+   * Phase capture (3e argument `true`) pour s'exécuter AVANT les handlers
+   * locaux des éléments (notamment l'onMouseDown de la colonne qui aurait
+   * sinon démarré un nouvel extending au même clic — c'est la « téléportation »
+   * qu'on veut éviter).
+   *
+   * Pose le flag `slotPendingCancelledRef` pour signaler au onMouseDown
+   * colonne qu'il doit bail (sinon il lit encore l'ancien state pending
+   * et démarre un extending malgré le setState).
+   */
+  const slotPendingCancelledRef = useRef(false);
+  useEffect(() => {
+    if (slotSelection?.kind !== 'pending') return undefined;
+    function onMouseDownOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('[data-slot-pending="true"]')) return; // clic dans la pending
+      slotPendingCancelledRef.current = true;
+      setSlotSelection(null);
+    }
+    document.addEventListener('mousedown', onMouseDownOutside, true);
+    return () => document.removeEventListener('mousedown', onMouseDownOutside, true);
+  }, [slotSelection?.kind]);
+
+  /**
    * Vérifie qu'un intervalle [startHour, endHour] est libre : aucune séance
    * ne le chevauche. Utilisé pour valider :
    *  - un bloc de 2h au hover (`isRangeFree(d, 8, 10)`)
@@ -810,6 +838,14 @@ export function PlanningGrid({
                 // direct en `pending` (= équivaut à cliquer dans la case hover).
                 if (event.target !== event.currentTarget) return;
                 if (drag || resizePreview) return;
+                // Si on vient juste d'annuler une pending (clic extérieur),
+                // ce mouseDown NE doit PAS démarrer un nouvel extending :
+                // c'est le clic qui a annulé. L'utilisateur doit relâcher
+                // puis recliquer pour créer une nouvelle sélection.
+                if (slotPendingCancelledRef.current) {
+                  slotPendingCancelledRef.current = false;
+                  return;
+                }
                 const rect = event.currentTarget.getBoundingClientRect();
                 const y = event.clientY - rect.top;
                 const blockStart = blockStartFor(DAY_START + y / HOUR_HEIGHT);
@@ -1058,6 +1094,11 @@ function SlotPreview({
         !isPending && !isExtending && 'border border-dashed border-primary-200 bg-primary-50/50',
       )}
       style={{ top, height }}
+      // Marqueur utilisé par le listener global mousedown (cf. PlanningGrid)
+      // pour distinguer « clic dans la sélection » (à ignorer) vs « clic
+      // extérieur » (qui doit annuler la pending). `closest('[data-slot-pending="true"]')`
+      // attrape aussi les enfants (bouton +, étiquette horaire).
+      data-slot-pending={isPending ? 'true' : undefined}
       onClick={wrapperOnClick}
       onMouseDown={wrapperOnMouseDown}
       role={wrapperRole}
