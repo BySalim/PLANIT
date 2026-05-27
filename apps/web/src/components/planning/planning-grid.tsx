@@ -19,6 +19,17 @@ interface PlanningGridProps {
   /** Ouverture du détail d'une séance (double-clic). */
   onSessionOpen?: ((session: SessionV2Dto) => void) | undefined;
   onRetry?: (() => void) | undefined;
+  /**
+   * I.6 — push une entrée undo après une mutation réussie (drag / resize).
+   * Le paste (Ctrl+V) reste hors undo en V02 (pas de mutation delete).
+   */
+  onPushUndo?:
+    | ((entry: {
+        readonly label: string;
+        readonly undo: () => Promise<void> | void;
+        readonly redo: () => Promise<void> | void;
+      }) => void)
+    | undefined;
 }
 
 const DAY_START = 8;
@@ -163,6 +174,7 @@ export function PlanningGrid({
   error,
   onSessionOpen,
   onRetry,
+  onPushUndo,
 }: PlanningGridProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -200,11 +212,15 @@ export function PlanningGrid({
     const startHour = startHourFromEvent(event, drag);
     const { session } = drag;
     const oldStart = new Date(session.startAt);
+    const oldStartIso = session.startAt;
+    const oldEndIso = session.endAt;
     const durationMs = new Date(session.endAt).getTime() - oldStart.getTime();
 
     const newStart = addDays(weekStart, dayIndex);
     newStart.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
     const newEnd = new Date(newStart.getTime() + durationMs);
+    const newStartIso = newStart.toISOString();
+    const newEndIso = newEnd.toISOString();
 
     setDrag(null);
     setDropPreview(null);
@@ -213,8 +229,29 @@ export function PlanningGrid({
 
     updateSession({
       id: session.id,
-      body: { startAt: newStart.toISOString(), endAt: newEnd.toISOString() },
+      body: { startAt: newStartIso, endAt: newEndIso },
     });
+
+    // I.6 — push une entry undo : restaurer l'ancien créneau via PUT.
+    if (onPushUndo) {
+      onPushUndo({
+        label: 'Déplacement de séance',
+        undo: () =>
+          new Promise<void>((resolve) => {
+            updateSession(
+              { id: session.id, body: { startAt: oldStartIso, endAt: oldEndIso } },
+              { onSettled: () => resolve() },
+            );
+          }),
+        redo: () =>
+          new Promise<void>((resolve) => {
+            updateSession(
+              { id: session.id, body: { startAt: newStartIso, endAt: newEndIso } },
+              { onSettled: () => resolve() },
+            );
+          }),
+      });
+    }
   }
 
   function endDrag() {
@@ -294,10 +331,42 @@ export function PlanningGrid({
       );
       const newEnd = new Date(r.startDate);
       newEnd.setHours(Math.floor(preview.endHour), Math.round((preview.endHour % 1) * 60), 0, 0);
+      const newStartIso = newStart.toISOString();
+      const newEndIso = newEnd.toISOString();
+
+      // Capture l'ancien créneau pour pouvoir undo (avant la mutation).
+      const oldStart = new Date(r.startDate);
+      oldStart.setHours(Math.floor(r.baseStartHour), Math.round((r.baseStartHour % 1) * 60), 0, 0);
+      const oldEnd = new Date(r.startDate);
+      oldEnd.setHours(Math.floor(r.baseEndHour), Math.round((r.baseEndHour % 1) * 60), 0, 0);
+      const oldStartIso = oldStart.toISOString();
+      const oldEndIso = oldEnd.toISOString();
+      const sessionId = r.sessionId;
+
       updateSession({
-        id: r.sessionId,
-        body: { startAt: newStart.toISOString(), endAt: newEnd.toISOString() },
+        id: sessionId,
+        body: { startAt: newStartIso, endAt: newEndIso },
       });
+
+      if (onPushUndo) {
+        onPushUndo({
+          label: 'Redimensionnement de séance',
+          undo: () =>
+            new Promise<void>((resolve) => {
+              updateSession(
+                { id: sessionId, body: { startAt: oldStartIso, endAt: oldEndIso } },
+                { onSettled: () => resolve() },
+              );
+            }),
+          redo: () =>
+            new Promise<void>((resolve) => {
+              updateSession(
+                { id: sessionId, body: { startAt: newStartIso, endAt: newEndIso } },
+                { onSettled: () => resolve() },
+              );
+            }),
+        });
+      }
     }
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -305,7 +374,7 @@ export function PlanningGrid({
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };
-  }, [updateSession]);
+  }, [updateSession, onPushUndo]);
 
   // Lignes-guides d'une colonne : positions calées pendant resize ET déplacement.
   function columnGuideLines(dayIndex: number): { key: string; hour: number }[] {

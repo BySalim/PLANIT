@@ -8,6 +8,8 @@ interface PlanningFooterProps {
   sessions: readonly SessionV2Dto[];
   isLoading?: boolean;
   isError?: boolean;
+  /** Délégué à PublishButton — vide la pile undo (V2-D11). */
+  onPublished?: (() => void) | undefined;
 }
 
 /**
@@ -26,6 +28,7 @@ export function PlanningFooter({
   sessions,
   isLoading = false,
   isError = false,
+  onPublished,
 }: PlanningFooterProps) {
   const total = sessions.length;
   const pending = sessions.filter((s) => s.hasUnpublishedChanges).length;
@@ -63,7 +66,7 @@ export function PlanningFooter({
         <span className="hidden text-[11.5px] text-text-muted lg:inline">
           Auto-publication vendredi 22:00
         </span>
-        <PublishButton sessions={sessions} />
+        <PublishButton sessions={sessions} onPublished={onPublished} />
         <button
           type="button"
           disabled

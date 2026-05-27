@@ -12,7 +12,9 @@ import { PlanningToolbar } from '@/components/planning/planning-toolbar';
 import { SessionDetailDrawer } from '@/components/planning/session-detail-drawer';
 import { ViewScopeToggle, type ViewScope } from '@/components/planning/view-scope-toggle';
 import type { ViewMode } from '@/components/planning/view-mode-tabs';
+import { useGlobalShortcut } from '@/lib/keyboard';
 import { useV2WeekSessionsQuery } from '@/lib/queries-v2';
+import { usePlanningUndoStack } from '@/lib/undo-stack';
 import { getCurrentWeekStart } from '@/lib/week';
 
 // V1-D2 hardcoded demo counters (matchent les compteurs PLANIT-IA D.kpis).
@@ -31,6 +33,11 @@ export default function RpPlanningPage() {
   const [scope, setScope] = useState<ViewScope>('week');
   const sessionsQuery = useV2WeekSessionsQuery(weekStart);
   const sessions = sessionsQuery.data ?? [];
+
+  // I.6 — pile undo/redo locale à la page (V2-D11). Vidée au publish.
+  const undoStack = usePlanningUndoStack();
+  useGlobalShortcut('z', { ctrl: true, shift: false }, undoStack.undo);
+  useGlobalShortcut('z', { ctrl: true, shift: true }, undoStack.redo);
 
   // Double-clic sur une séance → ouverture du drawer de détail.
   const handleSessionOpen = (session: SessionV2Dto) => {
@@ -56,6 +63,10 @@ export default function RpPlanningPage() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onCreateSession={() => setCreateOpen(true)}
+          canUndo={undoStack.canUndo}
+          canRedo={undoStack.canRedo}
+          onUndo={undoStack.undo}
+          onRedo={undoStack.redo}
         />
 
         {/* Holiday banner (only when the week has a holiday) */}
@@ -76,6 +87,7 @@ export default function RpPlanningPage() {
               error={sessionsQuery.error}
               onSessionOpen={handleSessionOpen}
               onRetry={() => sessionsQuery.refetch()}
+              onPushUndo={undoStack.push}
             />
           )}
         </div>
@@ -85,6 +97,7 @@ export default function RpPlanningPage() {
           sessions={sessions}
           isLoading={sessionsQuery.isLoading}
           isError={sessionsQuery.isError}
+          onPublished={undoStack.clear}
         />
       </div>
 
