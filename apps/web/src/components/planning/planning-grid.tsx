@@ -421,7 +421,6 @@ export function PlanningGrid({
     const { session: anchor } = drag;
     const anchorOldStart = new Date(anchor.startAt);
     const anchorOldStartMs = anchorOldStart.getTime();
-    const anchorOldDayIndex = anchorOldStart.getDay() === 0 ? 6 : anchorOldStart.getDay() - 1;
 
     const anchorNewStart = addDays(weekStart, dayIndex);
     anchorNewStart.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
@@ -441,16 +440,16 @@ export function PlanningGrid({
         : [anchor];
 
     const deltaMs = anchorNewStartMs - anchorOldStartMs;
-    const deltaDay = dayIndex - anchorOldDayIndex;
 
-    // Snapshot avant/après pour undo.
+    // Snapshot avant/après pour undo. `deltaMs` couvre déjà le changement de
+    // jour + d'heure (différence absolue en ms entre les deux dates), donc
+    // un simple `oldStart + deltaMs` suffit pour reporter le déplacement à
+    // chaque membre du groupe en préservant les offsets relatifs.
     const moves = group.map((s) => {
       const oldStart = new Date(s.startAt);
       const oldEnd = new Date(s.endAt);
       const durationMs = oldEnd.getTime() - oldStart.getTime();
       const newStart = new Date(oldStart.getTime() + deltaMs);
-      // Si le drag changeait de jour, propager le delta de jour à chaque membre.
-      if (deltaDay !== 0) newStart.setDate(newStart.getDate() + deltaDay - 0); // déjà inclus dans deltaMs si même semaine
       const newEnd = new Date(newStart.getTime() + durationMs);
       return {
         id: s.id,
@@ -660,7 +659,6 @@ export function PlanningGrid({
       // L'anchor = 1ʳᵉ séance copiée (le plus tôt dans la semaine source).
       const anchor = copiedSessions[0]!;
       const anchorOldStart = new Date(anchor.startAt);
-      const anchorOldDayIndex = anchorOldStart.getDay() === 0 ? 6 : anchorOldStart.getDay() - 1;
 
       const anchorNewHour = clamp(
         snap(DAY_START + pos.y / HOUR_HEIGHT),
@@ -675,13 +673,11 @@ export function PlanningGrid({
         0,
       );
       const deltaMs = anchorNewStart.getTime() - anchorOldStart.getTime();
-      const deltaDay = pos.dayIndex - anchorOldDayIndex;
 
       copiedSessions.forEach((s) => {
         const oldStart = new Date(s.startAt);
         const durationMs = new Date(s.endAt).getTime() - oldStart.getTime();
         const newStart = new Date(oldStart.getTime() + deltaMs);
-        if (deltaDay !== 0) newStart.setDate(newStart.getDate());
         const newEnd = new Date(newStart.getTime() + durationMs);
         const payload = buildCopyPayload(s, newStart.toISOString(), newEnd.toISOString());
         if (payload !== null) pasteSession(payload);
