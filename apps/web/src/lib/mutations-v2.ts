@@ -48,18 +48,72 @@ export function useCreateSessionV2Mutation() {
 // ── PUT /api/v2/sessions/:id ──────────────────────────────────────────
 // V2-D8 : `type` est **immutable** — l'endpoint le rejette serveur-side.
 // Le body côté client n'inclut donc pas `type` (cf. updateSessionV2Schema).
+//
+// Optimistic update : on patch immédiatement les listes V2 en cache pour
+// que le drag/resize bouge la carte sans attendre le PUT. Si l'API échoue
+// (ex : 429 throttle, conflit), `onError` restaure le snapshot — la séance
+// revient à sa position d'origine et un flash erreur s'affiche. `onSettled`
+// invalide toujours pour resync sur l'autorité serveur (smart-dirty,
+// `hasUnpublishedChanges`, etc.).
+
+type SessionListSnapshot = ReadonlyArray<{
+  readonly key: readonly unknown[];
+  readonly data: readonly SessionV2Dto[];
+}>;
 
 export function useUpdateSessionV2Mutation() {
-  const invalidate = useInvalidatePlanningV2();
+  const qc = useQueryClient();
   const flash = useFlash();
-  return useMutation<SessionV2Dto, Error, { id: string; body: UpdateSessionV2Dto }>({
+  return useMutation<
+    SessionV2Dto,
+    Error,
+    { id: string; body: UpdateSessionV2Dto },
+    { snapshots: SessionListSnapshot }
+  >({
     mutationFn: ({ id, body }) => apiPut(`/v2/sessions/${id}`, sessionV2Schema, body),
+    onMutate: async ({ id, body }) => {
+      // Annule toute query en vol pour éviter qu'elle n'écrase l'optimistic.
+      await qc.cancelQueries({ queryKey: planningV2Keys.all });
+      // Snapshot toutes les query lists V2 actuellement en cache.
+      const entries = qc.getQueriesData<readonly SessionV2Dto[]>({
+        queryKey: planningV2Keys.all,
+      });
+      const snapshots: SessionListSnapshot = entries
+        .filter(([, data]) => Array.isArray(data))
+        .map(([key, data]) => ({ key, data: data as readonly SessionV2Dto[] }));
+      // Patch chaque liste : remplace la séance ciblée par sa version updatée.
+      for (const { key, data } of snapshots) {
+        const next = data.map((s) =>
+          s.id === id
+            ? ({
+                ...s,
+                ...(body.startAt !== undefined ? { startAt: body.startAt } : {}),
+                ...(body.endAt !== undefined ? { endAt: body.endAt } : {}),
+              } as SessionV2Dto)
+            : s,
+        );
+        qc.setQueryData(key, next);
+      }
+      return { snapshots };
+    },
+    onError: (err, _vars, ctx) => {
+      // Rollback : restaure les listes au snapshot pré-mutation.
+      if (ctx?.snapshots) {
+        for (const { key, data } of ctx.snapshots) {
+          qc.setQueryData(key, data);
+        }
+      }
+      flash.push('error', `Mise à jour impossible : ${err.message}`);
+    },
     onSuccess: () => {
-      invalidate();
       flash.push('success', 'Séance mise à jour');
     },
-    onError: (err) => {
-      flash.push('error', `Mise à jour impossible : ${err.message}`);
+    onSettled: () => {
+      // Resync depuis le serveur (autoritaire pour `hasUnpublishedChanges`,
+      // snapshot, etc.). Une seule invalidation par mutation, même en cas
+      // de Promise.all (chaque settle déclenche un refetch mais TanStack
+      // déduplique les inflight queries).
+      void qc.invalidateQueries({ queryKey: planningV2Keys.all });
     },
   });
 }
