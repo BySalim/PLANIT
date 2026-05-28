@@ -65,10 +65,10 @@ describe('UE — GET /api/ues/:ueId/modules (lazy load)', () => {
     // depuis la même réponse).
     const ues = await api().get('/api/ues?withModules=true').set('Cookie', session.cookieHeader);
     const algoUe = (ues.body as { id: string; code: string }[]).find((u) => u.code === 'ALGO-UE');
-    expect(algoUe).toBeDefined();
+    if (algoUe === undefined) throw new Error('seed ALGO-UE introuvable');
 
     const res = await api()
-      .get(`/api/ues/${algoUe!.id}/modules`)
+      .get(`/api/ues/${algoUe.id}/modules`)
       .set('Cookie', session.cookieHeader);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
