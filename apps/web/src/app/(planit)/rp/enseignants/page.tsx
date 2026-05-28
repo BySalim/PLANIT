@@ -120,9 +120,9 @@ export default function EnseignantsPage() {
   return (
     <Shell
       title="Enseignants"
-      subtitle={total > 0 ? `${total} enseignant${total > 1 ? 's' : ''}` : undefined}
       breadcrumb={[{ label: 'Référentiels' }, { label: 'Enseignants' }]}
       activeNavId="teachers"
+      surface
     >
       {/* Toolbar */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
