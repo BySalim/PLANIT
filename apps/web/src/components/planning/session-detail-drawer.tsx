@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import {
   COURS_SOUS_TYPES,
   EVALUATION_SOUS_TYPES,
@@ -520,7 +521,7 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
 function ReadOnlyView({ session }: { session: SessionV2Dto }) {
   const start = new Date(session.startAt);
   const end = new Date(session.endAt);
-  const dateLabel = format(start, 'eeee d MMMM yyyy');
+  const dateLabel = format(start, 'eeee d MMMM yyyy', { locale: fr });
   const timeLabel = `${format(start, 'HH:mm')} – ${format(end, 'HH:mm')}`;
   const classesLabel = session.classes.map((c) => c.code).join(', ');
   const personLabel =
