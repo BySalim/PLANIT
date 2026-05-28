@@ -88,10 +88,18 @@ export class SeanceV2Controller {
     return this.seances.create(dto, user.id);
   }
 
-  /** B.2 — update (refuse type change → 422 ; smart dirty recompute). */
+  /**
+   * B.2 — update (refuse type change → 422 ; smart dirty recompute).
+   *
+   * Throttle 60/min : le PUT est appelé par le drag&drop / resize / undo /
+   * redo du planning RP. Une séquence de quelques drags + Ctrl+Z + Ctrl+V
+   * peut générer 20-30 PUT en moins d'une minute (multi-sélection en
+   * particulier). 10/min était trop bas et provoquait des 429 en usage
+   * normal. 60/min reste anti-abus (1 req/s soutenue) sans gêner l'UX.
+   */
   @Put(':id')
   @Roles('RESPONSABLE_PROGRAMME')
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: 'Mettre à jour une séance V02' })
   @ApiResponse({ status: 200, description: 'Séance mise à jour' })
   @ApiResponse({ status: 400, description: 'Body invalide' })
