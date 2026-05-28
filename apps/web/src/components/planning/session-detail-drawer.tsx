@@ -262,11 +262,13 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
     if (session) reset(valuesFromSession(session));
   }, [session, reset]);
 
-  // Liste plate des modules pour le select.
+  // Liste plate des modules pour le select. `ue.modules` est optionnel
+  // (mode lite ajouté pour la page UE & Modules) — la query utilisée ici
+  // demande `withModules=true` mais `?? []` reste défensif.
   const flatModules = useMemo(() => {
     const ues = uesQuery.data ?? [];
     return ues.flatMap((ue) =>
-      ue.modules.map((m) => ({
+      (ue.modules ?? []).map((m) => ({
         id: m.id,
         label: `${m.code} — ${m.libelle}`,
       })),

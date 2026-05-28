@@ -7,13 +7,29 @@ import { PrismaService } from '../common/prisma.service';
 export class UeService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** B.7 — liste avec modules nested. */
-  async list(): Promise<UEDto[]> {
+  /**
+   * B.7 — liste des UE.
+   *  - mode **lite** (par défaut) : pas de `modules` nested, juste
+   *    `moduleCount`. Utilisé par la page UE & Modules pour un mount
+   *    instantané même avec 50+ UE × 10+ modules. Les modules d'une UE
+   *    sont lazy-fetch via `findModulesForUe()` à l'ouverture.
+   *  - mode **full** (`withModules=true`) : `modules` nested, comme la
+   *    V1. Utilisé par le formulaire de séance qui a besoin de la liste
+   *    aplatie des modules pour le select Module.
+   */
+  async list(opts?: { withModules?: boolean }): Promise<UEDto[]> {
+    if (opts?.withModules === true) {
+      const rows = await this.prisma.uE.findMany({
+        orderBy: { code: 'asc' },
+        include: { modules: { orderBy: { code: 'asc' } } },
+      });
+      return rows.map(toDto);
+    }
     const rows = await this.prisma.uE.findMany({
       orderBy: { code: 'asc' },
-      include: { modules: { orderBy: { code: 'asc' } } },
+      include: { _count: { select: { modules: true } } },
     });
-    return rows.map(toDto);
+    return rows.map(toLiteDto);
   }
 
   async findOne(id: string): Promise<UEDto> {
@@ -23,6 +39,28 @@ export class UeService {
     });
     if (!row) throw new NotFoundException(`UE ${id} introuvable`);
     return toDto(row);
+  }
+
+  /**
+   * Modules d'une UE, triés par code. Utilisé par `GET /ues/:ueId/modules`
+   * pour le lazy load côté front. Retourne 404 si l'UE n'existe pas.
+   */
+  async findModulesForUe(ueId: string): Promise<ModuleV2Dto[]> {
+    const ue = await this.prisma.uE.findUnique({ where: { id: ueId } });
+    if (!ue) throw new NotFoundException(`UE ${ueId} introuvable`);
+    const rows = await this.prisma.module.findMany({
+      where: { ueId },
+      orderBy: { code: 'asc' },
+    });
+    return rows.map(
+      (m): ModuleV2Dto => ({
+        id: m.id,
+        code: m.code,
+        libelle: m.libelle,
+        color: m.color,
+        ueId: m.ueId ?? ueId,
+      }),
+    );
   }
 
   async create(dto: CreateUEDto): Promise<UEDto> {
@@ -104,6 +142,28 @@ function toDto(row: {
         ueId: m.ueId ?? row.id,
       }),
     ),
+  };
+}
+
+/**
+ * Variante « lite » : pas de `modules` nested, juste un `moduleCount`
+ * dérivé de Prisma `_count`. Utilisé par `list()` pour le mount initial
+ * de la page UE & Modules — la liste détaillée est lazy-chargée à
+ * l'ouverture de chaque accordéon.
+ */
+function toLiteDto(row: {
+  id: string;
+  code: string;
+  libelle: string;
+  color: string;
+  _count: { modules: number };
+}): UEDto {
+  return {
+    id: row.id,
+    code: row.code,
+    libelle: row.libelle,
+    color: row.color,
+    moduleCount: row._count.modules,
   };
 }
 

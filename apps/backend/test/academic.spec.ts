@@ -25,9 +25,23 @@ beforeEach(async () => {
 const api = (): ReturnType<typeof request> => request(app.getHttpServer());
 
 describe('UE — GET /api/ues (B.7)', () => {
-  it('liste les 3 UE seed avec leurs modules nested', async () => {
+  it('liste lite par défaut : UE seules avec moduleCount, sans modules nested', async () => {
     const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
     const res = await api().get('/api/ues').set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(3);
+    const algoUe = (res.body as { code: string; modules?: unknown; moduleCount?: number }[]).find(
+      (u) => u.code === 'ALGO-UE',
+    );
+    expect(algoUe).toBeDefined();
+    // Mode lite : pas de modules nested mais moduleCount présent.
+    expect(algoUe?.modules).toBeUndefined();
+    expect(algoUe?.moduleCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it('?withModules=true → mode legacy avec modules nested', async () => {
+    const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
+    const res = await api().get('/api/ues?withModules=true').set('Cookie', session.cookieHeader);
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(3);
     const algoUe = (res.body as { code: string; modules: { code: string }[] }[]).find(
@@ -41,6 +55,32 @@ describe('UE — GET /api/ues (B.7)', () => {
     const session = await loginAs(app, 'ETUDIANT');
     const res = await api().get('/api/ues').set('Cookie', session.cookieHeader);
     expect(res.status).toBe(403);
+  });
+});
+
+describe('UE — GET /api/ues/:ueId/modules (lazy load)', () => {
+  it("retourne les modules de l'UE triés par code", async () => {
+    const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
+    // Récupère un id d'UE seed pour le test (mode legacy pour lire les modules
+    // depuis la même réponse).
+    const ues = await api().get('/api/ues?withModules=true').set('Cookie', session.cookieHeader);
+    const algoUe = (ues.body as { id: string; code: string }[]).find((u) => u.code === 'ALGO-UE');
+    expect(algoUe).toBeDefined();
+
+    const res = await api()
+      .get(`/api/ues/${algoUe!.id}/modules`)
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect((res.body as unknown[]).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("404 si l'UE n'existe pas", async () => {
+    const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
+    const res = await api()
+      .get('/api/ues/clxxxxxxxx0000000000nope/modules')
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(404);
   });
 });
 

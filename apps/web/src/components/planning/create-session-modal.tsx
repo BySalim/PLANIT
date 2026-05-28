@@ -277,10 +277,13 @@ export function CreateSessionModal({
   const currentType = useWatch({ control, name: 'type' });
 
   // Liste plate des modules (UE → modules) pour le <Select module>.
+  // `ue.modules` est optionnel depuis l'ajout du mode lite sur GET /ues
+  // (page UE & Modules), mais la query V2 utilisée ici demande
+  // explicitement `withModules=true` → fallback `?? []` défensif.
   const flatModules = useMemo(() => {
     const ues = uesQuery.data ?? [];
     return ues.flatMap((ue) =>
-      ue.modules.map((m) => ({
+      (ue.modules ?? []).map((m) => ({
         id: m.id,
         label: `${m.code} — ${m.libelle}`,
         ueLibelle: ue.libelle,

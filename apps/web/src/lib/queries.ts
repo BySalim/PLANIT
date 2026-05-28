@@ -3,11 +3,13 @@ import {
   type SessionDto,
   type SessionStatsDto,
   type EnseignantDto,
+  type ModuleV2Dto,
   type UEDto,
   type FiliereDto,
   sessionSchema,
   sessionStatsSchema,
   enseignantSchema,
+  moduleV2Schema,
   ueSchema,
   filiereSchema,
   z,
@@ -99,16 +101,43 @@ export function useEnseignantsQuery(page: number = 1, statut?: string | undefine
 // ── UE & Modules ─────────────────────────────────────────────────────
 
 const ueListSchema = ueSchema.array();
+const moduleListSchema = moduleV2Schema.array();
 
 export const ueKeys = {
   all: ['ues'] as const,
   list: () => [...ueKeys.all, 'list'] as const,
+  modules: (ueId: string) => [...ueKeys.all, 'modules', ueId] as const,
 };
 
+/**
+ * Liste **lite** des UE — pas de `modules` nested, juste un `moduleCount`
+ * pour afficher « X modules » dans l'accordéon. Les modules sont
+ * lazy-chargés via `useUeModulesQuery(ueId)` quand l'utilisateur ouvre
+ * une UE.
+ */
 export function useUesQuery() {
   return useQuery<UEDto[]>({
     queryKey: ueKeys.list(),
     queryFn: () => apiGet('/ues', ueListSchema),
+    // 30s stale : l'utilisateur peut créer/éditer/supprimer une UE depuis
+    // d'autres onglets, mais pas si fréquemment qu'il faille refetch à
+    // chaque focus. Les mutations invalident le cache de toute façon.
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Lazy fetch des modules d'une UE. `enabled` est piloté par l'état de
+ * l'accordéon dans la page UE & Modules — la requête ne part qu'à
+ * l'ouverture, et la donnée reste en cache pour les ouvertures
+ * suivantes (pas de re-fetch sauf invalidation par mutation).
+ */
+export function useUeModulesQuery(ueId: string, options?: { enabled?: boolean }) {
+  return useQuery<ModuleV2Dto[]>({
+    queryKey: ueKeys.modules(ueId),
+    queryFn: () => apiGet(`/ues/${ueId}/modules`, moduleListSchema),
+    enabled: options?.enabled !== false,
+    staleTime: 30 * 1000,
   });
 }
 
