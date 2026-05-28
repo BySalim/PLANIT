@@ -13,7 +13,8 @@
       "Bash(gh pr diff:*)",
       "Bash(gh issue list:*)",
       "Bash(gh issue view:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot"
     ],
     "deny": [
       "Bash(git push:*)",
