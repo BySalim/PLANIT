@@ -53,13 +53,15 @@ describe('PlanningGrid', () => {
       wrapper,
     });
 
-    expect(screen.getByText(/lundi/i)).toBeInTheDocument();
-    expect(screen.getByText(/mardi/i)).toBeInTheDocument();
-    expect(screen.getByText(/mercredi/i)).toBeInTheDocument();
-    expect(screen.getByText(/jeudi/i)).toBeInTheDocument();
-    expect(screen.getByText(/vendredi/i)).toBeInTheDocument();
-    expect(screen.getByText(/samedi/i)).toBeInTheDocument();
-    expect(screen.getByText(/dimanche/i)).toBeInTheDocument();
+    // Match exact pour ne pas confondre avec le chip férié de la semaine de
+    // démo (« Lundi de Pentecôte » contient « lundi » en regex insensible).
+    expect(screen.getByText('Lundi')).toBeInTheDocument();
+    expect(screen.getByText('Mardi')).toBeInTheDocument();
+    expect(screen.getByText('Mercredi')).toBeInTheDocument();
+    expect(screen.getByText('Jeudi')).toBeInTheDocument();
+    expect(screen.getByText('Vendredi')).toBeInTheDocument();
+    expect(screen.getByText('Samedi')).toBeInTheDocument();
+    expect(screen.getByText('Dimanche')).toBeInTheDocument();
   });
 
   it("rend les libellés d'heure de 8h à 20h (toutes les 2h)", () => {

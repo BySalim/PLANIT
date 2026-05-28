@@ -4,7 +4,6 @@ import { useState } from 'react';
 import type { CreateSessionV2Dto, SessionV2Dto } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
 import { CreateSessionModal } from '@/components/planning/create-session-modal';
-import { HolidayBanner } from '@/components/planning/holiday-banner';
 import { PlanningFooter } from '@/components/planning/stats-bar';
 import { PlanningGrid } from '@/components/planning/planning-grid';
 import { PlanningGridSkeleton } from '@/components/planning/planning-grid-skeleton';
@@ -112,9 +111,6 @@ export default function RpPlanningPage() {
           onUndo={undoStack.undo}
           onRedo={undoStack.redo}
         />
-
-        {/* Holiday banner (only when the week has a holiday) */}
-        <HolidayBanner weekStart={weekStart} />
 
         {/* Day/Week toggle + session counter */}
         <ViewScopeToggle scope={scope} onChange={setScope} sessionCount={sessions.length} />

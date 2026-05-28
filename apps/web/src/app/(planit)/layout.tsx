@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { QueryProvider } from '@/app/providers';
-import { DevAuthBadge } from '@/components/auth/dev-auth-badge';
 import { ForbiddenListener } from '@/components/auth/forbidden-listener';
+import { DevToolsFloater } from '@/components/dev/dev-tools-floater';
 
 // Next.js App Router requires default export for layout
 // eslint-disable-next-line no-restricted-syntax
@@ -10,7 +10,7 @@ export default function PlanitLayout({ children }: { children: ReactNode }) {
     <QueryProvider>
       {children}
       <ForbiddenListener />
-      <DevAuthBadge />
+      <DevToolsFloater />
     </QueryProvider>
   );
 }
