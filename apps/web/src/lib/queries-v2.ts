@@ -143,12 +143,16 @@ export function useEnseignantsQuery() {
   });
 }
 
-// ── UE + Modules (GET /api/ues — RP only, modules embarqués) ───────────
+// ── UE + Modules (GET /api/ues?withModules=true — RP only) ─────────────
+// Mode legacy avec modules nested : utilisé par le formulaire séance
+// (`<CreateSessionModal>`, `<SessionDetailDrawer>`) qui a besoin de la
+// liste aplatie des modules pour son select Module. La page UE & Modules
+// utilise un endpoint distinct (queries.ts → useUesQuery, mode lite).
 
 export function useUesQuery() {
   return useQuery<UEDto[]>({
     queryKey: referentialKeys.ues,
-    queryFn: () => apiGet(`/ues`, ueListSchema),
+    queryFn: () => apiGet(`/ues?withModules=true`, ueListSchema),
     staleTime: 60 * 1000,
   });
 }

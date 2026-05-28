@@ -126,18 +126,12 @@ export default function FilieresPage() {
     }
   }
 
-  const total = filieres?.length ?? 0;
-
   return (
     <Shell
       title="Filières"
-      subtitle={
-        total > 0
-          ? `${total} filière${total > 1 ? 's' : ''} active${total > 1 ? 's' : ''}`
-          : undefined
-      }
       breadcrumb={[{ label: 'Offre de formation' }, { label: 'Filières' }]}
       activeNavId="filieres"
+      surface
     >
       {/* Toolbar */}
       <div className="mb-5 flex items-center justify-between">

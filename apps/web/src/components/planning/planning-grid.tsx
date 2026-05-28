@@ -6,6 +6,7 @@ import { fr } from 'date-fns/locale';
 import { BarChartIcon } from '@planit/ui';
 import type { CreateSessionV2Dto, SessionV2Dto } from '@planit/contracts';
 import { Button } from '@/components/ui/button';
+import { getWeekHolidays, type WeekHoliday } from '@/lib/holidays';
 import { useCreateSessionV2Mutation, useUpdateSessionV2Mutation } from '@/lib/mutations-v2';
 import { paletteForSessionV2 } from '@/lib/module-palette';
 import { cn } from '@/lib/utils';
@@ -116,6 +117,12 @@ function fmtHour(hour: number): string {
   const h = Math.floor(hour);
   const m = Math.round((hour - h) * 60);
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/** Capitale française : « Lundi » à partir de « lundi ». */
+function capitalize(str: string): string {
+  if (str.length === 0) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 function positionSession(session: SessionV2Dto): PositionedSession | null {
@@ -705,6 +712,16 @@ export function PlanningGrid({
     ? []
     : sessions.map((s) => positionSession(s)).filter((p): p is PositionedSession => p !== null);
 
+  // Map dayIndex → jour férié de la semaine (si présent). Permet d'afficher
+  // un indicateur discret dans le header de la colonne concernée plutôt
+  // qu'une bannière globale qui prend une ligne en haut du planning.
+  const holidaysByDay = new Map<number, WeekHoliday>();
+  for (const h of getWeekHolidays(weekStart)) {
+    const jsDay = h.date.getDay();
+    const dayIdx = jsDay === 0 ? 6 : jsDay - 1;
+    holidaysByDay.set(dayIdx, h);
+  }
+
   return (
     // Clic hors d'une séance → désélection (les cartes stoppent la propagation).
     // Calqué sur PLANIT-IA/rp/planning-canvas.jsx : rail heures 44px, en-tête
@@ -717,13 +734,25 @@ export function PlanningGrid({
         </div>
         {Array.from({ length: DAY_COUNT }, (_, dayIndex) => {
           const dayDate = addDays(weekStart, dayIndex);
+          const holiday = holidaysByDay.get(dayIndex);
+          // Capitale française : « Lundi » et non « LUNDI » ni « lundi ».
+          // date-fns + locale fr renvoie tout en minuscule par défaut.
+          const dayName = capitalize(format(dayDate, 'EEEE', { locale: fr }));
           return (
             <div
               key={dayIndex}
-              className="sticky top-0 z-20 flex h-[42px] flex-col justify-center border-b border-r border-border-soft bg-surface px-2.5 text-center"
+              className={cn(
+                'sticky top-0 z-20 flex h-[42px] flex-col justify-center border-b border-r px-2.5 text-center',
+                // Header neutre pour les jours normaux ; léger renforcement
+                // de la bordure inférieure pour les fériés (le chip dans la
+                // colonne se charge du signal fort).
+                holiday !== undefined
+                  ? 'border-b-accent/40 border-r-border-soft bg-surface'
+                  : 'border-border-soft bg-surface',
+              )}
             >
               <span className="truncate text-[11px] font-semibold leading-tight text-text">
-                {format(dayDate, 'EEEE', { locale: fr })}
+                {dayName}
               </span>
               <span className="mt-px truncate text-[10px] leading-tight text-text-muted">
                 {format(dayDate, 'd MMM', { locale: fr })}
@@ -752,6 +781,18 @@ export function PlanningGrid({
 
         {Array.from({ length: DAY_COUNT }, (_, dayIndex) => {
           const isDropColumn = dropPreview?.dayIndex === dayIndex;
+          const dayHoliday = holidaysByDay.get(dayIndex);
+          // Pattern diagonal très léger en fond de colonne : signal subliminal
+          // « jour non travaillé » sans gêner la lecture des séances éventuelles.
+          // Couleur dérivée de l'accent (rgba 232/98/10) pour rester dans la
+          // palette PLANIT — voir packages/design-tokens.
+          const holidayBgPattern: React.CSSProperties | undefined =
+            dayHoliday !== undefined
+              ? {
+                  backgroundImage:
+                    'repeating-linear-gradient(135deg, rgba(232,98,10,0.04) 0, rgba(232,98,10,0.04) 6px, transparent 6px, transparent 14px)',
+                }
+              : undefined;
           return (
             <div
               key={dayIndex}
@@ -759,7 +800,7 @@ export function PlanningGrid({
                 'relative border-r border-border transition-colors',
                 isDropColumn && 'bg-primary-50/60',
               )}
-              style={{ height: GRID_HEIGHT }}
+              style={{ height: GRID_HEIGHT, ...holidayBgPattern }}
               onDragOver={(event) => handleDragOver(event, dayIndex)}
               onDrop={(event) => handleDrop(event, dayIndex)}
               onMouseMove={(event) => {
@@ -873,6 +914,39 @@ export function PlanningGrid({
                 });
               }}
             >
+              {/* Chip jour férié : élément pinned premium au-dessus de la
+                  colonne. Sticky verticalement par rapport au scroll du grid
+                  → reste visible même quand on défile. `pointer-events-auto`
+                  permet le tooltip natif (title=) au survol ; l'élément
+                  occupe peu de hauteur (28px) et son placement absolu ne
+                  pousse pas le contenu sous-jacent. Z-index 4 = au-dessus
+                  des séances mais sous les overlays drag/resize. */}
+              {dayHoliday !== undefined ? (
+                <div
+                  className="pointer-events-auto absolute left-1/2 top-2 z-[4] flex max-w-[calc(100%-1rem)] -translate-x-1/2 select-none items-center gap-1.5 rounded-full border border-accent-200 bg-surface px-2.5 py-1 text-[11px] font-medium text-accent-800 shadow-sm transition-shadow hover:shadow-md"
+                  onMouseDown={(event) => event.stopPropagation()}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                    <line x1="9" y1="16" x2="15" y2="16" />
+                  </svg>
+                  <span className="truncate">{dayHoliday.name}</span>
+                </div>
+              ) : null}
+
               {HOURS.slice(0, -1).map((hour) => (
                 <div
                   key={hour}

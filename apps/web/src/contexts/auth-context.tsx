@@ -49,17 +49,35 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, { status: 'loading' } as AuthState);
 
   useEffect(() => {
-    fetch(`${API_BASE}/auth/me`, { credentials: 'include' })
+    // AbortController : annule le fetch en vol au démontage du Provider.
+    // Sans ça, en environnement de test (jsdom) où le composant est
+    // démonté avant la résolution, `dispatch` est appelé après tear-down
+    // → React 19 lève `ReferenceError: window is not defined` (cf. CI
+    // logs PR #35). Garde aussi anti-leak pour HMR / route changes.
+    const controller = new AbortController();
+    let cancelled = false;
+
+    fetch(`${API_BASE}/auth/me`, { credentials: 'include', signal: controller.signal })
       .then(async (r) => {
+        if (cancelled) return;
         if (!r.ok) {
           dispatch({ type: 'CLEAR_USER' });
           return;
         }
         const raw: unknown = await r.json();
+        if (cancelled) return;
         const parsed = authMeSchema.safeParse(raw);
         dispatch(parsed.success ? { type: 'SET_USER', user: parsed.data } : { type: 'CLEAR_USER' });
       })
-      .catch(() => dispatch({ type: 'CLEAR_USER' }));
+      .catch(() => {
+        if (cancelled) return;
+        dispatch({ type: 'CLEAR_USER' });
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<AuthMe> => {

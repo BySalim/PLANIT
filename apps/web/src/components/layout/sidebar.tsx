@@ -141,12 +141,21 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
     };
   }, []);
 
+  // Calcule le « meilleur match » par href le plus long parmi les items
+  // routés. `pathname.startsWith('/rp')` matche aussi `/rp/ue-modules`
+  // → on prend le plus spécifique pour éviter que Planning reste actif
+  // quand on est sur une sous-page (Filières, UE & Modules, etc.).
+  // Critère : pathname === href OU pathname commence par `href + '/'`.
+  const bestMatchHref = NAV.flatMap((g) => g.items)
+    .filter((i) => i.href !== '#')
+    .map((i) => i.href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .reduce<string>((best, href) => (href.length > best.length ? href : best), '');
+
   const isActive = (item: NavItem): boolean => {
-    if (item.href !== '#' && pathname.length > 0 && pathname.startsWith(item.href)) {
-      return true;
-    }
-    if (item.href === '#' && item.id === activeId) return true;
-    return false;
+    if (item.href !== '#') return item.href === bestMatchHref;
+    // Items placeholder (href='#') : fallback sur l'activeId fourni par la page.
+    return item.id === activeId;
   };
 
   const transition = draggingRef.current ? 'none' : 'width .22s ease';

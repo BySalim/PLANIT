@@ -74,15 +74,32 @@ export const moduleV2Schema = z.object({
   ueId: cuid,
 });
 
+/**
+ * UE — schéma hybride supportant les modes :
+ *  - **lite** (par défaut sur `GET /ues`) : `modules` omis, `moduleCount`
+ *    exposé pour afficher « X modules » sans payload lourd.
+ *  - **complet** (`GET /ues/:id`) : `modules` peuplé, `moduleCount` omis
+ *    (length suffit côté client).
+ *
+ * Les deux champs sont optionnels au niveau Zod pour que le même schéma
+ * couvre les deux modes sans devoir trimballer deux types parallèles.
+ * Côté consommateur web, on lit `ue.modules ?? []` et `ue.moduleCount ??
+ * ue.modules?.length ?? 0` — fallback safe peu importe le mode reçu.
+ */
 export const ueSchema = z.object({
   id: cuid,
   code: z.string().min(1).max(20),
   libelle: z.string().min(1).max(120),
   color: hexColor,
-  modules: z.array(moduleV2Schema),
+  modules: z.array(moduleV2Schema).optional(),
+  moduleCount: z.number().int().min(0).optional(),
 });
 
-export const createUeSchema = ueSchema.omit({ id: true, modules: true });
+export const createUeSchema = ueSchema.omit({
+  id: true,
+  modules: true,
+  moduleCount: true,
+});
 export const updateUeSchema = createUeSchema.partial();
 
 export type UEDto = z.infer<typeof ueSchema>;

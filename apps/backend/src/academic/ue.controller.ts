@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
+import { ApiCookieAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { createModuleSchema, createUeSchema, updateUeSchema } from '@planit/contracts';
+import { createModuleSchema, createUeSchema, updateUeSchema, z } from '@planit/contracts';
 import type {
   CreateModuleDto,
   CreateUEDto,
@@ -14,6 +14,17 @@ import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { ModulesService } from './modules.service';
 import { UeService } from './ue.service';
 
+const listQuerySchema = z.object({
+  // `?withModules=true` retourne les UE avec leurs modules nested
+  // (mode legacy utilisé par les formulaires séance). Sans le paramètre,
+  // l'endpoint retourne en mode lite (UE seules + moduleCount).
+  withModules: z
+    .union([z.literal('true'), z.literal('false')])
+    .optional()
+    .transform((v) => v === 'true'),
+});
+type ListQuery = z.infer<typeof listQuerySchema>;
+
 @ApiTags('UE')
 @ApiCookieAuth('access')
 @Controller('ues')
@@ -24,19 +35,42 @@ export class UeController {
     private readonly modules: ModulesService,
   ) {}
 
+  /**
+   * Liste **lite** par défaut — chaque UE expose `moduleCount` mais pas
+   * `modules`. Le front lazy-fetch les modules d'une UE quand
+   * l'utilisateur la déploie via `GET /ues/:ueId/modules`.
+   *
+   * `?withModules=true` réactive le mode legacy (UE avec `modules`
+   * nested), utilisé par les formulaires séance qui ont besoin de la
+   * liste aplatie des modules pour leur select.
+   */
   @Get()
-  @ApiOperation({ summary: 'Liste des UE avec leurs modules' })
-  @ApiResponse({ status: 200, description: 'Liste UE + modules nested' })
-  list(): Promise<UEDto[]> {
-    return this.ues.list();
+  @ApiQuery({
+    name: 'withModules',
+    required: false,
+    description: 'true → UE avec modules nested (legacy), sinon mode lite + moduleCount',
+  })
+  @ApiOperation({ summary: 'Liste des UE (lite par défaut)' })
+  @ApiResponse({ status: 200, description: 'Liste UE' })
+  list(@Query(new ZodValidationPipe(listQuerySchema)) query: ListQuery): Promise<UEDto[]> {
+    return this.ues.list(query.withModules === true ? { withModules: true } : undefined);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Détail UE' })
+  @ApiOperation({ summary: 'Détail UE (avec modules nested)' })
   @ApiResponse({ status: 200, description: 'UE trouvée' })
   @ApiResponse({ status: 404, description: 'UE introuvable' })
   findOne(@Param('id') id: string): Promise<UEDto> {
     return this.ues.findOne(id);
+  }
+
+  /** Lazy load des modules d'une UE pour la page UE & Modules. */
+  @Get(':ueId/modules')
+  @ApiOperation({ summary: "Modules d'une UE (lazy load)" })
+  @ApiResponse({ status: 200, description: 'Liste des modules' })
+  @ApiResponse({ status: 404, description: 'UE introuvable' })
+  findModules(@Param('ueId') ueId: string): Promise<ModuleV2Dto[]> {
+    return this.ues.findModulesForUe(ueId);
   }
 
   @Post()

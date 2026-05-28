@@ -6,7 +6,7 @@ import { PlusIcon, ChevronRightIcon } from '@planit/ui';
 import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast-provider';
-import { useUesQuery } from '@/lib/queries';
+import { useUesQuery, useUeModulesQuery } from '@/lib/queries';
 import { useDeleteUeMutation, useDeleteModuleMutation } from '@/lib/mutations';
 import { UeModal } from '@/components/rp/ue-modules/ue-modal';
 import { ModuleModal } from '@/components/rp/ue-modules/module-modal';
@@ -83,7 +83,6 @@ export default function UeModulesPage() {
 
   const { data: ues, isLoading, isError } = useUesQuery();
   const deleteUeMutation = useDeleteUeMutation();
-  const deleteModuleMutation = useDeleteModuleMutation();
 
   const [openUeIds, setOpenUeIds] = useState<Set<string>>(new Set());
   const [ueModal, setUeModal] = useState<UeModalState>({ open: false });
@@ -109,25 +108,12 @@ export default function UeModulesPage() {
     }
   }
 
-  async function handleDeleteModule(mod: ModuleV2Dto) {
-    const confirmed = window.confirm(`Supprimer le module "${mod.libelle}" ?`);
-    if (!confirmed) return;
-    try {
-      await deleteModuleMutation.mutateAsync(mod.id);
-      toast.show('Module supprimé.', { variant: 'success' });
-    } catch {
-      toast.show('Impossible de supprimer le module.', { variant: 'error' });
-    }
-  }
-
-  const totalModules = ues?.reduce((acc, ue) => acc + ue.modules.length, 0) ?? 0;
-
   return (
     <Shell
       title="UE & Modules"
-      subtitle={ues && ues.length > 0 ? `${ues.length} UE · ${totalModules} modules` : undefined}
       breadcrumb={[{ label: 'Offre de formation' }, { label: 'UE & Modules' }]}
       activeNavId="modules"
+      surface
     >
       {/* Toolbar */}
       <div className="mb-5 flex items-center justify-between">
@@ -166,157 +152,26 @@ export default function UeModulesPage() {
           {ues.map((ue, idx) => {
             const isOpen = openUeIds.has(ue.id);
             const isLast = idx === ues.length - 1;
+            const moduleCount = ue.moduleCount ?? ue.modules?.length ?? 0;
             return (
-              <div key={ue.id} className={!isLast ? 'border-b border-border-soft' : ''}>
-                {/* ── En-tête UE ── */}
-                <div
-                  className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-bg"
-                  style={{ borderLeft: `4px solid ${ue.color}` }}
-                >
-                  {/* Badge code */}
-                  <ColorBadge code={ue.code} hex={ue.color} />
-
-                  {/* Libellé */}
-                  <span className="flex-1 font-semibold text-text">{ue.libelle}</span>
-
-                  {/* Compteur modules */}
-                  <span className="text-[13px] text-text-muted">
-                    {ue.modules.length} module{ue.modules.length !== 1 ? 's' : ''}
-                  </span>
-
-                  {/* Éditer l'UE */}
-                  <button
-                    type="button"
-                    title="Éditer l'UE"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setUeModal({ open: true, mode: 'edit', initial: ue });
-                    }}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-text"
-                  >
-                    <PencilIcon />
-                  </button>
-
-                  {/* Supprimer l'UE */}
-                  <button
-                    type="button"
-                    title="Supprimer l'UE"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleDeleteUe(ue);
-                    }}
-                    disabled={deleteUeMutation.isPending}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-err-100 hover:text-err disabled:opacity-50"
-                  >
-                    <TrashIcon />
-                  </button>
-
-                  {/* Ajouter un module */}
-                  <button
-                    type="button"
-                    title="Ajouter un module"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setModuleModal({ open: true, mode: 'create', ueId: ue.id });
-                      if (!isOpen) toggleUe(ue.id);
-                    }}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-accent"
-                  >
-                    <PlusIcon size={15} color="currentColor" />
-                  </button>
-
-                  {/* Expand / collapse */}
-                  <button
-                    type="button"
-                    onClick={() => toggleUe(ue.id)}
-                    aria-expanded={isOpen}
-                    aria-label={isOpen ? 'Réduire' : 'Développer'}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-text"
-                  >
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        transition: 'transform .2s ease',
-                        transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-                      }}
-                    >
-                      <ChevronRightIcon size={15} color="currentColor" />
-                    </span>
-                  </button>
-                </div>
-
-                {/* ── Liste modules (dépliée) ── */}
-                {isOpen && (
-                  <div className="border-t border-border-soft bg-bg">
-                    {ue.modules.length === 0 ? (
-                      <p className="px-14 py-3 text-[13px] text-text-muted">
-                        Aucun module dans cette UE.
-                      </p>
-                    ) : (
-                      ue.modules.map((mod, mIdx) => (
-                        <div
-                          key={mod.id}
-                          className={`flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface ${
-                            mIdx < ue.modules.length - 1 ? 'border-b border-border-soft' : ''
-                          }`}
-                          style={{ paddingLeft: '3rem' }}
-                        >
-                          {/* Indentation visuelle */}
-                          <ColorBadge code={mod.code} hex={mod.color} />
-
-                          {/* Libellé module */}
-                          <span className="flex-1 text-[13px] text-text">{mod.libelle}</span>
-
-                          {/* Ouvrir → edit module */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setModuleModal({
-                                open: true,
-                                mode: 'edit',
-                                ueId: ue.id,
-                                initial: mod,
-                              })
-                            }
-                            className="flex h-7 items-center gap-1 rounded-lg border border-border px-2.5 text-[12px] font-medium text-text-muted transition-colors hover:border-accent hover:text-accent"
-                          >
-                            Ouvrir
-                            <ChevronRightIcon size={12} color="currentColor" />
-                          </button>
-
-                          {/* Éditer */}
-                          <button
-                            type="button"
-                            title="Modifier le module"
-                            onClick={() =>
-                              setModuleModal({
-                                open: true,
-                                mode: 'edit',
-                                ueId: ue.id,
-                                initial: mod,
-                              })
-                            }
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface hover:text-text"
-                          >
-                            <PencilIcon />
-                          </button>
-
-                          {/* Supprimer */}
-                          <button
-                            type="button"
-                            title="Supprimer le module"
-                            onClick={() => void handleDeleteModule(mod)}
-                            disabled={deleteModuleMutation.isPending}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-err-100 hover:text-err disabled:opacity-50"
-                          >
-                            <TrashIcon />
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+              <UeRow
+                key={ue.id}
+                ue={ue}
+                isOpen={isOpen}
+                isLast={isLast}
+                moduleCount={moduleCount}
+                deletePending={deleteUeMutation.isPending}
+                onToggle={() => toggleUe(ue.id)}
+                onEdit={() => setUeModal({ open: true, mode: 'edit', initial: ue })}
+                onDelete={() => void handleDeleteUe(ue)}
+                onAddModule={() => {
+                  setModuleModal({ open: true, mode: 'create', ueId: ue.id });
+                  if (!isOpen) toggleUe(ue.id);
+                }}
+                onEditModule={(mod) =>
+                  setModuleModal({ open: true, mode: 'edit', ueId: ue.id, initial: mod })
+                }
+              />
             );
           })}
         </div>
@@ -339,5 +194,226 @@ export default function UeModulesPage() {
         initial={moduleModal.open && moduleModal.mode === 'edit' ? moduleModal.initial : undefined}
       />
     </Shell>
+  );
+}
+
+// ── Ligne UE ──────────────────────────────────────────────────────────
+// Sortie en composant dédié pour pouvoir appeler `useUeModulesQuery`
+// conditionnellement par UE (les hooks doivent rester appelés au top
+// level d'un composant — un appel direct dans `.map(...)` planterait
+// les Rules of Hooks).
+
+interface UeRowProps {
+  ue: UEDto;
+  isOpen: boolean;
+  isLast: boolean;
+  moduleCount: number;
+  deletePending: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onAddModule: () => void;
+  onEditModule: (mod: ModuleV2Dto) => void;
+}
+
+function UeRow({
+  ue,
+  isOpen,
+  isLast,
+  moduleCount,
+  deletePending,
+  onToggle,
+  onEdit,
+  onDelete,
+  onAddModule,
+  onEditModule,
+}: UeRowProps) {
+  // Lazy fetch : ne part qu'à la première ouverture, reste en cache pour
+  // les ouvertures suivantes (staleTime: 30s). Mutations sur l'UE/module
+  // invalident automatiquement via `ueKeys.all`.
+  const modulesQuery = useUeModulesQuery(ue.id, { enabled: isOpen });
+  const modules = modulesQuery.data ?? [];
+
+  return (
+    <div className={!isLast ? 'border-b border-border-soft' : ''}>
+      {/* ── En-tête UE — toute la ligne est cliquable pour expand ── */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isOpen}
+        aria-label={`${isOpen ? 'Réduire' : 'Développer'} l'UE ${ue.libelle}`}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        className="flex cursor-pointer select-none items-center gap-3 px-5 py-3.5 transition-colors hover:bg-bg focus:outline-none focus-visible:bg-bg"
+        style={{ borderLeft: `4px solid ${ue.color}` }}
+      >
+        {/* Badge code */}
+        <ColorBadge code={ue.code} hex={ue.color} />
+
+        {/* Libellé */}
+        <span className="flex-1 font-semibold text-text">{ue.libelle}</span>
+
+        {/* Compteur modules — affiche moduleCount serveur (mode lite) */}
+        <span className="text-[13px] text-text-muted">
+          {moduleCount} module{moduleCount !== 1 ? 's' : ''}
+        </span>
+
+        {/* Éditer l'UE */}
+        <button
+          type="button"
+          title="Éditer l'UE"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-text"
+        >
+          <PencilIcon />
+        </button>
+
+        {/* Supprimer l'UE */}
+        <button
+          type="button"
+          title="Supprimer l'UE"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          disabled={deletePending}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-err-100 hover:text-err disabled:opacity-50"
+        >
+          <TrashIcon />
+        </button>
+
+        {/* Ajouter un module */}
+        <button
+          type="button"
+          title="Ajouter un module"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddModule();
+          }}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-accent"
+        >
+          <PlusIcon size={15} color="currentColor" />
+        </button>
+
+        {/* Chevron — purement décoratif (la ligne entière est le bouton) */}
+        <span
+          aria-hidden
+          className="flex h-7 w-7 items-center justify-center text-text-muted"
+          style={{
+            display: 'inline-flex',
+            transition: 'transform .2s ease',
+            transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+          }}
+        >
+          <ChevronRightIcon size={15} color="currentColor" />
+        </span>
+      </div>
+
+      {/* ── Liste modules (lazy-loaded à l'ouverture) ── */}
+      {isOpen ? (
+        <div className="border-t border-border-soft bg-bg">
+          <ModulesList
+            modules={modules}
+            isLoading={modulesQuery.isLoading}
+            isError={modulesQuery.isError}
+            onEdit={onEditModule}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+interface ModulesListProps {
+  modules: readonly ModuleV2Dto[];
+  isLoading: boolean;
+  isError: boolean;
+  onEdit: (mod: ModuleV2Dto) => void;
+}
+
+function ModulesList({ modules, isLoading, isError, onEdit }: ModulesListProps) {
+  const toast = useToast();
+  const deleteModuleMutation = useDeleteModuleMutation();
+
+  async function handleDeleteModule(mod: ModuleV2Dto) {
+    const confirmed = window.confirm(`Supprimer le module "${mod.libelle}" ?`);
+    if (!confirmed) return;
+    try {
+      await deleteModuleMutation.mutateAsync(mod.id);
+      toast.show('Module supprimé.', { variant: 'success' });
+    } catch {
+      toast.show('Impossible de supprimer le module.', { variant: 'error' });
+    }
+  }
+
+  if (isLoading) {
+    return <p className="px-14 py-3 text-[13px] text-text-muted">Chargement des modules…</p>;
+  }
+
+  if (isError) {
+    return <p className="px-14 py-3 text-[13px] text-err">Impossible de charger les modules.</p>;
+  }
+
+  if (modules.length === 0) {
+    return <p className="px-14 py-3 text-[13px] text-text-muted">Aucun module dans cette UE.</p>;
+  }
+
+  return (
+    <>
+      {modules.map((mod, mIdx) => (
+        <div
+          key={mod.id}
+          className={`flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface ${
+            mIdx < modules.length - 1 ? 'border-b border-border-soft' : ''
+          }`}
+          style={{ paddingLeft: '3rem' }}
+        >
+          {/* Indentation visuelle */}
+          <ColorBadge code={mod.code} hex={mod.color} />
+
+          {/* Libellé module */}
+          <span className="flex-1 text-[13px] text-text">{mod.libelle}</span>
+
+          {/* Ouvrir → edit module */}
+          <button
+            type="button"
+            onClick={() => onEdit(mod)}
+            className="flex h-7 items-center gap-1 rounded-lg border border-border px-2.5 text-[12px] font-medium text-text-muted transition-colors hover:border-accent hover:text-accent"
+          >
+            Ouvrir
+            <ChevronRightIcon size={12} color="currentColor" />
+          </button>
+
+          {/* Éditer */}
+          <button
+            type="button"
+            title="Modifier le module"
+            onClick={() => onEdit(mod)}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface hover:text-text"
+          >
+            <PencilIcon />
+          </button>
+
+          {/* Supprimer */}
+          <button
+            type="button"
+            title="Supprimer le module"
+            onClick={() => void handleDeleteModule(mod)}
+            disabled={deleteModuleMutation.isPending}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-err-100 hover:text-err disabled:opacity-50"
+          >
+            <TrashIcon />
+          </button>
+        </div>
+      ))}
+    </>
   );
 }
