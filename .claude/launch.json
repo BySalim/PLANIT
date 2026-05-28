@@ -9,6 +9,13 @@
       "autoPort": true
     },
     {
+      "name": "backend",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@planit/backend", "dev"],
+      "port": 3001,
+      "autoPort": false
+    },
+    {
       "name": "design",
       "runtimeExecutable": "python",
       "runtimeArgs": [".claude/start-design.py", "5500"],
