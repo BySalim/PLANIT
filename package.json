@@ -10,7 +10,9 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel --filter \"./apps/*\" dev",
+    "dev": "pnpm -r --parallel --filter \"./apps/*\" --filter \"!@planit/mobile\" dev",
+    "dev:mobile": "pnpm --filter @planit/mobile dev",
+    "dev:all": "pnpm -r --parallel --filter \"./apps/*\" dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
