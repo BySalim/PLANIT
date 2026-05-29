@@ -96,20 +96,42 @@ import Image from 'next/image';
 
 ## Favicon
 
-Next.js App Router détecte automatiquement `apps/web/src/app/icon.svg` et génère
-les balises `<link rel="icon">` appropriées. Aucune configuration supplémentaire requise.
+Le favicon est généré via [realfavicongenerator.net](https://realfavicongenerator.net)
+(package « Download », pas les packages Node). Les fichiers vivent dans
+`apps/web/public/favicon/` (servis sous `/favicon/…`) et sont câblés via
+l'**API Metadata** de Next.js dans
+[`apps/web/src/app/layout.tsx`](../apps/web/src/app/layout.tsx) (`metadata.icons`,
+`metadata.manifest`, `metadata.appleWebApp.title`) — **pas** de `<link>` brut dans le `<head>`.
 
-Pour un favicon `.ico` legacy (navigateurs très anciens) :
+> ⚠️ Ne **pas** remettre un `apps/web/src/app/icon.svg` (convention de fichier Next.js) :
+> il émettrait un `<link rel="icon">` en double qui écrase le favicon du package.
 
-1. Convertir `logo-color.svg` en PNG 32×32
-2. Placer en `apps/web/public/favicon.ico`
+Fichiers attendus dans `apps/web/public/favicon/` (sortie standard realfavicon) :
+
+| Fichier                        | Rôle                                       |
+| ------------------------------ | ------------------------------------------ |
+| `favicon.ico`                  | Favicon legacy + `rel="shortcut icon"`     |
+| `favicon.svg`                  | Favicon vectoriel (navigateurs récents)    |
+| `favicon-96x96.png`            | Favicon PNG 96×96                          |
+| `apple-touch-icon.png`         | Icône iOS 180×180                          |
+| `web-app-manifest-192x192.png` | Icône PWA 192 (référencée par le manifest) |
+| `web-app-manifest-512x512.png` | Icône PWA 512 (référencée par le manifest) |
+| `site.webmanifest`             | Web App Manifest (nom, icônes, thème)      |
+
+Pour mettre à jour le favicon : régénérer le package sur realfavicongenerator,
+remplacer les fichiers ci-dessus dans `public/favicon/`. Aucune modif de code
+nécessaire tant que les noms de fichiers restent identiques.
+
+> Note : les chemins d'icônes dans `site.webmanifest` sont absolus
+> (`/favicon/web-app-manifest-*.png`) — à garder cohérents si le dossier change.
 
 ---
 
 ## Historique
 
-| Date       | Action                                                                    | Auteur          |
-| ---------- | ------------------------------------------------------------------------- | --------------- |
-| 2026-05-21 | Couleurs `#593114` / `#EE7023` extraites d'Illustrator, tokens mis à jour | Salim           |
-| 2026-05-21 | `PlanitLogo` SVG prototype câblé avec couleurs exactes                    | Salim           |
-| 2026-05-21 | Export 5 variantes SVG → `public/brand/` + favicon `src/app/icon.svg`     | Libasse / Salim |
+| Date       | Action                                                                                                        | Auteur          |
+| ---------- | ------------------------------------------------------------------------------------------------------------- | --------------- |
+| 2026-05-21 | Couleurs `#593114` / `#EE7023` extraites d'Illustrator, tokens mis à jour                                     | Salim           |
+| 2026-05-21 | `PlanitLogo` SVG prototype câblé avec couleurs exactes                                                        | Salim           |
+| 2026-05-21 | Export 5 variantes SVG → `public/brand/` + favicon `src/app/icon.svg`                                         | Libasse / Salim |
+| 2026-05-29 | Favicon migré vers package realfavicongenerator (`public/favicon/` + Metadata API), `src/app/icon.svg` retiré | Salim           |
