@@ -18,18 +18,25 @@
 
 ### Icônes (calendrier + toque académique)
 
-| Fichier                                   | Usage                                           | Fond recommandé           | Couleurs SVG                     |
-| ----------------------------------------- | ----------------------------------------------- | ------------------------- | -------------------------------- |
-| `apps/web/public/brand/logo-color.svg`    | Header, documents, og:image, impression couleur | Blanc / clair             | `#593114` + `#EE7023`            |
-| `apps/web/public/brand/logo-color-3d.svg` | Splash screen, landing page, visuels marketing  | Blanc / clair             | Dégradés Illustrator (référence) |
-| `apps/web/public/brand/logo-mono.svg`     | Fond sombre, impression N&B, superposition      | Noir / sombre / `primary` | Blanc (#fff)                     |
+| Fichier                                   | Usage                                                                                                        | Fond recommandé                     | Couleurs SVG                     |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------- | -------------------------------- |
+| `apps/web/public/brand/logo-color.svg`    | Header, documents, og:image, impression couleur                                                              | Blanc / clair                       | `#593114` + `#EE7023`            |
+| `apps/web/public/brand/logo-color-3d.svg` | Splash screen, landing page, visuels marketing                                                               | Blanc / clair                       | Dégradés Illustrator (référence) |
+| `apps/web/public/brand/logo-mono.svg`     | **App — marque dans la boîte dégradée** (menu RP, headers enseignant/étudiant) ; fond sombre, impression N&B | Noir / sombre / dégradé / `primary` | Blanc (#fff)                     |
 
 ### Typographie & identité
 
-| Fichier                                   | Usage                                                                                  | Fond recommandé | Couleurs SVG            |
-| ----------------------------------------- | -------------------------------------------------------------------------------------- | --------------- | ----------------------- |
-| `apps/web/public/brand/logo-wordmark.svg` | Email, PDF, entêtes longs, documentation                                               | Blanc / clair   | `#613616` + `#E9640B` ¹ |
-| `apps/web/public/brand/icon.svg`          | Monogramme « lettre PLANIT » (badge, watermark) — voir § Favicon pour l'icône d'onglet | —               | Blanc (#fff)            |
+| Fichier                                         | Usage                                                                                  | Fond recommandé    | Couleurs SVG                    |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------ | ------------------------------- |
+| `apps/web/public/brand/logo-wordmark-white.svg` | **App — wordmark sur fond sombre** : menu RP                                           | Sombre / `primary` | Blanc `#fff` + orange `#e9640b` |
+| `apps/web/public/brand/logo-wordmark-color.svg` | **App — wordmark sur fond clair** : headers enseignant/étudiant, page login            | Blanc / clair      | `#613616` + `#e9640b`           |
+| `apps/web/public/brand/logo-wordmark.svg`       | Legacy — email, PDF, entêtes longs, documentation                                      | Blanc / clair      | `#613616` + `#E9640B` ¹         |
+| `apps/web/public/brand/icon.svg`                | Monogramme « lettre PLANIT » (badge, watermark) — voir § Favicon pour l'icône d'onglet | —                  | Blanc (#fff)                    |
+
+> **Logo lockup app** : dans le menu RP et les headers enseignant/étudiant, la marque
+> est un assemblage **icône (`logo-mono.svg`) dans une boîte dégradée + wordmark**.
+> Wordmark blanc (`-white`) sur fond sombre (menu RP), wordmark couleur (`-color`) sur
+> fond clair (enseignant/étudiant/login). Rendu via `<img>` (assets statiques `public/brand/`).
 
 > ¹ Le wordmark utilise `#613616` (marron) et `#E9640B` (orange), légèrement différents des tokens
 > `#593114` / `#EE7023` — intentionnel pour la lisibilité du texte à taille réduite.
@@ -128,9 +135,10 @@ nécessaire tant que les noms de fichiers restent identiques.
 
 ## Historique
 
-| Date       | Action                                                                                                        | Auteur          |
-| ---------- | ------------------------------------------------------------------------------------------------------------- | --------------- |
-| 2026-05-21 | Couleurs `#593114` / `#EE7023` extraites d'Illustrator, tokens mis à jour                                     | Salim           |
-| 2026-05-21 | `PlanitLogo` SVG prototype câblé avec couleurs exactes                                                        | Salim           |
-| 2026-05-21 | Export 5 variantes SVG → `public/brand/` + favicon `src/app/icon.svg`                                         | Libasse / Salim |
-| 2026-05-29 | Favicon migré vers package realfavicongenerator (`public/favicon/` + Metadata API), `src/app/icon.svg` retiré | Salim           |
+| Date       | Action                                                                                                                                               | Auteur          |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| 2026-05-21 | Couleurs `#593114` / `#EE7023` extraites d'Illustrator, tokens mis à jour                                                                            | Salim           |
+| 2026-05-21 | `PlanitLogo` SVG prototype câblé avec couleurs exactes                                                                                               | Salim           |
+| 2026-05-21 | Export 5 variantes SVG → `public/brand/` + favicon `src/app/icon.svg`                                                                                | Libasse / Salim |
+| 2026-05-29 | Favicon migré vers package realfavicongenerator (`public/favicon/` + Metadata API), `src/app/icon.svg` retiré                                        | Salim           |
+| 2026-05-29 | Nouveaux wordmarks `logo-wordmark-white/-color.svg` câblés (menu RP, headers enseignant/étudiant, login) ; `P`/`CalendarIcon` logo → `logo-mono.svg` | Salim           |
