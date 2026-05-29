@@ -26,11 +26,10 @@
 
 ### Typographie & identité
 
-| Fichier                                   | Usage                                    | Fond recommandé | Couleurs SVG            |
-| ----------------------------------------- | ---------------------------------------- | --------------- | ----------------------- |
-| `apps/web/public/brand/logo-wordmark.svg` | Email, PDF, entêtes longs, documentation | Blanc / clair   | `#613616` + `#E9640B` ¹ |
-| `apps/web/public/brand/icon.svg`          | Favicon (lettre PLANIT custom)           | —               | Blanc (#fff)            |
-| `apps/web/src/app/icon.svg`               | Favicon auto Next.js App Router          | —               | Blanc (#fff)            |
+| Fichier                                   | Usage                                                                                  | Fond recommandé | Couleurs SVG            |
+| ----------------------------------------- | -------------------------------------------------------------------------------------- | --------------- | ----------------------- |
+| `apps/web/public/brand/logo-wordmark.svg` | Email, PDF, entêtes longs, documentation                                               | Blanc / clair   | `#613616` + `#E9640B` ¹ |
+| `apps/web/public/brand/icon.svg`          | Monogramme « lettre PLANIT » (badge, watermark) — voir § Favicon pour l'icône d'onglet | —               | Blanc (#fff)            |
 
 > ¹ Le wordmark utilise `#613616` (marron) et `#E9640B` (orange), légèrement différents des tokens
 > `#593114` / `#EE7023` — intentionnel pour la lisibilité du texte à taille réduite.
