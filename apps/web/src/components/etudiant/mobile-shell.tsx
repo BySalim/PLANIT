@@ -119,11 +119,11 @@ function DesktopSidebar({
           aria-hidden
           className="bg-brand-gradient flex size-9 items-center justify-center rounded-lg text-white"
         >
-          <CalendarIcon size={18} color="currentColor" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/logo-mono.svg" alt="" className="size-6" />
         </span>
-        <span className="font-display text-[18px] font-bold tracking-tight text-primary">
-          PLANIT
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/logo-wordmark-color.svg" alt="PLANIT" className="h-[18px] w-auto" />
       </Link>
 
       {/* Navigation */}
@@ -221,11 +221,11 @@ function MobileHeader({
           aria-hidden
           className="bg-brand-gradient flex size-9 items-center justify-center rounded-lg text-white"
         >
-          <CalendarIcon size={18} color="currentColor" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/logo-mono.svg" alt="" className="size-6" />
         </span>
-        <span className="font-display text-[18px] font-bold tracking-tight text-primary">
-          PLANIT
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/logo-wordmark-color.svg" alt="PLANIT" className="h-[18px] w-auto" />
       </Link>
       <div className="flex items-center gap-2">
         <button

@@ -40,7 +40,14 @@ export default function LoginPage() {
   return (
     <div className="w-full max-w-sm px-4">
       <div className="mb-8 text-center">
-        <h1 className="font-display text-3xl font-bold text-primary">PLANIT</h1>
+        <h1>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/logo-wordmark-color.svg"
+            alt="PLANIT"
+            className="mx-auto block h-10 w-auto"
+          />
+        </h1>
         <p className="mt-1 text-sm text-text-muted">ISM Dakar — Gestion des emplois du temps</p>
       </div>
 

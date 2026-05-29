@@ -18,19 +18,25 @@
 
 ### Icônes (calendrier + toque académique)
 
-| Fichier                                   | Usage                                           | Fond recommandé           | Couleurs SVG                     |
-| ----------------------------------------- | ----------------------------------------------- | ------------------------- | -------------------------------- |
-| `apps/web/public/brand/logo-color.svg`    | Header, documents, og:image, impression couleur | Blanc / clair             | `#593114` + `#EE7023`            |
-| `apps/web/public/brand/logo-color-3d.svg` | Splash screen, landing page, visuels marketing  | Blanc / clair             | Dégradés Illustrator (référence) |
-| `apps/web/public/brand/logo-mono.svg`     | Fond sombre, impression N&B, superposition      | Noir / sombre / `primary` | Blanc (#fff)                     |
+| Fichier                                   | Usage                                                                                                        | Fond recommandé                     | Couleurs SVG                     |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------- | -------------------------------- |
+| `apps/web/public/brand/logo-color.svg`    | Header, documents, og:image, impression couleur                                                              | Blanc / clair                       | `#593114` + `#EE7023`            |
+| `apps/web/public/brand/logo-color-3d.svg` | Splash screen, landing page, visuels marketing                                                               | Blanc / clair                       | Dégradés Illustrator (référence) |
+| `apps/web/public/brand/logo-mono.svg`     | **App — marque dans la boîte dégradée** (menu RP, headers enseignant/étudiant) ; fond sombre, impression N&B | Noir / sombre / dégradé / `primary` | Blanc (#fff)                     |
 
 ### Typographie & identité
 
-| Fichier                                   | Usage                                    | Fond recommandé | Couleurs SVG            |
-| ----------------------------------------- | ---------------------------------------- | --------------- | ----------------------- |
-| `apps/web/public/brand/logo-wordmark.svg` | Email, PDF, entêtes longs, documentation | Blanc / clair   | `#613616` + `#E9640B` ¹ |
-| `apps/web/public/brand/icon.svg`          | Favicon (lettre PLANIT custom)           | —               | Blanc (#fff)            |
-| `apps/web/src/app/icon.svg`               | Favicon auto Next.js App Router          | —               | Blanc (#fff)            |
+| Fichier                                         | Usage                                                                                  | Fond recommandé    | Couleurs SVG                    |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------ | ------------------------------- |
+| `apps/web/public/brand/logo-wordmark-white.svg` | **App — wordmark sur fond sombre** : menu RP                                           | Sombre / `primary` | Blanc `#fff` + orange `#e9640b` |
+| `apps/web/public/brand/logo-wordmark-color.svg` | **App — wordmark sur fond clair** : headers enseignant/étudiant, page login            | Blanc / clair      | `#613616` + `#e9640b`           |
+| `apps/web/public/brand/logo-wordmark.svg`       | Legacy — email, PDF, entêtes longs, documentation                                      | Blanc / clair      | `#613616` + `#E9640B` ¹         |
+| `apps/web/public/brand/icon.svg`                | Monogramme « lettre PLANIT » (badge, watermark) — voir § Favicon pour l'icône d'onglet | —                  | Blanc (#fff)                    |
+
+> **Logo lockup app** : dans le menu RP et les headers enseignant/étudiant, la marque
+> est un assemblage **icône (`logo-mono.svg`) dans une boîte dégradée + wordmark**.
+> Wordmark blanc (`-white`) sur fond sombre (menu RP), wordmark couleur (`-color`) sur
+> fond clair (enseignant/étudiant/login). Rendu via `<img>` (assets statiques `public/brand/`).
 
 > ¹ Le wordmark utilise `#613616` (marron) et `#E9640B` (orange), légèrement différents des tokens
 > `#593114` / `#EE7023` — intentionnel pour la lisibilité du texte à taille réduite.
@@ -96,20 +102,43 @@ import Image from 'next/image';
 
 ## Favicon
 
-Next.js App Router détecte automatiquement `apps/web/src/app/icon.svg` et génère
-les balises `<link rel="icon">` appropriées. Aucune configuration supplémentaire requise.
+Le favicon est généré via [realfavicongenerator.net](https://realfavicongenerator.net)
+(package « Download », pas les packages Node). Les fichiers vivent dans
+`apps/web/public/favicon/` (servis sous `/favicon/…`) et sont câblés via
+l'**API Metadata** de Next.js dans
+[`apps/web/src/app/layout.tsx`](../apps/web/src/app/layout.tsx) (`metadata.icons`,
+`metadata.manifest`, `metadata.appleWebApp.title`) — **pas** de `<link>` brut dans le `<head>`.
 
-Pour un favicon `.ico` legacy (navigateurs très anciens) :
+> ⚠️ Ne **pas** remettre un `apps/web/src/app/icon.svg` (convention de fichier Next.js) :
+> il émettrait un `<link rel="icon">` en double qui écrase le favicon du package.
 
-1. Convertir `logo-color.svg` en PNG 32×32
-2. Placer en `apps/web/public/favicon.ico`
+Fichiers attendus dans `apps/web/public/favicon/` (sortie standard realfavicon) :
+
+| Fichier                        | Rôle                                       |
+| ------------------------------ | ------------------------------------------ |
+| `favicon.ico`                  | Favicon legacy + `rel="shortcut icon"`     |
+| `favicon.svg`                  | Favicon vectoriel (navigateurs récents)    |
+| `favicon-96x96.png`            | Favicon PNG 96×96                          |
+| `apple-touch-icon.png`         | Icône iOS 180×180                          |
+| `web-app-manifest-192x192.png` | Icône PWA 192 (référencée par le manifest) |
+| `web-app-manifest-512x512.png` | Icône PWA 512 (référencée par le manifest) |
+| `site.webmanifest`             | Web App Manifest (nom, icônes, thème)      |
+
+Pour mettre à jour le favicon : régénérer le package sur realfavicongenerator,
+remplacer les fichiers ci-dessus dans `public/favicon/`. Aucune modif de code
+nécessaire tant que les noms de fichiers restent identiques.
+
+> Note : les chemins d'icônes dans `site.webmanifest` sont absolus
+> (`/favicon/web-app-manifest-*.png`) — à garder cohérents si le dossier change.
 
 ---
 
 ## Historique
 
-| Date       | Action                                                                    | Auteur          |
-| ---------- | ------------------------------------------------------------------------- | --------------- |
-| 2026-05-21 | Couleurs `#593114` / `#EE7023` extraites d'Illustrator, tokens mis à jour | Salim           |
-| 2026-05-21 | `PlanitLogo` SVG prototype câblé avec couleurs exactes                    | Salim           |
-| 2026-05-21 | Export 5 variantes SVG → `public/brand/` + favicon `src/app/icon.svg`     | Libasse / Salim |
+| Date       | Action                                                                                                                                               | Auteur          |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| 2026-05-21 | Couleurs `#593114` / `#EE7023` extraites d'Illustrator, tokens mis à jour                                                                            | Salim           |
+| 2026-05-21 | `PlanitLogo` SVG prototype câblé avec couleurs exactes                                                                                               | Salim           |
+| 2026-05-21 | Export 5 variantes SVG → `public/brand/` + favicon `src/app/icon.svg`                                                                                | Libasse / Salim |
+| 2026-05-29 | Favicon migré vers package realfavicongenerator (`public/favicon/` + Metadata API), `src/app/icon.svg` retiré                                        | Salim           |
+| 2026-05-29 | Nouveaux wordmarks `logo-wordmark-white/-color.svg` câblés (menu RP, headers enseignant/étudiant, login) ; `P`/`CalendarIcon` logo → `logo-mono.svg` | Salim           |

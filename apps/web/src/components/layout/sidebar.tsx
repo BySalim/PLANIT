@@ -186,16 +186,14 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
         >
           <div className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-sb-dark-2">
             <div className="bg-brand-gradient flex h-8 w-8 items-center justify-center rounded-lg">
-              <span className="font-display text-[13px] font-bold leading-none tracking-tight text-white">
-                P
-              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/logo-mono.svg" alt="" className="size-6" />
             </div>
           </div>
           {!collapsed ? (
             <div className="min-w-0 flex-1">
-              <div className="font-display text-[19px] font-bold leading-none tracking-tight text-white">
-                PLANIT
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/logo-wordmark-white.svg" alt="PLANIT" className="h-[18px] w-auto" />
               <div className="mt-1 truncate text-[10.5px] font-medium tracking-wider text-sb-dark-muted">
                 ÉCOLE D&apos;INGÉNIEURS · ISM
               </div>
