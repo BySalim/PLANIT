@@ -5,6 +5,7 @@ import { startOfWeek } from 'date-fns';
 import { io, type Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import type { SessionDto } from '@planit/contracts';
+import { useAuth } from '@/contexts/auth-context';
 import { API_BASE } from '@/lib/api';
 import { planningKeys } from '@/lib/queries';
 import { toWeekStartParam } from '@/lib/week';
@@ -71,9 +72,16 @@ export function useRealtimeSessions(
   const { onPublished, showToast = true } = options;
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { state } = useAuth();
+  // Pas de socket sans cookie d'auth : le backend refuserait le handshake et,
+  // pire, en CI Lighthouse (où le backend ne tourne pas), la tentative de
+  // connexion `connection refused` polluerait la console — déclenche l'audit
+  // `errors-in-console`. Le hook redémarre tout seul dès que l'auth devient
+  // valide (state.status dans le array de dépendances).
+  const isAuthenticated = state.status === 'authenticated';
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !isAuthenticated) {
       return;
     }
 
@@ -108,5 +116,5 @@ export function useRealtimeSessions(
     return () => {
       socket.disconnect();
     };
-  }, [enabled, queryClient, toast, onPublished, showToast]);
+  }, [enabled, isAuthenticated, queryClient, toast, onPublished, showToast]);
 }
