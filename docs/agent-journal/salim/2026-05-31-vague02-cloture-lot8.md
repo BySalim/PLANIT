@@ -116,3 +116,29 @@
 - **CLAUDE.md** : sous-section « Patterns émergés clôture Vague 02 (2026-05-31) » ajoutée + alignement Lighthouse.
 - **Tech-debt** : 3 entrées `TD-LH-*` marquées résolues + `TD-LH-WEIGHT` retiré du blocage.
 - **Strategie repo** : README + scenarios + lots commités sur `master`, pushés.
+
+## 9. Addendum — pivot Lighthouse (commit `a748a15`)
+
+Le 1er commit Phase A (`8fc3510`) ne suffisait pas : avec le label `lighthouse-strict`, le job CI a fail sur **5 audits** (et 5 warnings supplémentaires). Le diagnostic du rapport HTML LH a révélé que :
+
+- Les **scores des catégories** sont en réalité excellents : `performance 0.97`, `accessibility 1.0`, `best-practices 0.96`, `seo 1.0`.
+- Le preset `lighthouse:no-pwa` met **toutes** les ~50 assertions individuelles à `error`. Le label rend strict 11+ audits non listés dans le runbook (qui n'en mentionnait que 4).
+- `errors-in-console` à 0 = 2 entrées seulement : 401 sur `/api/auth/me` (visite anonyme = comportement attendu) + 404 sur `/favicon.ico` (favicon dans `/public/favicon/` pas à la racine).
+- `csp-xss` à 0 = LH exige `'strict-dynamic'` + nonce par requête (notre `'unsafe-inline'` est insuffisant).
+- `total-byte-weight` à 0 = 305 KiB observés (sous le seuil critique mais le scoring strict LH veut < 100 KiB).
+
+Décision (Salim, en cours de session) : **option 2 — adapter la politique** (garder strict ce qui est non-négociable, rétrograder en warn les audits qui demandent un chantier dédié hors V02). Cf. journal de décision dans le commit message du commit `a748a15`.
+
+Changements du pivot :
+
+- `apps/web/public/favicon.ico` créé (copie depuis `/public/favicon/favicon.ico`)
+- Logos PLANIT (wordmark + mono) gagnent `width`/`height` explicites + `fetchPriority="high"` sur /login
+- `<link rel="preload">` du logo wordmark dans `LoginLayout` (résout `prioritize-lcp-image`)
+- `.github/lighthouserc.json` : 11 audits passés à `warn` (csp-xss, errors-in-console, total-byte-weight, prioritize-lcp-image, 5 audits perf, 3 audits cache)
+- `docs/runbooks/ci-lighthouse.md` : section seuils ré-écrite avec justification audit par audit
+- `docs/tech-debt.md` : `TD-LH-CSP-NONCE`, `TD-LH-CONSOLE-AUTHME`, `TD-LH-PERF` consolidés (les anciens `TD-LH-CSP`/`CONSOLE`/`WEIGHT` étaient marqués résolus à tort)
+- CLAUDE.md : section Lighthouse mise à jour pour refléter la nouvelle politique
+
+**Justification de la politique** : préserver la valeur (l'a11y et perf catégorielles restent strictes, les a11y critiques restent strictes, les régressions futures seront détectées) **tout en évitant** que des audits hors scope V02 ne bloquent une release légitime. La barre peut monter audit par audit quand on adresse les TD-LH-\*.
+
+**Phase CHECK pivot** : typecheck + lint + 36/36 tests + preview `/login` OK (landmark, console propre).
