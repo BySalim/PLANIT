@@ -1,25 +1,44 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { loginSchema, type LoginDto } from '@planit/contracts';
 import { useAuth, ROLE_HOME } from '@/contexts/auth-context';
+import { safeReturnUrl } from '@/lib/return-url';
 
+// Next 15 : useSearchParams() exige un boundary <Suspense> pour le prerender.
 // Next.js App Router requires default export for page
 // eslint-disable-next-line no-restricted-syntax
 export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-primary" />
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const { state, login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [serverError, setServerError] = useState<string | null>(null);
 
-  // Redirige si déjà authentifié
+  // Destination post-login : la page demandée avant la redirection vers /login
+  // (returnUrl, validée anti open-redirect), sinon la home du rôle.
+  const returnUrl = safeReturnUrl(searchParams.get('returnUrl'));
+
+  // Redirige si déjà authentifié (ex. retour sur /login avec un cookie valide).
   useEffect(() => {
     if (state.status === 'authenticated') {
-      router.replace(ROLE_HOME[state.user.role] ?? '/rp');
+      router.replace(returnUrl ?? ROLE_HOME[state.user.role] ?? '/rp');
     }
-  }, [state, router]);
+  }, [state, router, returnUrl]);
 
   const {
     register,
@@ -31,7 +50,7 @@ export default function LoginPage() {
     setServerError(null);
     try {
       const user = await login(data.email, data.password);
-      router.replace(ROLE_HOME[user.role] ?? '/rp');
+      router.replace(returnUrl ?? ROLE_HOME[user.role] ?? '/rp');
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Une erreur est survenue');
     }

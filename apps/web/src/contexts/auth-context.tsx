@@ -50,32 +50,38 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
   useEffect(() => {
     // AbortController : annule le fetch en vol au démontage du Provider.
-    // Sans ça, en environnement de test (jsdom) où le composant est
-    // démonté avant la résolution, `dispatch` est appelé après tear-down
-    // → React 19 lève `ReferenceError: window is not defined` (cf. CI
-    // logs PR #35). Garde aussi anti-leak pour HMR / route changes.
+    // Sans ça, en environnement de test (jsdom) où le composant est démonté
+    // avant la résolution, `dispatch` est appelé après tear-down → React 19
+    // lève `ReferenceError: window is not defined` (cf. CI logs PR #35).
+    //
+    // IMPORTANT (StrictMode dev) : on **ne** conditionne **pas** le chemin de
+    // succès à un flag `cancelled` que le cleanup mettrait à `true`. Sous le
+    // double-invoke StrictMode (setup → cleanup → setup), le 1er fetch peut
+    // résoudre juste après que le cleanup ait posé `cancelled=true`, et son
+    // handler serait alors skippé → l'app reste bloquée en `loading`. À la
+    // place : tout fetch qui résout dispatche ; on n'ignore QUE les rejets
+    // dus à l'abort (via `signal.aborted`). Le proxy same-origin (rapide) a
+    // révélé cette race ; le fetch survivant (2e mount) dispatche toujours.
     const controller = new AbortController();
-    let cancelled = false;
 
     fetch(`${API_BASE}/auth/me`, { credentials: 'include', signal: controller.signal })
       .then(async (r) => {
-        if (cancelled) return;
         if (!r.ok) {
           dispatch({ type: 'CLEAR_USER' });
           return;
         }
         const raw: unknown = await r.json();
-        if (cancelled) return;
         const parsed = authMeSchema.safeParse(raw);
         dispatch(parsed.success ? { type: 'SET_USER', user: parsed.data } : { type: 'CLEAR_USER' });
       })
       .catch(() => {
-        if (cancelled) return;
+        // Abort (cleanup/unmount) → on ne touche pas au state. Toute autre
+        // erreur (réseau, backend down) → non authentifié.
+        if (controller.signal.aborted) return;
         dispatch({ type: 'CLEAR_USER' });
       });
 
     return () => {
-      cancelled = true;
       controller.abort();
     };
   }, []);
@@ -101,7 +107,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     }
 
     const raw: unknown = await r.json();
-    // Le backend retourne { user: AuthMeDto } (cf. A.1)
+    // Le backend `POST /auth/login` retourne directement l'`AuthMeDto`
+    // (cf. apps/backend/src/auth/auth.controller.ts → `return user`), pas un
+    // wrapper `{ user }`. Les cookies access+refresh sont posés en HttpOnly.
     const parsed = authMeSchema.safeParse(raw);
     if (!parsed.success) throw new Error('Réponse inattendue du serveur');
 

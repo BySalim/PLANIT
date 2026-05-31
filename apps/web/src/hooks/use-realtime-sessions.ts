@@ -6,7 +6,7 @@ import { io, type Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import type { SessionDto } from '@planit/contracts';
 import { useAuth } from '@/contexts/auth-context';
-import { API_BASE } from '@/lib/api';
+import { WS_URL } from '@/lib/api';
 import { planningKeys } from '@/lib/queries';
 import { toWeekStartParam } from '@/lib/week';
 import { useToast } from '@/components/ui/toast-provider';
@@ -89,7 +89,7 @@ export function useRealtimeSessions(
     // au handshake (cf. `ws.gateway.ts`). On envoie donc les cookies via
     // `withCredentials: true`. Le `userId` reste utile uniquement comme clé
     // de dépendance React pour réinitialiser le socket quand l'acteur change.
-    const socket: Socket = io(API_BASE, { withCredentials: true });
+    const socket: Socket = io(WS_URL, { withCredentials: true });
 
     socket.on('session:published', (payload?: SessionPublishedPayload) => {
       const sessions = payload?.sessions;

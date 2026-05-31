@@ -1,4 +1,13 @@
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3001/api';
+// Same-origin par défaut : les requêtes HTTP partent en relatif `/api/...` et
+// sont proxifiées vers le backend par Next (dev, cf. next.config.ts) ou Caddy
+// (prod). Cookies d'auth first-party, pas de CORS, dev == prod.
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '/api';
+
+// Le WebSocket (socket.io) ne passe pas par le proxy HTTP : il vise le backend
+// en absolu. Le cookie d'auth first-party (posé via le proxy) reste envoyé en
+// same-site à `:3001` lors du handshake. En prod, surcharger via
+// NEXT_PUBLIC_WS_URL selon le routage Caddy.
+export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:3001/api';
 
 export interface ResponseParser<T> {
   safeParse(raw: unknown): { success: true; data: T } | { success: false; error: unknown };
