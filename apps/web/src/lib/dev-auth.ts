@@ -41,7 +41,7 @@ export function actorFromPathname(pathname: string): ActorRoute | null {
 
 async function checkAuth(): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/api/auth/me`, {
+    const res = await fetch(`${API_BASE}/auth/me`, {
       credentials: 'include',
     });
     return res.ok;
@@ -52,7 +52,7 @@ async function checkAuth(): Promise<boolean> {
 
 async function devLogin(account: DevAccount): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

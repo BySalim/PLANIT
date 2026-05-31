@@ -4,15 +4,24 @@ import type { NextConfig } from 'next';
 // - Next.js + React 19 hydratent via des <script> inline → `'unsafe-inline'`
 //   reste requis sur `script-src` tant qu'on n'a pas migré vers nonce-based
 //   (chantier séparé, trace : TD-LH-CSP-NONCE à créer si besoin).
+// - **`'unsafe-eval'` UNIQUEMENT en dev** : le bundler de Next dev (webpack,
+//   `devtool: eval-source-map`) enveloppe chaque module client dans `eval()`.
+//   Sans cette directive en dev, le navigateur bloque l'exécution → React
+//   n'hydrate JAMAIS → app entièrement non-interactive (login, effets, etc.).
+//   En prod, pas d'eval : on garde la CSP stricte validée par Lighthouse.
 // - Le `connect-src` autorise localhost:3001 pour le dev/local (backend HTTP
 //   et WebSocket). En prod l'origine viendra de NEXT_PUBLIC_API_BASE — la
 //   politique reste compatible (le scheme/host correspondant doit être
 //   ajouté lors du déploiement, cf. TD futur sur la CSP prod).
 // - `object-src 'none'` + `base-uri 'self'` + `frame-ancestors 'none'` :
 //   blocage anti-XSS / clickjacking exigé par Lighthouse `csp-xss`.
+const isDev = process.env.NODE_ENV !== 'production';
+const scriptSrc = isDev
+  ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+  : "script-src 'self' 'unsafe-inline'";
 const CSP_DIRECTIVES = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  scriptSrc,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   "img-src 'self' data: blob:",
@@ -23,10 +32,23 @@ const CSP_DIRECTIVES = [
   "frame-ancestors 'none'",
 ].join('; ');
 
+// Origine du backend NestJS visée par le proxy `/api` (dev). En prod, Caddy
+// joue ce rôle (cf. infra/caddy/Caddyfile.dev) — front et API sont servis sur
+// la même origine. On reproduit ce modèle en dev pour que les cookies d'auth
+// HttpOnly soient *first-party* sur localhost:3000 (sinon, en cross-origin
+// direct vers :3001, leur persistance/lecture par le middleware est fragile).
+const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN ?? 'http://localhost:3001';
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Workspace packages shipped as TypeScript source must be transpiled by Next.
   transpilePackages: ['@planit/ui', '@planit/design-tokens', '@planit/contracts', '@planit/utils'],
+  // Proxy same-origin : toute requête `/api/*` du front est relayée vers le
+  // backend. Next forwarde `Set-Cookie`/`Cookie`, donc le cookie d'auth est
+  // posé et lu comme first-party. `middleware.ts` peut alors le voir.
+  async rewrites() {
+    return [{ source: '/api/:path*', destination: `${BACKEND_ORIGIN}/api/:path*` }];
+  },
   async headers() {
     return [
       {
