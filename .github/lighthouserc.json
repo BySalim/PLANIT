@@ -15,7 +15,20 @@
         "categories:performance": ["error", { "minScore": 0.85 }],
         "categories:accessibility": ["error", { "minScore": 0.9 }],
         "categories:best-practices": ["warn", { "minScore": 0.8 }],
-        "categories:seo": "off"
+        "categories:seo": "off",
+
+        "csp-xss": "warn",
+        "errors-in-console": "warn",
+        "total-byte-weight": "warn",
+        "prioritize-lcp-image": "warn",
+        "bootup-time": "warn",
+        "dom-size": "warn",
+        "mainthread-work-breakdown": "warn",
+        "server-response-time": "warn",
+        "largest-contentful-paint": "warn",
+        "unused-javascript": "warn",
+        "render-blocking-resources": "warn",
+        "uses-long-cache-ttl": "warn"
       }
     }
   }

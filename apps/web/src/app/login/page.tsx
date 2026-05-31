@@ -45,6 +45,13 @@ export default function LoginPage() {
           <img
             src="/brand/logo-wordmark-color.svg"
             alt="PLANIT"
+            // width/height explicites pour `unsized-images` LH (CLS).
+            // Valeurs = ratio natif du viewBox SVG (407x88) ; le CSS h-10 w-auto
+            // ré-impose la taille finale, ces attributs ne servent qu'à
+            // réserver le slot avant chargement.
+            width={407}
+            height={88}
+            fetchPriority="high"
             className="mx-auto block h-10 w-auto"
           />
         </h1>
