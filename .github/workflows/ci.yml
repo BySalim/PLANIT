@@ -118,6 +118,36 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'pull_request'
+    # Postgres + backend en background pour que le fetch initial `/auth/me`
+    # depuis le AuthProvider (root layout) retourne un 401 propre au lieu
+    # d'un `net::ERR_CONNECTION_REFUSED` qui pollue la console et fait
+    # tomber l'audit `errors-in-console`. Le backend reçoit les requêtes
+    # mais répond 401 puisque l'audit Lighthouse n'a pas de cookie — c'est
+    # le comportement attendu.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: planit
+          POSTGRES_PASSWORD: planit
+          POSTGRES_DB: planit_lh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U planit -d planit_lh"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://planit:planit@localhost:5432/planit_lh
+      # Secrets dummy : aucun token n'est signé/vérifié pendant l'audit
+      # (Lighthouse n'a pas de cookie). Suffisants pour faire booter le
+      # backend.
+      JWT_ACCESS_SECRET: lh_dummy_access_secret_at_least_32_chars_long
+      JWT_REFRESH_SECRET: lh_dummy_refresh_secret_at_least_32_chars_long
+      JWT_ACCESS_TTL: '900'
+      JWT_REFRESH_TTL: '604800'
+      FRONTEND_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
 
@@ -130,6 +160,32 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Le backend est consommé par Next.js client-side dès le mount du
+      # AuthProvider (root layout). Sans lui, `fetch('/api/auth/me')` lance
+      # un `ERR_CONNECTION_REFUSED` que Chrome log en console → fail LH.
+      - name: Prisma migrate deploy (LH backend)
+        working-directory: apps/backend
+        run: |
+          pnpm prisma migrate deploy
+          pnpm prisma generate
+
+      # Les packages CJS doivent exister avant `nest build`.
+      - name: Build internal packages (contracts + utils)
+        run: |
+          pnpm --filter @planit/contracts build
+          pnpm --filter @planit/utils build
+
+      - name: Build backend
+        working-directory: apps/backend
+        run: pnpm build
+
+      - name: Start backend (background)
+        working-directory: apps/backend
+        run: nohup pnpm start > backend.log 2>&1 &
+
+      - name: Wait for backend
+        run: npx --yes wait-on http://localhost:3001/api/health --timeout 60000
 
       - name: Build web (production)
         working-directory: apps/web

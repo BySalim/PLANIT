@@ -14,6 +14,7 @@ import {
   filiereSchema,
   z,
 } from '@planit/contracts';
+import { useAuth } from '@/contexts/auth-context';
 import { apiGet } from './api';
 import { toWeekStartParam } from './week';
 
@@ -34,6 +35,8 @@ export function useWeekSessionsQuery(
   weekStart: Date,
   options?: { teacherId?: string; studentId?: string },
 ) {
+  const { state } = useAuth();
+  const isAuthenticated = state.status === 'authenticated';
   const weekStartParam = toWeekStartParam(weekStart);
   const teacherId = options?.teacherId;
   const studentId = options?.studentId;
@@ -53,22 +56,32 @@ export function useWeekSessionsQuery(
   return useQuery<SessionDto[]>({
     queryKey,
     queryFn: () => apiGet(`/sessions?${params.toString()}`, sessionListSchema),
+    // Évite un fetch sortant avant que RequireAuth ait redirigé un visiteur
+    // non auth : la console resterait propre pour Lighthouse `errors-in-console`
+    // (sinon le `connection refused` quand le backend n'est pas joignable
+    // — typique CI LH sans backend — pollue la console).
+    enabled: isAuthenticated,
   });
 }
 
 export function useWeekStatsQuery(weekStart: Date) {
+  const { state } = useAuth();
+  const isAuthenticated = state.status === 'authenticated';
   const weekStartParam = toWeekStartParam(weekStart);
   return useQuery<SessionStatsDto>({
     queryKey: planningKeys.stats(weekStartParam),
     queryFn: () => apiGet(`/sessions/stats?weekStart=${weekStartParam}`, sessionStatsSchema),
+    enabled: isAuthenticated,
   });
 }
 
 export function useSessionDetailQuery(sessionId: string | null) {
+  const { state } = useAuth();
+  const isAuthenticated = state.status === 'authenticated';
   return useQuery<SessionDto>({
     queryKey: planningKeys.session(sessionId ?? ''),
     queryFn: () => apiGet(`/sessions/${sessionId}`, sessionSchema),
-    enabled: sessionId !== null,
+    enabled: sessionId !== null && isAuthenticated,
   });
 }
 

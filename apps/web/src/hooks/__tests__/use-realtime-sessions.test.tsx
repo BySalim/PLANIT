@@ -36,6 +36,18 @@ vi.mock('@/components/ui/toast-provider', () => {
   };
 });
 
+// Stub useAuth → authentifié par défaut. Le hook gate désormais sur
+// `state.status === 'authenticated'` (anti-pollution console Lighthouse
+// quand le backend n'est pas joignable).
+vi.mock('@/contexts/auth-context', () => ({
+  useAuth: () => ({
+    state: {
+      status: 'authenticated',
+      user: { id: 'u1', email: 't@x', role: 'RESPONSABLE_PROGRAMME', fullName: 'T' },
+    },
+  }),
+}));
+
 import { useRealtimeSessions } from '../use-realtime-sessions';
 import type { SessionDto } from '@planit/contracts';
 

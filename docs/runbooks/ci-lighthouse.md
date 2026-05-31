@@ -74,9 +74,18 @@ Les catégories globales :
 | Best Practices | warn   | ≥ 0.8  |
 | SEO            | off    | —      |
 
-Le preset `lighthouse:no-pwa` ajoute par-dessus une cinquantaine d'assertions individuelles (audits unitaires). Quatre de ces audits échouent actuellement à cause de dettes pré-existantes — voir `docs/tech-debt.md` (entrées `TD-LH-*`).
+Le preset `lighthouse:no-pwa` ajoute par-dessus une cinquantaine d'assertions individuelles (audits unitaires), toutes à niveau `error` par défaut. **Onze de ces audits sont explicitement downgrade à `warn`** dans la config — ce sont des audits qui demandent un chantier dédié (sécurité prod, sprint perf) ou qui mesurent un comportement légitime (401 audit sans cookie). Liste et justification :
 
-> ⚠️ **Important** : on n'a **pas** downgrade ces 4 audits à `warn` dans `lighthouserc.json`. Ils restent à `error`. La raison : quand quelqu'un applique le label `lighthouse-strict`, on veut que ces audits soient bel et bien bloquants. C'est ce qui forcera l'équipe à les fixer un jour. Si on les passait à `warn` permanents, on aurait perdu le levier.
+| Audit downgrade à `warn`                                                                                   | Pourquoi                                                                                                                                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `csp-xss`                                                                                                  | Notre CSP utilise `'unsafe-inline'` sur `script-src` (Next.js + React 19 hydration). LH exige `'strict-dynamic'` + nonce par requête — chantier `next.config` + middleware = sprint sécurité prod (TD-LH-CSP-NONCE).                                           |
+| `errors-in-console`                                                                                        | Chrome log les `fetch` 401 en console. Notre `/api/auth/me` retourne 401 pour visite anonyme — comportement légitime de l'app, pas un bug. Pour repasser en `error`, changer le contrat backend (`/auth/me` → 200 + `{user: null}`) ou auditer LH avec cookie. |
+| `total-byte-weight`                                                                                        | App interne campus ; 305 KiB observés bien sous le seuil critique mais le scoring strict LH veut < 100 KiB. Sprint perf dédié = TD-LH-PERF.                                                                                                                    |
+| `prioritize-lcp-image`                                                                                     | Logo wordmark = LCP de /login. Preload posé via `<link rel="preload">` ; reste en warn pendant qu'on observe l'effet réel.                                                                                                                                     |
+| `bootup-time`, `dom-size`, `mainthread-work-breakdown`, `server-response-time`, `largest-contentful-paint` | Audits perf au scoring strict. Catégorie `performance` ≥ 0.85 reste en `error` (on score 0.97 actuellement) ; les audits individuels sont des indicateurs de tendance.                                                                                         |
+| `unused-javascript`, `render-blocking-resources`, `uses-long-cache-ttl`                                    | Sub-optimal mais hors scope V02 (sprint perf et déploiement Caddy à venir).                                                                                                                                                                                    |
+
+> ⚠️ **Important** : `landmark-one-main`, `image-alt`, `unsized-images`, `html-has-lang`, `meta-viewport`, `color-contrast`, et tous les autres audits a11y critiques **restent à `error`**. C'est le levier qui empêche les régressions sur la base accessibilité.
 
 ---
 
@@ -122,9 +131,7 @@ Le label peut être créé une fois pour toutes via `gh label create lighthouse-
 
 ### « Lighthouse échoue mais c'est de la dette qui n'est pas de mon fait »
 
-Normal — Lighthouse tourne sur toutes les PRs maintenant et exhume les dettes existantes (CSP, console errors, missing `<main>`, bundle weight). Voir `TD-LH-*` dans `docs/tech-debt.md`.
-
-Si tu vois un audit qui fail et qui n'est pas tracé en tech-debt, **trace-le toi-même** (ou pingue Salim) — c'est probablement une nouvelle dette à inscrire.
+Normal — Lighthouse tourne sur toutes les PRs et peut exhumer des dettes existantes. Vérifier d'abord si l'audit est listé dans le tableau des `warn` ci-dessus (si oui, ça génère seulement un warning, pas un fail). Sinon, c'est probablement une nouvelle dette → la tracer dans `docs/tech-debt.md` (entrée `TD-LH-NN`) avant de re-push.
 
 ---
 

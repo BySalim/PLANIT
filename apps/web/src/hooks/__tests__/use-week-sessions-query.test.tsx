@@ -2,6 +2,20 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { PropsWithChildren, ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Stub useAuth → authentifié par défaut : les hooks gate désormais sur
+// `state.status === 'authenticated'` pour éviter les fetch sortants avant
+// que RequireAuth ait redirigé un visiteur non auth (audit Lighthouse
+// `errors-in-console`). Les tests vérifient ici le comportement nominal.
+vi.mock('@/contexts/auth-context', () => ({
+  useAuth: () => ({
+    state: {
+      status: 'authenticated',
+      user: { id: 'u1', email: 't@x', role: 'RESPONSABLE_PROGRAMME', fullName: 'T' },
+    },
+  }),
+}));
+
 import { planningKeys, useWeekSessionsQuery } from '@/lib/queries';
 
 /**

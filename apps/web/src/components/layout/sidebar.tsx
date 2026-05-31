@@ -187,7 +187,7 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
           <div className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-sb-dark-2">
             <div className="bg-brand-gradient flex h-8 w-8 items-center justify-center rounded-lg">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/logo-mono.svg" alt="" className="size-6" />
+              <img src="/brand/logo-mono.svg" alt="" width={274} height={253} className="size-6" />
             </div>
           </div>
           {!collapsed ? (
