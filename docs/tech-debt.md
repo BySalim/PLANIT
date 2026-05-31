@@ -7,6 +7,24 @@
 
 ---
 
+## Observabilité (ADR-0009 — phases reportées)
+
+> Phase 0 livrée en V02 (error boundaries frontend + readiness probe). Les phases
+> suivantes nécessitent une dépendance npm et/ou un compte externe → **décisions
+> sensibles** à arbitrer (cf. [ADR-0009](architecture/adr/0009-observabilite-strategie.md)).
+
+| ID            | Description                                                           | Impact                                                              | Priorité |
+| ------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | -------- |
+| TD-OBS-SENTRY | Error tracking non branché (Sentry ou GlitchTip)                      | Erreurs prod front+back non agrégées/alertées ; debug à l'aveugle   | Haute    |
+| TD-OBS-UPTIME | Pas de monitoring uptime ni alerting sur les 5xx                      | Personne n'est prévenu en cas de panne / pic d'erreurs              | Haute    |
+| TD-OBS-REQID  | Pas de `requestId`/correlation id dans les logs                       | Impossible de relier les lignes de log d'une même requête           | Moyenne  |
+| TD-OBS-SINK   | Error boundaries front sans report distant (Phase 0 = repli UI seul)  | Les erreurs de rendu ne remontent nulle part tant que Sentry absent | Moyenne  |
+| TD-OBS-LOGS   | Logs pino en stdout only — pas d'agrégateur (Better Stack/Axiom/Loki) | Recherche/rétention limitées au `docker logs` du conteneur          | Moyenne  |
+| TD-OBS-METRIC | Pas de métriques (RED / golden signals) ni dashboards                 | Aucune visibilité perf backend en prod (latence, taux d'erreur)     | Moyenne  |
+| TD-OBS-HEALTH | `/health/ready` non câblé dans Caddy/compose ni à un moniteur externe | La probe existe mais n'est pas exploitée par l'infra                | Faible   |
+
+---
+
 ## Vague 02 — Auth + RBAC + conflits salles
 
 Tout ce qui dépend de l'arrivée de l'authentification, du modèle `User` enrichi
