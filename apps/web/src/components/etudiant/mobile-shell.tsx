@@ -120,10 +120,16 @@ function DesktopSidebar({
           className="bg-brand-gradient flex size-9 items-center justify-center rounded-lg text-white"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo-mono.svg" alt="" className="size-6" />
+          <img src="/brand/logo-mono.svg" alt="" width={274} height={253} className="size-6" />
         </span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/logo-wordmark-color.svg" alt="PLANIT" className="h-[18px] w-auto" />
+        <img
+          src="/brand/logo-wordmark-color.svg"
+          alt="PLANIT"
+          width={407}
+          height={88}
+          className="h-[18px] w-auto"
+        />
       </Link>
 
       {/* Navigation */}
@@ -222,10 +228,16 @@ function MobileHeader({
           className="bg-brand-gradient flex size-9 items-center justify-center rounded-lg text-white"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo-mono.svg" alt="" className="size-6" />
+          <img src="/brand/logo-mono.svg" alt="" width={274} height={253} className="size-6" />
         </span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/logo-wordmark-color.svg" alt="PLANIT" className="h-[18px] w-auto" />
+        <img
+          src="/brand/logo-wordmark-color.svg"
+          alt="PLANIT"
+          width={407}
+          height={88}
+          className="h-[18px] w-auto"
+        />
       </Link>
       <div className="flex items-center gap-2">
         <button

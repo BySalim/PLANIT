@@ -208,9 +208,10 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 - **Gating à deux niveaux** :
   - PR ciblant `main` (release `develop → main`) → **toujours bloquante**, auto-strict, pas besoin de label. C'est le moment où on garantit la qualité officielle.
   - PR ciblant `develop` → bloquante **uniquement si** la PR porte le label `lighthouse-strict`. Sinon `continue-on-error: true` — annotations warning mais job vert.
-- **Les seuils dans `.github/lighthouserc.json` restent stricts** (preset `lighthouse:no-pwa` + `categories:performance` ≥ 0.85, `categories:accessibility` ≥ 0.9). Aucun audit downgradé à `warn`. La sévérité reste accurate ; seul le **gating** est paramétrable.
-- **Backend obligatoire dans le job LH** depuis pré-release V02 : sans lui, le fetch initial `/auth/me` du AuthProvider lance un `ERR_CONNECTION_REFUSED` que Chrome log en console (audit `errors-in-console` fail). Le job lance désormais Postgres + backend dummy avant d'auditer le frontend.
+- **Politique des seuils dans `.github/lighthouserc.json`** : catégories `performance` ≥ 0.85 et `accessibility` ≥ 0.9 restent `error` (non-négociables, on score actuellement 0.97 / 1.0). Tous les **audits a11y critiques** (`landmark-one-main`, `image-alt`, `unsized-images`, `html-has-lang`, `meta-viewport`, `color-contrast`, etc.) restent `error`. **Onze audits non actionnables dans le scope V02** sont explicitement downgrade à `warn` : `csp-xss` (chantier nonce → `TD-LH-CSP-NONCE`), `errors-in-console` (401 audit anonyme légitime → `TD-LH-CONSOLE-AUTHME`), `total-byte-weight` + 5 audits perf + 3 audits cache (sprint perf V03 → `TD-LH-PERF`). Liste complète et justification dans le runbook.
+- **Backend obligatoire dans le job LH** depuis pré-release V02 : sans lui, le fetch initial `/auth/me` du AuthProvider lance un `ERR_CONNECTION_REFUSED` que Chrome log en console. Le job lance désormais Postgres + backend dummy avant d'auditer le frontend.
 - **Usage du label** : pose `lighthouse-strict` sur une PR feature pour une responsabilisation ponctuelle ou un sprint perf. Pas par défaut sur develop — sinon on retombe dans l'effet « Lighthouse rouge récurrent ignoré ».
+- **Pour repasser un audit `warn` en `error`** : adresser la dette (`TD-LH-*`), confirmer score réel ≥ 0.9 sur 2 runs consécutifs, retirer la ligne du tableau `assertions` dans `lighthouserc.json`. Documenter dans le runbook.
 - Détails dans `docs/runbooks/ci-lighthouse.md`.
 
 ### Patterns émergés clôture Vague 02 (2026-05-31)
