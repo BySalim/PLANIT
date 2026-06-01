@@ -29,6 +29,7 @@ import {
   useV2SessionDetailQuery,
 } from '@/lib/queries-v2';
 import { ClasseChipsPicker } from './classe-chips-picker';
+import { SessionDetailSkeleton } from './session-detail-skeleton';
 
 // ─────────────────────────────────────────────────────────────────────
 // <SessionDetailDrawer> V2 — LOT 3 R.5 + R.6
@@ -310,9 +311,17 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
       width="md"
       footer={
         session && !detailQuery.isLoading ? (
+          // ⚠️ `key` distinctes obligatoires entre les deux modes. Sans elles,
+          // React réutilise le nœud DOM du bouton primary en position : le
+          // « Modifier » (type=button) devient « Enregistrer »
+          // (type=submit, form=…) lors du flush synchrone du clic, puis le
+          // navigateur exécute l'activation par défaut sur ce nœud devenu
+          // submit → soumission fantôme du formulaire au simple clic sur
+          // « Modifier ». Les keys forcent un démontage/remontage → pas de morph.
           isEditing ? (
             <>
               <Button
+                key="cancel"
                 variant="ghost"
                 onClick={() => setIsEditing(false)}
                 disabled={mutation.isPending}
@@ -320,6 +329,7 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
                 Annuler
               </Button>
               <Button
+                key="save"
                 type="submit"
                 form="edit-session-form"
                 variant="primary"
@@ -334,11 +344,16 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
                   n'a jamais été publiée. Une séance déjà publiée ne peut pas
                   être supprimée via ce flow (le backend refuse 400). */}
               {session.lastPublishedAt === null ? (
-                <Button variant="danger" onClick={handleDelete} disabled={deleteMutation.isPending}>
+                <Button
+                  key="delete"
+                  variant="danger"
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                >
                   {deleteMutation.isPending ? 'Suppression…' : 'Supprimer'}
                 </Button>
               ) : null}
-              <Button variant="primary" onClick={() => setIsEditing(true)}>
+              <Button key="edit" variant="primary" onClick={() => setIsEditing(true)}>
                 Modifier
               </Button>
             </>
@@ -347,7 +362,7 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
       }
     >
       {detailQuery.isLoading ? (
-        <p className="text-sm text-text-muted">Chargement…</p>
+        <SessionDetailSkeleton />
       ) : detailQuery.error ? (
         <p
           role="alert"
