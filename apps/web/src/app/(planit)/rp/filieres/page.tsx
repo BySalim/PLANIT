@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/toast-provider';
 import { useFilieresQuery } from '@/lib/queries';
 import { useDeleteFiliereMutation } from '@/lib/mutations';
 import { FiliereModal } from '@/components/rp/filieres/filiere-modal';
+import { FilieresListSkeleton } from '@/components/rp/filieres/filieres-list-skeleton';
 
 // ── Icônes inline ─────────────────────────────────────────────────────
 function PencilIcon() {
@@ -147,9 +148,7 @@ export default function FilieresPage() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-sm text-text-muted">
-          Chargement…
-        </div>
+        <FilieresListSkeleton />
       ) : isError ? (
         <div className="flex items-center justify-center py-16 text-sm text-err">
           Impossible de charger les filières.

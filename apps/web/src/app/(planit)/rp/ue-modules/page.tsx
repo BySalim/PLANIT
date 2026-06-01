@@ -10,6 +10,10 @@ import { useUesQuery, useUeModulesQuery } from '@/lib/queries';
 import { useDeleteUeMutation, useDeleteModuleMutation } from '@/lib/mutations';
 import { UeModal } from '@/components/rp/ue-modules/ue-modal';
 import { ModuleModal } from '@/components/rp/ue-modules/module-modal';
+import {
+  ModulesListSkeleton,
+  UeModulesSkeleton,
+} from '@/components/rp/ue-modules/ue-modules-skeleton';
 
 // ── Icônes inline ─────────────────────────────────────────────────────
 function PencilIcon() {
@@ -129,9 +133,7 @@ export default function UeModulesPage() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-sm text-text-muted">
-          Chargement…
-        </div>
+        <UeModulesSkeleton />
       ) : isError ? (
         <div className="flex items-center justify-center py-16 text-sm text-err">
           Impossible de charger les UE.
@@ -355,7 +357,7 @@ function ModulesList({ modules, isLoading, isError, onEdit }: ModulesListProps) 
   }
 
   if (isLoading) {
-    return <p className="px-14 py-3 text-[13px] text-text-muted">Chargement des modules…</p>;
+    return <ModulesListSkeleton />;
   }
 
   if (isError) {

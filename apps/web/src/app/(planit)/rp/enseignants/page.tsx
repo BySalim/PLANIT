@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/toast-provider';
 import { useEnseignantsQuery } from '@/lib/queries';
 import { useDeleteEnseignantMutation } from '@/lib/mutations';
 import { EnseignantModal } from '@/components/rp/enseignants/enseignant-modal';
+import { EnseignantsTableSkeleton } from '@/components/rp/enseignants/enseignants-table-skeleton';
 
 // ── Icônes inline (pas dans @planit/ui) ─────────────────────────────
 function PencilIcon() {
@@ -147,9 +148,7 @@ export default function EnseignantsPage() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-sm text-text-muted">
-          Chargement…
-        </div>
+        <EnseignantsTableSkeleton />
       ) : isError ? (
         <div className="flex items-center justify-center py-16 text-sm text-err">
           Impossible de charger les enseignants.
