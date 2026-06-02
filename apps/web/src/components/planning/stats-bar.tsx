@@ -1,43 +1,38 @@
 'use client';
 
-import { ClockIcon, DownloadIcon } from '@planit/ui';
-import type { SessionDto } from '@planit/contracts';
+import { ClockIcon } from '@planit/ui';
+import type { SessionV2Dto } from '@planit/contracts';
 import { PublishButton } from './publish-button';
 
 interface PlanningFooterProps {
-  sessions: SessionDto[];
+  sessions: readonly SessionV2Dto[];
   isLoading?: boolean;
   isError?: boolean;
+  /** Délégué à PublishButton — vide la pile undo (V2-D11). */
+  onPublished?: (() => void) | undefined;
 }
 
-function EyeIcon() {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
+/**
+ * Footer planning RP — LOT 3 R.7.
+ *
+ * Changements V02 :
+ * - Boutons "Aperçu étudiant" et "Exporter" **supprimés** (hors scope V02,
+ *   pas de retour planifié pour ces deux fonctionnalités).
+ * - Bouton "Historique" conservé en dernière position (placeholder V03+).
+ * - Compteurs alignés sur le modèle V2 : `isPublished` + `hasUnpublishedChanges`
+ *   (plus de PROVISOIRE / VALIDE / PUBLIE).
+ * - "Publier la semaine" renommé en "Publier les modifications" via
+ *   <PublishButton> V2.
+ */
 export function PlanningFooter({
   sessions,
   isLoading = false,
   isError = false,
+  onPublished,
 }: PlanningFooterProps) {
-  // Compute counters from local sessions (synced with grid display).
   const total = sessions.length;
-  const published = sessions.filter((s) => s.status === 'PUBLIE').length;
-  const validated = sessions.filter((s) => s.status === 'VALIDE').length;
-  const provisoires = sessions.filter((s) => s.status === 'PROVISOIRE').length;
+  const pending = sessions.filter((s) => s.hasUnpublishedChanges).length;
+  const published = total - pending;
 
   return (
     <footer
@@ -60,49 +55,27 @@ export function PlanningFooter({
             </span>
             <span className="text-text-faint">·</span>
             <span>
-              <strong className="font-semibold text-info">{validated}</strong> validées
-            </span>
-            <span className="text-text-faint">·</span>
-            <span>
-              <strong className="font-semibold text-warn-text">{provisoires}</strong> provisoires
+              <strong className="font-semibold text-warn-text">{pending}</strong> en attente
             </span>
           </>
         )}
       </div>
 
+      {/* R.7 — ordre : [Publier les modifications, Historique]. */}
       <div className="flex flex-shrink-0 items-center gap-2">
         <span className="hidden text-[11.5px] text-text-muted lg:inline">
           Auto-publication vendredi 22:00
         </span>
-        {/* V2: Historique / Exporter / Aperçu étudiant — visibles mais disabled */}
+        <PublishButton sessions={sessions} onPublished={onPublished} />
         <button
           type="button"
           disabled
-          title="Disponible Vague 02"
+          title="Disponible V03"
           className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text-muted"
         >
           <ClockIcon size={13} color="currentColor" />
           <span>Historique</span>
         </button>
-        <button
-          type="button"
-          disabled
-          title="Disponible Vague 02"
-          className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text-muted"
-        >
-          <DownloadIcon size={13} color="currentColor" />
-          <span>Exporter</span>
-        </button>
-        <button
-          type="button"
-          disabled
-          title="Disponible Vague 02"
-          className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-primary-200 bg-surface px-3 text-[12px] font-semibold text-primary"
-        >
-          <EyeIcon />
-          <span>Aperçu étudiant</span>
-        </button>
-        <PublishButton sessions={sessions} />
       </div>
     </footer>
   );

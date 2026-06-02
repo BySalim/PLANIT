@@ -5,7 +5,8 @@ import { startOfWeek } from 'date-fns';
 import { io, type Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import type { SessionDto } from '@planit/contracts';
-import { API_BASE } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
+import { WS_URL } from '@/lib/api';
 import { planningKeys } from '@/lib/queries';
 import { toWeekStartParam } from '@/lib/week';
 import { useToast } from '@/components/ui/toast-provider';
@@ -65,19 +66,30 @@ function buildInvalidationKeys(sessions: readonly SessionDto[]): ReadonlyArray<r
 }
 
 export function useRealtimeSessions(
-  userId: string | null,
+  enabled: boolean,
   options: UseRealtimeSessionsOptions = {},
 ): void {
   const { onPublished, showToast = true } = options;
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { state } = useAuth();
+  // Pas de socket sans cookie d'auth : le backend refuserait le handshake et,
+  // pire, en CI Lighthouse (où le backend ne tourne pas), la tentative de
+  // connexion `connection refused` polluerait la console — déclenche l'audit
+  // `errors-in-console`. Le hook redémarre tout seul dès que l'auth devient
+  // valide (state.status dans le array de dépendances).
+  const isAuthenticated = state.status === 'authenticated';
 
   useEffect(() => {
-    if (userId === null) {
+    if (!enabled || !isAuthenticated) {
       return;
     }
 
-    const socket: Socket = io(API_BASE, { auth: { userId } });
+    // V02 LOT 1 : le backend lit `userId` + `role` depuis le cookie HttpOnly
+    // au handshake (cf. `ws.gateway.ts`). On envoie donc les cookies via
+    // `withCredentials: true`. Le `userId` reste utile uniquement comme clé
+    // de dépendance React pour réinitialiser le socket quand l'acteur change.
+    const socket: Socket = io(WS_URL, { withCredentials: true });
 
     socket.on('session:published', (payload?: SessionPublishedPayload) => {
       const sessions = payload?.sessions;
@@ -104,5 +116,5 @@ export function useRealtimeSessions(
     return () => {
       socket.disconnect();
     };
-  }, [userId, queryClient, toast, onPublished, showToast]);
+  }, [enabled, isAuthenticated, queryClient, toast, onPublished, showToast]);
 }

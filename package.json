@@ -10,27 +10,30 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "lint": "turbo lint",
-    "typecheck": "turbo typecheck",
-    "test": "turbo test",
+    "dev": "pnpm -r --parallel --filter \"./apps/*\" --filter \"!@planit/mobile\" dev",
+    "dev:mobile": "pnpm --filter @planit/mobile dev",
+    "dev:all": "pnpm -r --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
     "db:migrate": "pnpm --filter @planit/backend db:migrate",
     "db:seed": "pnpm --filter @planit/backend db:seed",
     "db:reset": "pnpm --filter @planit/backend db:reset",
     "test:e2e": "playwright test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "pnpm --filter @planit/contracts build && pnpm --filter @planit/utils build"
   },
   "devDependencies": {
-    "turbo": "^2.5.4",
-    "typescript": "^5.8.3",
-    "prettier": "^3.5.3",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
-    "lint-staged": "^16.1.0",
+    "@playwright/test": "^1.49.1",
     "husky": "^9.1.7",
-    "@playwright/test": "^1.49.1"
+    "lint-staged": "^16.1.0",
+    "prettier": "^3.5.3",
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -39,7 +42,12 @@
       "@prisma/engines",
       "prisma",
       "esbuild",
-      "sharp"
+      "sharp",
+      "@swc/core",
+      "unrs-resolver"
+    ],
+    "ignoredBuiltDependencies": [
+      "@scarf/scarf"
     ]
   },
   "lint-staged": {

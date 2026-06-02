@@ -12,25 +12,46 @@ interface PlanningToolbarProps {
   onViewModeChange: (mode: ViewMode) => void;
   onCreateSession: () => void;
   selectedClassLabel?: string | undefined;
+  // I.6 — undo/redo wiring (V2-D11). Pile vidée au publish.
+  canUndo?: boolean | undefined;
+  canRedo?: boolean | undefined;
+  onUndo?: (() => void) | undefined;
+  onRedo?: (() => void) | undefined;
 }
 
 function ToolbarSeparator() {
   return <div className="h-6 w-px flex-shrink-0 bg-border-soft" aria-hidden />;
 }
 
-// V2: undo/redo affichés disabled — annuler/refaire arrive en Vague 02 (TD-019).
-function UndoRedoButton({ direction }: { direction: 'undo' | 'redo' }) {
+// I.6 — bouton undo/redo branché sur `usePlanningUndoStack` (V2 LOT 4).
+function UndoRedoButton({
+  direction,
+  disabled,
+  onClick,
+}: {
+  direction: 'undo' | 'redo';
+  disabled: boolean;
+  onClick: (() => void) | undefined;
+}) {
   const path =
     direction === 'undo'
       ? 'M3 7v6h6M21 17a9 9 0 0 0-15-6.7L3 13'
       : 'M21 7v6h-6M3 17a9 9 0 0 1 15-6.7L21 13';
+  const shortcutLabel = direction === 'undo' ? 'Ctrl+Z' : 'Ctrl+Maj+Z';
+  const action = direction === 'undo' ? 'Annuler' : 'Refaire';
   return (
     <button
       type="button"
-      disabled
-      title={direction === 'undo' ? 'Annuler (V2)' : 'Refaire (V2)'}
-      aria-label={direction === 'undo' ? 'Annuler' : 'Refaire'}
-      className="inline-flex h-8 w-8 flex-shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-border-soft bg-surface text-text-faint"
+      disabled={disabled}
+      onClick={onClick}
+      title={`${action} (${shortcutLabel})`}
+      aria-label={action}
+      className={cn(
+        'inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border bg-surface transition-colors',
+        disabled
+          ? 'cursor-not-allowed border-border-soft text-text-faint'
+          : 'border-border text-text-sec hover:border-primary hover:text-primary',
+      )}
     >
       <svg
         width="14"
@@ -111,13 +132,17 @@ export function PlanningToolbar({
   onViewModeChange,
   onCreateSession,
   selectedClassLabel,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
 }: PlanningToolbarProps) {
   return (
     <div className="flex h-[52px] flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-border-soft bg-surface px-3">
       {/* Left : undo/redo + week nav + class selector */}
       <div className="flex flex-shrink-0 items-center gap-1">
-        <UndoRedoButton direction="undo" />
-        <UndoRedoButton direction="redo" />
+        <UndoRedoButton direction="undo" disabled={!canUndo} onClick={onUndo} />
+        <UndoRedoButton direction="redo" disabled={!canRedo} onClick={onRedo} />
       </div>
       <ToolbarSeparator />
       <WeekNavigator weekStart={weekStart} onChange={onWeekChange} />

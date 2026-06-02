@@ -37,7 +37,7 @@ export default function EnseignantHomePage() {
     setUpdateModal({ open: true, sessions: sessions ?? [] });
   }, []);
 
-  useRealtimeSessions(teacher.id, {
+  useRealtimeSessions(true, {
     onPublished: handlePublished,
     showToast: false,
   });

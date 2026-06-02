@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
 enum Role {
   SUPER_ADMIN
   ADMIN
@@ -18,6 +22,11 @@ enum Role {
   PARTENAIRE
 }
 
+// V01 enum — kept for backward compatibility with the V01 SeanceService/mapper.
+// V02 introduces SessionTypeV2 + SessionSousType ; the service migration to
+// the V02 enums is scheduled in LOT 2 V02 (Oumar), at which point this enum
+// can be dropped along with `Seance.type` (legacy). Until then, both columns
+// coexist on `Seance`.
 enum SessionType {
   CM
   TD
@@ -34,25 +43,99 @@ enum SessionStatus {
   PUBLIE
 }
 
+// V02 model — 3 categories. Migration LOT 2 (Oumar) will switch the API to
+// rely on `Seance.typeV2` + `Seance.sousType`, then drop the V01 fields.
+enum SessionTypeV2 {
+  COURS
+  EVALUATION
+  EVENEMENT
+}
+
+// Optional sub-classification under COURS or EVALUATION. Null for EVENEMENT
+// (or when the V02 fields are not yet populated for a legacy row).
+enum SessionSousType {
+  CM
+  TD
+  TP
+  EXAMEN
+  RATTRAPAGE
+  DEVOIR
+}
+
+enum EnseignantStatut {
+  PERMANENT
+  VACATAIRE
+}
+
+enum FiliereGrade {
+  LICENCE
+  MASTER
+  DOCTORAT
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auth
+// ─────────────────────────────────────────────────────────────────────────────
+
 model User {
   id             String    @id @default(cuid())
   email          String    @unique
   fullName       String
   role           Role
   passwordHash   String?
-  refreshTokenId String?
+  refreshTokenId String? // V01 placeholder, deprecated by `refreshTokens` (LOT 2 cleanup)
+  matricule      String?   @unique
   deletedAt      DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  // Students belong to a class.
   classeId String?
   classe   Classe? @relation(fields: [classeId], references: [id])
 
-  // Teachers own the sessions they teach.
+  // V01 — teacher relation on Seance; kept until LOT 2 migrates to Enseignant.
   taughtSeances Seance[] @relation("SeanceTeacher")
 
+  enseignant    Enseignant?
+  refreshTokens RefreshToken[]
+
   @@map("users")
+}
+
+// Cf. ADR-0005 §5 (rotation refresh + détection de réutilisation) et ADR-0007.
+model RefreshToken {
+  id         String    @id @default(cuid())
+  hash       String    @unique
+  userId     String
+  familyId   String
+  userAgent  String?
+  ip         String?
+  issuedAt   DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Domaine académique
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Filiere {
+  id              String       @id @default(cuid())
+  sigle           String       @unique
+  libelle         String
+  isDoubleDiplome Boolean      @default(false)
+  grade           FiliereGrade
+  classes         Classe[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("filieres")
 }
 
 model Classe {
@@ -62,21 +145,53 @@ model Classe {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  students User[]
-  seances  Seance[]
+  // Optional in this migration so existing seed data can land before a Filiere
+  // is associated. Will tighten to NOT NULL when LOT 2 enforces filière on
+  // classe creation.
+  filiereId String?
+  filiere   Filiere? @relation(fields: [filiereId], references: [id])
+
+  students    User[]
+  seances     Seance[] // V01 — direct FK on Seance.classeId
+  seanceLinks SeanceClasse[] // V02 — N-N join, used by LOT 2 onwards
 
   @@map("classes")
 }
 
-model Module {
+model UE {
   id        String   @id @default(cuid())
   code      String   @unique
-  name      String
+  libelle   String
+  color     String
+  modules   Module[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  seances Seance[]
+  @@map("ues")
+}
 
+model Module {
+  id   String @id @default(cuid())
+  code String @unique
+
+  // V01 column kept ; V02 introduces `libelle` + `color` + `ueId`. The
+  // V01 mapper still reads `name`; LOT 2 migrates consumers to `libelle`
+  // then drops `name`.
+  name String
+
+  // V02 fields. Default "" lets the migration land without backfilling
+  // existing rows ; the seed populates them, and LOT 2 will tighten to
+  // NOT NULL (no default) once the new CRUD is online.
+  libelle String  @default("")
+  color   String  @default("#64748B")
+  ueId    String?
+  ue      UE?     @relation(fields: [ueId], references: [id], onDelete: Restrict)
+
+  seances   Seance[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ueId])
   @@map("modules")
 }
 
@@ -85,43 +200,125 @@ model Salle {
   name      String   @unique
   type      String
   capacity  Int
+  seances   Seance[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  seances Seance[]
 
   @@map("salles")
 }
 
+// Table dédiée enseignant (1-1 avec User). V02 model. The V01 service still
+// uses `Seance.teacherId` (FK → User) ; LOT 2 will switch consumers to
+// `Seance.enseignantId` (FK → Enseignant) then drop the legacy column.
+model Enseignant {
+  id                  String           @id @default(cuid())
+  userId              String           @unique
+  nomComplet          String
+  emailInstitutionnel String           @unique
+  whatsapp            String?
+  statut              EnseignantStatut
+  specialite          String
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taughtSeances Seance[] @relation("SeanceEnseignant")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("enseignants")
+}
+
+// Singleton — id = 'singleton'. Read by GET /api/settings (public),
+// written by PUT /api/settings (RP only, LOT 2).
+model Settings {
+  id           String   @id @default("singleton")
+  dayStartHour Int      @default(8)
+  dayEndHour   Int      @default(20)
+  updatedAt    DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Séances — schema hybride V01 + V02 (LOT 0 V02)
+// ─────────────────────────────────────────────────────────────────────────────
+// V02 adds: libelle, typeV2, sousType, intervenantNom, description,
+// publishedSnapshot, hasUnpublishedChanges, enseignantId, SeanceClasse (N-N).
+// V01 columns kept: type (enum), status, classeId (singular), teacherId.
+// LOT 2 V02 (Oumar) will:
+//   1. switch the SeanceService to consume the V02 fields,
+//   2. backfill SeanceClasse from classeId,
+//   3. backfill enseignantId from teacherId,
+//   4. drop the V01 columns in a subsequent migration.
+// ─────────────────────────────────────────────────────────────────────────────
+
 model Seance {
   id              String        @id @default(cuid())
-  type            SessionType
-  status          SessionStatus @default(PROVISOIRE)
+  type            SessionType // V01 — to be removed in LOT 2
+  status          SessionStatus @default(PROVISOIRE) // V01 — to be removed in LOT 2
   startAt         DateTime
   endAt           DateTime
   isPublished     Boolean       @default(false)
   lastModifiedAt  DateTime      @default(now())
   lastPublishedAt DateTime?
 
+  // ── V02 fields (defaults make the migration backwards-compatible) ──
+  libelle        String           @default("")
+  typeV2         SessionTypeV2?
+  sousType       SessionSousType?
+  intervenantNom String?
+  description    String?
+
+  // Smart dirty — cf. ADR-0008.
+  // publishedSnapshot = stableStringify(extractComparable(seance)) at last publish.
+  publishedSnapshot     Json?
+  hasUnpublishedChanges Boolean @default(true)
+
+  // V01 — FK directes, conservées pour compatibilité.
+  // classeId/moduleId restent NOT NULL (toujours requis V01 ET V02).
+  // salleId/teacherId deviennent nullable en V02 LOT 2 : un EVENEMENT V02
+  // peut ne pas avoir de salle ni d'enseignant interne (intervenant externe).
+  // Le V01 service continue de les exiger via Zod (createSessionSchema).
   classeId String
   classe   Classe @relation(fields: [classeId], references: [id])
 
   moduleId String
   module   Module @relation(fields: [moduleId], references: [id])
 
-  salleId String
-  salle   Salle  @relation(fields: [salleId], references: [id])
+  salleId String?
+  salle   Salle?  @relation(fields: [salleId], references: [id], onDelete: SetNull)
 
-  teacherId String
-  teacher   User   @relation("SeanceTeacher", fields: [teacherId], references: [id])
+  teacherId String?
+  teacher   User?   @relation("SeanceTeacher", fields: [teacherId], references: [id])
+
+  // V02 — Enseignant FK (optionnel, peuplé en LOT 2).
+  enseignantId String?
+  enseignant   Enseignant? @relation("SeanceEnseignant", fields: [enseignantId], references: [id], onDelete: SetNull)
+
+  // V02 — N-N classes (peuplé en LOT 2, vide en LOT 0).
+  seanceClasses SeanceClasse[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([classeId, startAt])
   @@index([teacherId, startAt])
-  // Accélère le scan `findMany({ where: { isPublished: false, classeId } })`
-  // déclenché par POST /api/sessions/publish (B.5).
+  // V01 — accélère le scan déclenché par POST /api/sessions/publish.
   @@index([isPublished, classeId])
+  // V02 — accélère le calcul hasUnpublishedChanges.
+  @@index([isPublished, hasUnpublishedChanges])
   @@map("seances")
+}
+
+// N-N Seance ↔ Classe (V2-D6). Populé en LOT 2 (Oumar) — vide à la sortie du LOT 0.
+model SeanceClasse {
+  seanceId String
+  classeId String
+
+  seance Seance @relation(fields: [seanceId], references: [id], onDelete: Cascade)
+  classe Classe @relation(fields: [classeId], references: [id], onDelete: Cascade)
+
+  @@id([seanceId, classeId])
+  @@index([classeId])
+  @@map("seance_classes")
 }

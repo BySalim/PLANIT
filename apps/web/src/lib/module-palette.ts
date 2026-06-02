@@ -1,4 +1,4 @@
-import type { SessionType } from '@planit/contracts';
+import type { SessionType, SessionTypeV2 } from '@planit/contracts';
 
 /**
  * 6 teintes module — source : PLANIT-IA/rp/shared/tokens-ext.js (window.PALETTES).
@@ -63,4 +63,24 @@ export function paletteForSession(moduleId: string, type: SessionType): ModulePa
   if (cat === 'evaluation') return MODULE_PALETTES.red;
   if (cat === 'evenement') return MODULE_PALETTES.purple;
   return MODULE_PALETTES[colorForModule(moduleId)];
+}
+
+// ── V2 — types top-level COURS / EVALUATION / EVENEMENT ────────────────
+// Le module est nullable côté V2 (EVENEMENT n'en a pas) — on fallback sur
+// un id stable pour ne pas casser le hash.
+
+export function categoryForTypeV2(type: SessionTypeV2): SessionCategory {
+  if (type === 'EVALUATION') return 'evaluation';
+  if (type === 'EVENEMENT') return 'evenement';
+  return 'cours';
+}
+
+export function paletteForSessionV2(
+  moduleId: string | null | undefined,
+  type: SessionTypeV2,
+): ModulePaletteEntry {
+  const cat = categoryForTypeV2(type);
+  if (cat === 'evaluation') return MODULE_PALETTES.red;
+  if (cat === 'evenement') return MODULE_PALETTES.purple;
+  return MODULE_PALETTES[colorForModule(moduleId ?? 'no-module')];
 }

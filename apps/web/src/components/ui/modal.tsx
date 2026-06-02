@@ -48,7 +48,13 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', footer }:
         aria-labelledby="modal-title"
         tabIndex={-1}
         className={cn(
-          'flex w-full flex-col rounded-xl bg-surface shadow-xl outline-none',
+          // `max-h-[calc(100dvh-2rem)]` borne la carte à la hauteur du viewport
+          // (moins le padding `p-4` du wrapper, soit 2rem au total). Sans cette
+          // contrainte, un contenu plus haut que l'écran déborderait par le haut
+          // et le bas, rendant le `overflow-y-auto` du body inutile.
+          // `100dvh` (dynamic viewport height) gère correctement les browsers
+          // mobiles dont la barre d'adresse se replie au scroll.
+          'flex max-h-[calc(100dvh-2rem)] w-full flex-col rounded-xl bg-surface shadow-xl outline-none',
           SIZE_CLASSES[size],
         )}
       >

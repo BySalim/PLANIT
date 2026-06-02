@@ -63,9 +63,9 @@ const NAV: NavGroup[] = [
   {
     group: 'OFFRE DE FORMATION',
     items: [
-      { id: 'filieres', label: 'Filières', href: '#', icon: GraduationCapIcon },
+      { id: 'filieres', label: 'Filières', href: '/rp/filieres', icon: GraduationCapIcon },
       { id: 'formations', label: 'Formations', href: '#', icon: BookStackIcon },
-      { id: 'modules', label: 'UE & Modules', href: '#', icon: BookOpenIcon },
+      { id: 'modules', label: 'UE & Modules', href: '/rp/ue-modules', icon: BookOpenIcon },
       { id: 'maquettes', label: 'Maquettes de formation', href: '#', icon: BookStackIcon },
     ],
   },
@@ -74,7 +74,7 @@ const NAV: NavGroup[] = [
     items: [
       { id: 'students', label: 'Étudiants', href: '#', icon: UsersIcon },
       { id: 'classes', label: 'Classes', href: '#', icon: LayersIcon },
-      { id: 'teachers', label: 'Enseignants', href: '#', icon: UserCogIcon },
+      { id: 'teachers', label: 'Enseignants', href: '/rp/enseignants', icon: UserCogIcon },
       { id: 'personnel', label: 'Personnel', href: '#', icon: UserIcon },
       { id: 'rooms', label: 'Salles', href: '#', icon: DoorIcon },
     ],
@@ -141,12 +141,21 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
     };
   }, []);
 
+  // Calcule le « meilleur match » par href le plus long parmi les items
+  // routés. `pathname.startsWith('/rp')` matche aussi `/rp/ue-modules`
+  // → on prend le plus spécifique pour éviter que Planning reste actif
+  // quand on est sur une sous-page (Filières, UE & Modules, etc.).
+  // Critère : pathname === href OU pathname commence par `href + '/'`.
+  const bestMatchHref = NAV.flatMap((g) => g.items)
+    .filter((i) => i.href !== '#')
+    .map((i) => i.href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .reduce<string>((best, href) => (href.length > best.length ? href : best), '');
+
   const isActive = (item: NavItem): boolean => {
-    if (item.href !== '#' && pathname.length > 0 && pathname.startsWith(item.href)) {
-      return true;
-    }
-    if (item.href === '#' && item.id === activeId) return true;
-    return false;
+    if (item.href !== '#') return item.href === bestMatchHref;
+    // Items placeholder (href='#') : fallback sur l'activeId fourni par la page.
+    return item.id === activeId;
   };
 
   const transition = draggingRef.current ? 'none' : 'width .22s ease';
@@ -177,16 +186,14 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
         >
           <div className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-sb-dark-2">
             <div className="bg-brand-gradient flex h-8 w-8 items-center justify-center rounded-lg">
-              <span className="font-display text-[13px] font-bold leading-none tracking-tight text-white">
-                P
-              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/logo-mono.svg" alt="" width={274} height={253} className="size-6" />
             </div>
           </div>
           {!collapsed ? (
             <div className="min-w-0 flex-1">
-              <div className="font-display text-[19px] font-bold leading-none tracking-tight text-white">
-                PLANIT
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/logo-wordmark-white.svg" alt="PLANIT" className="h-[18px] w-auto" />
               <div className="mt-1 truncate text-[10.5px] font-medium tracking-wider text-sb-dark-muted">
                 ÉCOLE D&apos;INGÉNIEURS · ISM
               </div>

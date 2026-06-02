@@ -27,13 +27,23 @@ Stack : Next.js 15 + React 19 (web) · Expo (mobile) · NestJS (backend) · Post
 
 ## Règles équipe — non-négociables
 
-| Membre                        | Branche        | Spécialité                       |
+| Membre                        | Branche        | Spécialité **indicative**        |
 | ----------------------------- | -------------- | -------------------------------- |
 | Salim Ouedraogo (@BySalim)    | `feat/salim`   | Tech Lead — arbitrage, ADR, spec |
 | Oumy (@oumy-code)             | `feat/oumy`    | Frontend Web                     |
 | Libasse (@cheelee08)          | `feat/libasse` | Frontend Mobile + design         |
 | Oumar (@papiuzumaki)          | `feat/oumar`   | Backend (NestJS, Prisma)         |
 | Djibril (@pape-djibrilbousso) | `feat/djibril` | DevOps + intégrations            |
+
+> **⚠️ Les « spécialités » sont indicatives, pas contraignantes.** Ce qui détermine le travail d'un membre, c'est **le LOT qui lui est assigné**, pas son rôle nominal. La spécialité reflète juste l'expertise principale ; en pratique, **n'importe qui peut prendre n'importe quel LOT** (frontend, backend, devops, design) si la répartition de la vague le prévoit.
+>
+> **Le Tech Lead (Salim) décide qui fait quel LOT**, vague par vague, en fonction de la charge et des disponibilités. La répartition officielle se trouve dans `../PLANIT-Strategie-VibeCode/vagues/vague-XX-lots.md` (section « Répartition par membre »). Cette répartition fait foi.
+>
+> **Conséquence pour toi (Claude)** :
+>
+> - **NE PAS** flagger qu'un membre touche un fichier hors de sa spécialité nominale comme un problème (ex. Oumar qui code du frontend, Djibril qui touche au backend). Tant que c'est sur **sa propre branche** et que ça correspond à **son LOT assigné**, c'est légitime.
+> - Le seul cross-domain qui mérite alerte, c'est **modifier la branche d'un autre membre** ou **bypasser la répartition de la vague** sans accord du TL.
+> - En review, juger le travail sur ses mérites techniques (qualité, conformité spec, tests, conventions) — pas sur la corrélation rôle ↔ fichiers touchés.
 
 **À chaque démarrage de session, tu DOIS** :
 
@@ -155,6 +165,67 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 - **Statut séance V1** : `isPublished: boolean` simple (séance non publiée ou publiée). L'enum à 3 valeurs `PROVISOIRE/VALIDE/PUBLIE` est documentée dans le vocabulaire métier mais pas encore appliquée côté Prisma — bascule prévue V02.
 - **Vue planning** : deux composants distincts en V1, `<PlanningGrid>` (RP — drag/resize/copier-coller) vs `<WeekTimeline>` (Enseignant/Étudiant — lecture). Décision de fusion ou de séparation actée par ADR à écrire début V02 (cf. tech-debt `FUSION-PLANNING`).
 - **Realtime backend → frontend** : 1 event public en V01 (`session:published`). Cf. ADR-0004 et `docs/runbooks/ws-events.md`.
+
+---
+
+## Patterns émergés Vague 02 (LOT 1 + 2 + infra)
+
+### Auth backend (LOT 1)
+
+- **`@Public()` opt-in, `JwtAuthGuard` global fail-closed** via `APP_GUARD`. Tout endpoint est protégé par défaut — un endpoint public exige `@Public()` explicite (anti-oubli).
+- **`@Roles('RESPONSABLE_PROGRAMME', ...)`** au niveau contrôleur/route pour le RBAC backend. Le `role` est embarqué dans le JWT access (`{ sub, role, email }`) — pas de hit BD à chaque requête.
+- **`@CurrentUser()`** param decorator pour récupérer `{ id, role, email }` dans un controller. Ne pas accéder à `req.user` directement.
+- **Cookies HttpOnly + SameSite=Strict + 2 secrets séparés** (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`). Pas de CSRF token (cf. ADR-0007 §2). `Secure=false` en dev uniquement (sinon le browser refuse en `http://localhost`).
+- **Rotation refresh atomique + révocation de famille** : `prisma.$transaction([update old, create new])` ; si refresh révoqué rejoué → `updateMany` sur tous les tokens de la `familyId` (cf. ADR-0005 §5).
+- **Throttle login** : `5/min/IP` en prod, `10000` en test (sinon `loginAs` enchaînés bloquent les tests). Pattern aligné sur `ThrottlerModule.forRoot`.
+
+### Packaging des packages internes
+
+- **Packages consommés à l'exécution par Node (`@planit/contracts`, `@planit/utils`)** : **compilés en CJS dans `./dist/`**, exports pointent vers ces builds. Node v24 ESM strict refuse les directory imports (`export * from './date'`) en source TS — d'où l'obligation de builder un JS standard.
+- **Packages consommés uniquement par bundlers (`@planit/ui`, `@planit/design-tokens`)** : peuvent rester en source TS direct (Vite/Next.js transpilent).
+- **`postinstall`** racine build automatiquement `contracts` + `utils` après chaque `pnpm install` — pas besoin de build manuel après un clone.
+- **CI** : step `Build internal packages` avant lint/typecheck/test pour garantir que `dist/` existe.
+
+### Orchestration scripts racine
+
+- **`pnpm -r --parallel`** au lieu de `turbo` dans les scripts racine (`dev`, `build`, `lint`, `typecheck`, `test`). Smart App Control (Win11 22H2+) bloque `turbo.exe` non signé. Trade-off : pas de cache turbo (acceptable à cette taille). Réactivation tracée en tech-debt `TD-031`.
+
+### Patterns émergés post-LOT 2 (polish batch 2026-05-28)
+
+> Ajustements pratiques sortis de l'usage interactif du planning V02. Détails complets dans `docs/agent-journal/salim/2026-05-28-vague02-polish-batch.md`.
+
+- **Lazy load mode lite/full sur les list endpoints** — pattern appliqué sur `GET /ues`. Mode **lite par défaut** (UE seules + `moduleCount` via Prisma `_count`) → mount initial instantané. `?withModules=true` réactive le mode legacy pour les consommateurs qui ont besoin du nested (formulaire séance). Schéma Zod : champ `modules` rendu `.optional()` + ajout `moduleCount?: number` — un seul schéma couvre les deux modes. Le lazy fetch d'un détail (modules d'une UE déployée) passe par un endpoint dédié (`GET /ues/:ueId/modules`) + un hook React Query avec `enabled` piloté par l'état UI. À répliquer pour tout endpoint où la volumétrie nested pourrait dépasser ~100 KB.
+- **Optimistic update sur les mutations V2** — pattern dans `useUpdateSessionV2Mutation` ([mutations-v2.ts](apps/web/src/lib/mutations-v2.ts)) : `onMutate` snapshot toutes les query lists matchant `planningV2Keys.all` puis patch immédiat ; `onError` rollback complet depuis le snapshot ; `onSettled` invalide pour resync sur l'autorité serveur (smart-dirty, `hasUnpublishedChanges`). Effet : drag&drop / resize / undo bougent la carte instantanément, rollback automatique si 429 ou autre erreur. À répliquer sur les autres mutations V2 (create / delete / publish) quand un besoin de fluidité similaire émerge — pas avant (complexité non gratuite).
+- **Throttle calibré par usage réel** — `@Throttle({ limit: 60, ttl: 60_000 })` sur les mutations consommées par des interactions répétées (drag, resize, undo Promise.all). Garder 10/min pour les actions ponctuelles (create, delete, publish). Le défaut global 100/min/IP du `ThrottlerModule` reste le filet de sécurité. Toujours commenter le pourquoi du throttle au-dessus du décorateur.
+- **Sidebar active state = best-match par href le plus long** ([sidebar.tsx](apps/web/src/components/layout/sidebar.tsx)) : `pathname.startsWith(item.href)` matche tout préfixe et fait apparaître plusieurs items actifs simultanément (ex. Planning + UE & Modules pour `/rp/ue-modules`). Calcul correct : filtrer les items dont `pathname === href || pathname.startsWith(href + '/')`, puis prendre le href le plus long. Un seul item actif, toujours le plus spécifique. Pattern à appliquer à toute future page imbriquée.
+- **AbortController sur les fetch d'effets** — tout `useEffect` qui `fetch` puis `dispatch` doit cancel au cleanup. Sans ça, en test jsdom (et en navigation Next.js réelle pour les pages quittées), la résolution post-démontage déclenche un `dispatch` sur un environnement mort → React 19 lève `ReferenceError: window is not defined`, Vitest exit 1 malgré tests verts. Pattern dans [auth-context.tsx](apps/web/src/contexts/auth-context.tsx) — `AbortController` + flag `cancelled` lus dans `.then()`/`.catch()`, cleanup `useEffect` appelle `abort()`.
+- **DevToolsFloater** (`apps/web/src/components/dev/dev-tools-floater.tsx`) — remplace l'ancien `<DevAuthBadge>` de V2-D16. Bouton rond gear draggable, position persistée dans `localStorage`, panneau auto-positionné côté libre de viewport. Gate `process.env.NODE_ENV !== 'development'` dans le wrapper exporté (tree-shake en build prod). Pour ajouter un nouvel outil de dev (test interactif d'une vue, switch de comportement, etc.) → étendre le panneau intérieur, pas créer un autre flottant.
+- **Shell `surface`** ([shell.tsx](apps/web/src/components/layout/shell.tsx)) — prop optionnel qui fait passer le wrapper + le `<main>` en `bg-surface` (blanc). Utilisé sur les pages RP non-Planning (Enseignants, Filières, UE & Modules) pour un fond clair uniforme sans carte interne. Planning garde son `fullBleed` (grille blanche occupe tout). Pas de stats / subtitle dans le header en V2 — décision actée sur toute page RP non-Planning.
+
+### Lighthouse CI — signal partout, gating à deux niveaux
+
+- **Le job `lighthouse` tourne sur toutes les PRs** ciblant `develop`/`main`. Chaque dev voit l'impact perf/a11y/SEO de ses changements dès l'ouverture de la PR, via les artefacts uploadés (rapports HTML accessibles depuis Actions et via les liens `storage.googleapis.com` postés dans les logs).
+- **Gating à deux niveaux** :
+  - PR ciblant `main` (release `develop → main`) → **toujours bloquante**, auto-strict, pas besoin de label. C'est le moment où on garantit la qualité officielle.
+  - PR ciblant `develop` → bloquante **uniquement si** la PR porte le label `lighthouse-strict`. Sinon `continue-on-error: true` — annotations warning mais job vert.
+- **Politique des seuils dans `.github/lighthouserc.json`** : catégories `performance` ≥ 0.85 et `accessibility` ≥ 0.9 restent `error` (non-négociables, on score actuellement 0.97 / 1.0). Tous les **audits a11y critiques** (`landmark-one-main`, `image-alt`, `unsized-images`, `html-has-lang`, `meta-viewport`, `color-contrast`, etc.) restent `error`. **Onze audits non actionnables dans le scope V02** sont explicitement downgrade à `warn` : `csp-xss` (chantier nonce → `TD-LH-CSP-NONCE`), `errors-in-console` (401 audit anonyme légitime → `TD-LH-CONSOLE-AUTHME`), `total-byte-weight` + 5 audits perf + 3 audits cache (sprint perf V03 → `TD-LH-PERF`). Liste complète et justification dans le runbook.
+- **Backend obligatoire dans le job LH** depuis pré-release V02 : sans lui, le fetch initial `/auth/me` du AuthProvider lance un `ERR_CONNECTION_REFUSED` que Chrome log en console. Le job lance désormais Postgres + backend dummy avant d'auditer le frontend.
+- **URL auditée = `/login` uniquement** (depuis release V02) : le middleware edge redirige toute route applicative en 307 → `/login` en anonyme, donc auditer `/etudiant`/`/enseignant` faisait échouer l'audit `redirects` (faux négatif, le redirect d'auth est légitime) sur la 1ʳᵉ PR strict vers `main`. `/login` est le shell public commun aux 3 acteurs. Auditer le contenu connecté réel = run authentifié (`puppeteerScript`), tracé `TD-LH-AUTH-AUDIT`.
+- **Usage du label** : pose `lighthouse-strict` sur une PR feature pour une responsabilisation ponctuelle ou un sprint perf. Pas par défaut sur develop — sinon on retombe dans l'effet « Lighthouse rouge récurrent ignoré ».
+- **Pour repasser un audit `warn` en `error`** : adresser la dette (`TD-LH-*`), confirmer score réel ≥ 0.9 sur 2 runs consécutifs, retirer la ligne du tableau `assertions` dans `lighthouserc.json`. Documenter dans le runbook.
+- Détails dans `docs/runbooks/ci-lighthouse.md`.
+
+### Patterns émergés clôture Vague 02 (2026-05-31)
+
+> Capitalisation finale avant tag `v0.2.0`. Tout nouveau code suit ces conventions.
+
+- **Pattern auth frontend complet** ([auth-context.tsx](apps/web/src/contexts/auth-context.tsx) + [require-auth.tsx](apps/web/src/components/auth/require-auth.tsx) + [middleware.ts](apps/web/src/middleware.ts) + [api.ts](apps/web/src/lib/api.ts) + [forbidden-listener.tsx](apps/web/src/components/auth/forbidden-listener.tsx)) : `<AuthProvider>` dans root layout boot via `fetch('/auth/me')`, `useAuth()` retourne `{ state, login, logout }` où `state.status ∈ {loading, authenticated, unauthenticated}`. **`middleware.ts` = gating _optimiste_ (pattern Next 15)** : vérifie la présence du cookie `access` et redirige non-auth → `/login?returnUrl=…`, et `/login`+cookie → cible. Sécurité réelle = guards RBAC backend (le middleware est UX, pas la frontière). `<RequireAuth roles={...}>` reste pour l'enforcement **par rôle** (JWT opaque côté edge) + filet. **`returnUrl`** validé anti open-redirect via `safeReturnUrl` ([lib/return-url.ts](apps/web/src/lib/return-url.ts)), partagé middleware + page `/login` (en `<Suspense>` pour `useSearchParams`). `app/page.tsx` = résolveur client `ROLE_HOME[role]`. Intercepteur 401 dans `request()` tente UN refresh atomique (singleton `pendingRefresh`) puis rejoue ; échec → `/login`. 403 → `CustomEvent('api:forbidden')` → `<ForbiddenListener>`. **AuthProvider StrictMode-safe** : le chemin de succès du `fetch('/auth/me')` ne dépend PAS d'un flag `cancelled` muté par le cleanup (sinon, sous double-invoke + proxy rapide, le dispatch est skippé → bloqué en `loading`) ; seuls les rejets `signal.aborted` sont ignorés.
+- **Proxy same-origin dev = mirror prod** ([next.config.ts](apps/web/next.config.ts) `rewrites()` `/api/:path*` → backend ; prod = Caddy). `API_BASE='/api'` (relatif) → cookies d'auth **first-party**, pas de CORS, dev == prod. Le WebSocket garde une URL absolue (`WS_URL`). **⚠️ Piège CSP/eval** : la CSP `script-src` doit inclure **`'unsafe-eval'` en DEV uniquement** — Next dev (webpack `eval-source-map`) exécute les modules via `eval()` ; sans ça, **React n'hydrate pas** (app non-interactive : login muet, spinners infinis), et un audit Lighthouse (prod, sans eval) ne le détecte pas. Toujours tester une CSP en `next dev` ET `next start`.
+- **Gate hooks de données sur `state.status === 'authenticated'`** ([queries.ts](apps/web/src/lib/queries.ts), [use-realtime-sessions.ts](apps/web/src/hooks/use-realtime-sessions.ts)) : les hooks `useWeekSessionsQuery`, `useSessionDetailQuery`, `useWeekStatsQuery` lisent `useAuth()` et conditionnent `enabled`. `useRealtimeSessions` n'ouvre pas le socket avant auth. Bénéfice : aucun fetch/socket sortant pendant la fenêtre entre mount et redirection RequireAuth — pas de bruit console (audit Lighthouse `errors-in-console`), pas de 401 inutiles côté backend. À répliquer sur tout nouveau hook qui consomme un endpoint protégé. Tests : `vi.mock('@/contexts/auth-context')` retournant `state.status: 'authenticated'` pour préserver l'intention nominale (cf. `apps/web/src/hooks/__tests__/use-week-sessions-query.test.tsx`).
+- **Pattern smart dirty** (V2-D7, ADR-0008) : source de vérité serveur = `Seance.publishedSnapshot` (JSON figé du dernier publish) + `hasUnpublishedChanges` recalculé à chaque `GET` ([apps/backend/src/seance-v2/seance-v2.service.ts](apps/backend/src/seance-v2/seance-v2.service.ts)). Client peut diffrer en local pour réactivité immédiate du badge ; retour à l'état publié → snapshot identique → badge disparaît automatiquement. Le `publishedSnapshot` est comparé avec normalisation (tri des clés) pour éviter les faux dirty dus à l'ordre JSON. À conserver inchangé tant qu'on n'a pas d'usage cross-session.
+- **Pattern undo/redo client-side** (V2-D11, LOT 4) : `useUndoRedo<T>()` ([packages/ui/src/hooks/](packages/ui/src/hooks/use-undo-redo.ts)), pile bornée (50), scope = frame d'édition non publiée. Chaque action push `{ action, payload, inverse }` ; `CTRL+Z` rejoue `inverse`, `CTRL+SHIFT+Z` rejoue `action`. `publish()` vide la pile. Pas d'undo cross-session (refresh = pile vide). Boutons toolbar miroir des raccourcis. Pour étendre à de nouvelles mutations : capture `inverse` au moment du push (snapshot, pas reference) — sinon rollback partiel sur mutations chainées.
+- **Pattern multi-classes** (V2-D6) : `Seance ↔ Classe` en N-N via table jointure `SeanceClasse`. Filtre API `?classeId=X` matche toute séance dont la jointure contient X (et non plus égalité directe). Le frontend reçoit `classes: ClasseDto[]` (pas `classe: ClasseDto`) sur le SessionV2Dto. Composant `<ClasseChipsPicker>` ([apps/web/src/components/planning/classe-chips-picker.tsx](apps/web/src/components/planning/classe-chips-picker.tsx)) pour la sélection multiple. Migration depuis V01 : ajout de la table jointure + script de copie `classeId → SeanceClasse(seanceId, classeId)`.
+- **ADR-0007, ADR-0008, ADR-0009 confirmés mergés sur develop** (Vague 02). Ces décisions sont **acquises** : remettre en cause = nouvel ADR.
 
 ---
 

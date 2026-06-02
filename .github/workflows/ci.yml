@@ -24,6 +24,8 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+    env:
+      DATABASE_URL: postgresql://planit:planit@localhost:5432/planit_test
     steps:
       - uses: actions/checkout@v4
 
@@ -37,6 +39,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # LOT 0 V02 — Vague 02 introduces non-trivial migration data; we run
+      # `prisma migrate deploy` against the CI Postgres so a broken migration
+      # fails the PR before any test runs.
+      - name: Prisma migrate deploy (CI shadow)
+        working-directory: apps/backend
+        run: |
+          pnpm prisma migrate deploy
+          pnpm prisma generate
+
+      # @planit/contracts and @planit/utils export ./dist/*.js (the packages
+      # are consumed by Node/CommonJS at runtime via NestJS — Node v24 ESM
+      # refuses directory imports in source TS, so a built CJS dist/ is
+      # required). Vite/Vitest in apps/web also resolves these exports —
+      # without a prior build, the web test suite fails with "Failed to
+      # resolve entry". Build before lint/typecheck/test so every downstream
+      # step sees hydrated dist/ directories.
+      - name: Build internal packages (contracts + utils)
+        run: |
+          pnpm --filter @planit/contracts build
+          pnpm --filter @planit/utils build
+
       - name: Lint
         run: pnpm lint
 
@@ -45,8 +68,6 @@ jobs:
 
       - name: Test
         run: pnpm test
-        env:
-          DATABASE_URL: postgresql://planit:planit@localhost:5432/planit_test
 
   build:
     name: Build
@@ -69,3 +90,140 @@ jobs:
         run: pnpm build
         env:
           DATABASE_URL: postgresql://planit:planit@localhost:5432/planit_ci
+
+  # Lighthouse mobile audit (page publique `/login`).
+  #
+  # Depuis l'auth V02, toute route applicative est gated par le middleware edge
+  # (307 → /login en anonyme) : `/login` est la seule page auditable sans
+  # session. Audit des vraies pages connectées = run authentifié (TD-LH-AUTH-AUDIT).
+  #
+  # Politique :
+  # - **Tourne sur toutes les PRs** ciblant develop/main (et seulement
+  #   les PRs : pas les push sur feat/*). Chaque dev voit ainsi l'impact
+  #   perf/a11y/best-practices/SEO de ses changements via les artefacts
+  #   uploadés (rapports HTML accessibles depuis l'onglet Actions du run
+  #   et via les liens `storage.googleapis.com` postés dans les logs).
+  # - **Gating à deux niveaux** :
+  #   1. PR ciblant `main` (release develop → main) → **toujours bloquant**.
+  #      C'est le moment où on garantit la qualité officielle, pas
+  #      d'option laxiste.
+  #   2. PR ciblant `develop` → bloquant **uniquement** si la PR porte
+  #      le label `lighthouse-strict`. Sinon informationnel (assertions
+  #      annotées en warning, job vert).
+  #
+  # Ce mode (signal partout, gate auto-release + opt-in feature) évite
+  # que des dettes pré-existantes hors scope d'une PR feature ne bloquent
+  # inutilement, tout en garantissant qu'aucune release vers main ne
+  # passe sans audit strict.
+  #
+  # Voir `docs/runbooks/ci-lighthouse.md` pour les détails d'usage.
+  lighthouse:
+    name: Lighthouse mobile (Étudiant + Enseignant)
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    # Postgres + backend en background pour que le fetch initial `/auth/me`
+    # depuis le AuthProvider (root layout) retourne un 401 propre au lieu
+    # d'un `net::ERR_CONNECTION_REFUSED` qui pollue la console et fait
+    # tomber l'audit `errors-in-console`. Le backend reçoit les requêtes
+    # mais répond 401 puisque l'audit Lighthouse n'a pas de cookie — c'est
+    # le comportement attendu.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: planit
+          POSTGRES_PASSWORD: planit
+          POSTGRES_DB: planit_lh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U planit -d planit_lh"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://planit:planit@localhost:5432/planit_lh
+      # Secrets dummy : aucun token n'est signé/vérifié pendant l'audit
+      # (Lighthouse n'a pas de cookie). Suffisants pour faire booter le
+      # backend.
+      JWT_ACCESS_SECRET: lh_dummy_access_secret_at_least_32_chars_long
+      JWT_REFRESH_SECRET: lh_dummy_refresh_secret_at_least_32_chars_long
+      JWT_ACCESS_TTL: '900'
+      JWT_REFRESH_TTL: '604800'
+      FRONTEND_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Le backend est consommé par Next.js client-side dès le mount du
+      # AuthProvider (root layout). Sans lui, `fetch('/api/auth/me')` lance
+      # un `ERR_CONNECTION_REFUSED` que Chrome log en console → fail LH.
+      - name: Prisma migrate deploy (LH backend)
+        working-directory: apps/backend
+        run: |
+          pnpm prisma migrate deploy
+          pnpm prisma generate
+
+      # Les packages CJS doivent exister avant `nest build`.
+      - name: Build internal packages (contracts + utils)
+        run: |
+          pnpm --filter @planit/contracts build
+          pnpm --filter @planit/utils build
+
+      - name: Build backend
+        working-directory: apps/backend
+        run: pnpm build
+
+      - name: Start backend (background)
+        working-directory: apps/backend
+        run: nohup pnpm start > backend.log 2>&1 &
+
+      - name: Wait for backend
+        run: npx --yes wait-on http://localhost:3001/api/health --timeout 60000
+
+      - name: Build web (production)
+        working-directory: apps/web
+        run: pnpm build
+
+      - name: Start web (background)
+        working-directory: apps/web
+        run: pnpm start &
+        env:
+          PORT: '3000'
+
+      - name: Wait for server
+        run: npx --yes wait-on http://localhost:3000 --timeout 60000
+
+      - name: Run Lighthouse CI (mobile)
+        # Gating à deux niveaux (cf. commentaire au-dessus du job) :
+        # - target = main → toujours bloquant (release officielle)
+        # - target = develop → bloquant uniquement si label `lighthouse-strict`
+        # `continue-on-error` est `true` (non bloquant) seulement si on est
+        # vers develop ET pas de label strict.
+        continue-on-error: ${{ github.base_ref != 'main' && !contains(github.event.pull_request.labels.*.name, 'lighthouse-strict') }}
+        uses: treosh/lighthouse-ci-action@v11
+        with:
+          # On audite `/login`, **seule page publique** depuis l'arrivée de
+          # l'auth V02 : le middleware edge redirige toute route applicative
+          # (`/etudiant`, `/enseignant`, `/rp`…) en 307 vers `/login` tant
+          # qu'il n'y a pas de cookie de session. Auditer ces routes en
+          # anonyme faisait donc échouer l'audit `redirects` (Lighthouse suit
+          # la 307) — un faux négatif, le redirect d'auth étant légitime.
+          # `/login` est le shell commun aux 3 acteurs ; perf/a11y y sont
+          # représentatifs. Auditer les vraies pages connectées demande un run
+          # authentifié (cookie) → tech-debt TD-LH-AUTH-AUDIT, cf. runbook.
+          urls: |
+            http://localhost:3000/login
+          configPath: ./.github/lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true

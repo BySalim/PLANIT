@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import type { Logger } from 'pino';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
@@ -12,6 +13,10 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api');
+
+  // cookie-parser pose `req.cookies` — requis par les strategies passport-jwt
+  // (extracteurs depuis les cookies HttpOnly `access` et `refresh`).
+  app.use(cookieParser());
 
   app.useGlobalPipes(new ZodValidationPipe());
 
@@ -26,7 +31,9 @@ async function bootstrap(): Promise<void> {
     .setTitle('PLANIT API')
     .setDescription("API de la plateforme de gestion des emplois du temps de l'ISM Dakar")
     .setVersion('0.1.0')
-    .addBearerAuth()
+    // Auth V02 via cookies HttpOnly (ADR-0007 §2) — pas de Bearer token.
+    .addCookieAuth('access')
+    .addCookieAuth('refresh')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
