@@ -45,6 +45,14 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// Filet anti-blocage du boot : si `/auth/me` ne répond pas (backend en
+// cold-start, proxy qui pend), on abandonne au bout de ce délai et on bascule
+// en « non authentifié » plutôt que de rester coincé en `loading` — ce qui se
+// traduisait par un spinner « chargement infini » au tout premier accès qu'un
+// refresh manuel « débloquait ». L'utilisateur voit alors /login ; le premier
+// appel data réauthentifie de toute façon via l'intercepteur 401→refresh.
+const BOOT_TIMEOUT_MS = 8000;
+
 export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, { status: 'loading' } as AuthState);
 
@@ -60,12 +68,18 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     // résoudre juste après que le cleanup ait posé `cancelled=true`, et son
     // handler serait alors skippé → l'app reste bloquée en `loading`. À la
     // place : tout fetch qui résout dispatche ; on n'ignore QUE les rejets
-    // dus à l'abort (via `signal.aborted`). Le proxy same-origin (rapide) a
-    // révélé cette race ; le fetch survivant (2e mount) dispatche toujours.
+    // dus à l'abort de cleanup (et non au timeout). Le proxy same-origin
+    // (rapide) a révélé cette race ; le fetch survivant (2e mount) dispatche.
     const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, BOOT_TIMEOUT_MS);
 
     fetch(`${API_BASE}/auth/me`, { credentials: 'include', signal: controller.signal })
       .then(async (r) => {
+        clearTimeout(timeout);
         if (!r.ok) {
           dispatch({ type: 'CLEAR_USER' });
           return;
@@ -75,13 +89,16 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         dispatch(parsed.success ? { type: 'SET_USER', user: parsed.data } : { type: 'CLEAR_USER' });
       })
       .catch(() => {
-        // Abort (cleanup/unmount) → on ne touche pas au state. Toute autre
-        // erreur (réseau, backend down) → non authentifié.
-        if (controller.signal.aborted) return;
+        clearTimeout(timeout);
+        // Abort dû au cleanup/unmount (pas au timeout) → on ne touche pas au
+        // state. Timeout, ou toute autre erreur (réseau, backend down) → non
+        // authentifié (le filet anti-spinner-infini).
+        if (controller.signal.aborted && !timedOut) return;
         dispatch({ type: 'CLEAR_USER' });
       });
 
     return () => {
+      clearTimeout(timeout);
       controller.abort();
     };
   }, []);

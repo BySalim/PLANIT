@@ -90,3 +90,41 @@ body {
     box-shadow: 0 0 0 4px rgba(232, 98, 10, 0.1);
   }
 }
+
+/* ── Skeleton loading ──────────────────────────────────────────────────
+   Placeholder neutre balayé par un reflet « shimmer ». Brique de base de
+   tous les skeletons de page (table, liste, accordéon, drawer) via le
+   composant <Skeleton> (components/ui/skeleton.tsx).
+   Le reflet utilise --color-surface (blanc) en translucide pour rester dans
+   les tokens, et se fige si l'utilisateur préfère moins d'animations (a11y). */
+@keyframes planitShimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@utility skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-border-soft);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--color-surface) 70%, transparent),
+      transparent
+    );
+    animation: planitShimmer 1.6s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
