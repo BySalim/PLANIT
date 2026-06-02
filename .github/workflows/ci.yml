@@ -91,7 +91,11 @@ jobs:
         env:
           DATABASE_URL: postgresql://planit:planit@localhost:5432/planit_ci
 
-  # Lighthouse mobile audit (/etudiant + /enseignant).
+  # Lighthouse mobile audit (page publique `/login`).
+  #
+  # Depuis l'auth V02, toute route applicative est gated par le middleware edge
+  # (307 → /login en anonyme) : `/login` est la seule page auditable sans
+  # session. Audit des vraies pages connectées = run authentifié (TD-LH-AUTH-AUDIT).
   #
   # Politique :
   # - **Tourne sur toutes les PRs** ciblant develop/main (et seulement
@@ -209,9 +213,17 @@ jobs:
         continue-on-error: ${{ github.base_ref != 'main' && !contains(github.event.pull_request.labels.*.name, 'lighthouse-strict') }}
         uses: treosh/lighthouse-ci-action@v11
         with:
+          # On audite `/login`, **seule page publique** depuis l'arrivée de
+          # l'auth V02 : le middleware edge redirige toute route applicative
+          # (`/etudiant`, `/enseignant`, `/rp`…) en 307 vers `/login` tant
+          # qu'il n'y a pas de cookie de session. Auditer ces routes en
+          # anonyme faisait donc échouer l'audit `redirects` (Lighthouse suit
+          # la 307) — un faux négatif, le redirect d'auth étant légitime.
+          # `/login` est le shell commun aux 3 acteurs ; perf/a11y y sont
+          # représentatifs. Auditer les vraies pages connectées demande un run
+          # authentifié (cookie) → tech-debt TD-LH-AUTH-AUDIT, cf. runbook.
           urls: |
-            http://localhost:3000/etudiant
-            http://localhost:3000/enseignant
+            http://localhost:3000/login
           configPath: ./.github/lighthouserc.json
           uploadArtifacts: true
           temporaryPublicStorage: true

@@ -151,3 +151,30 @@ le typecheck + la vérif navigateur). Les squelettes portent `role="status"` +
 - **CLAUDE.md / ADR / tech-debt** : aucun changement (pattern additif, pas de
   décision structurante). Le pattern skeleton pourra être cité dans les « patterns
   émergés » au prochain passage CLAUDE.md si le TL le souhaite.
+
+---
+
+## Addendum (2026-06-02) — finalisation V02 + déblocage release Lighthouse
+
+PR #43 mergée sur `develop`. Lancement de la release V02 (`develop → main`, PR #44).
+Le **Lighthouse strict** (auto-bloquant sur cible `main`) a échoué — **pas une
+régression de cette PR** : 1ʳᵉ PR strict depuis l'arrivée du middleware edge
+(PR #42). Le middleware redirige `/etudiant`·`/enseignant` (audités par le job)
+en **307 → /login** en anonyme → l'audit `redirects` tombe à 0 (faux négatif, le
+redirect d'auth est légitime). Seul blocage ; `performance`/`accessibility`
+passent (sur `/login`).
+
+**Fix retenu (validé TL)** : le job audite désormais **`/login`** (seule page
+publique post-auth, shell commun aux 3 acteurs) au lieu des routes gated. Plus de
+redirect → audit vert, sans toucher au gating. Limite assumée : le contenu réel
+des pages connectées n'est pas audité → tech-debt **`TD-LH-AUTH-AUDIT`** (run
+authentifié via `puppeteerScript`).
+
+- **Modifiés** : `.github/workflows/ci.yml` (URLs → `/login` + commentaire),
+  `docs/runbooks/ci-lighthouse.md` (§ « Quelle URL est auditée » + futures),
+  `docs/tech-debt.md` (`TD-LH-AUTH-AUDIT`), `CLAUDE.md` (note politique LH).
+- **Flux** (validé TL) : commit sur `feat/salim` → PR → `develop` ; release #44
+  re-run vert ; **le TL clique Merge sur #44** (main). Puis tag `v0.2.0` annoté
+  sur PLANIT (par Claude) + sur PLANIT-Strategie-VibeCode (par Salim) + `push --tags`.
+- Décision sensible signalée : édition de `CLAUDE.md` (note documentaire reflétant
+  le fix validé, pas un changement de convention).
