@@ -23,15 +23,17 @@ const DEMO_CONFLICTS = 3;
 const DEMO_PENDING_DEMANDS = 5;
 const DEMO_UNREAD_NOTIFS = 3;
 
-// Next.js App Router requires default export for page
-// eslint-disable-next-line no-restricted-syntax
 interface CreateInit {
   readonly date: Date;
   readonly startTime: string;
   readonly endTime: string;
 }
 
-export default function RpPlanningPage() {
+/**
+ * Vue planning RP/AC — rendue par le home role-aware (`/`) quand l'acteur connecté
+ * est RESPONSABLE_PROGRAMME ou ASSISTANT_PROGRAMME. (Anciennement la page `/rp`.)
+ */
+export function RpPlanningView() {
   const [weekStart, setWeekStart] = useState<Date>(() => getCurrentWeekStart());
   const [createOpen, setCreateOpen] = useState(false);
   // I.1 / I.2 — pré-remplissage de la modale depuis un clic/drag sur slot vide.
@@ -91,7 +93,7 @@ export default function RpPlanningPage() {
     <Shell
       fullBleed
       title="Planning hebdomadaire"
-      breadcrumb={[{ label: 'Espace RP', href: '/rp' }, { label: 'Planning' }]}
+      breadcrumb={[{ label: 'Espace RP', href: '/' }, { label: 'Planning' }]}
       activeNavId="planning"
       conflicts={DEMO_CONFLICTS}
       pendingDemands={DEMO_PENDING_DEMANDS}

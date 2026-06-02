@@ -3,15 +3,16 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ChevronLeftIcon } from '@planit/ui';
-import { MobileShell } from '@/components/enseignant/mobile-shell';
+import { MobileShell } from '@/components/layout/mobile-shell';
 import { SessionDetailView } from '@/components/enseignant/session-detail-view';
-import { useCurrentTeacher } from '@/hooks/use-current-teacher';
 import { useRealtimeSessions } from '@/hooks/use-realtime-sessions';
 import { useSessionDetailQuery } from '@/lib/queries';
 
+// Détail séance des acteurs consultation — URL `/seance/:id`, role-agnostique.
+// Fusion de `/enseignant/seance/:id` et `/etudiant/seance/:id` (la vue est déjà
+// identique pour les deux rôles ; aucune donnée acteur n'est requise ici).
 // eslint-disable-next-line no-restricted-syntax
-export default function EnseignantSeanceDetailPage() {
-  const teacher = useCurrentTeacher();
+export default function SeanceDetailPage() {
   useRealtimeSessions(true);
 
   const params = useParams<{ id: string }>();
@@ -24,7 +25,7 @@ export default function EnseignantSeanceDetailPage() {
       <div className="flex flex-col gap-4 px-4 py-4">
         <div className="flex items-center gap-2">
           <Link
-            href="/enseignant/planning"
+            href="/planning"
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-soft bg-surface px-3 text-sm font-medium text-text-sec transition-colors hover:border-primary hover:text-primary"
             aria-label="Retour au planning"
           >

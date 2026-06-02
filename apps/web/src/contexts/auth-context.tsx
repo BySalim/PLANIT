@@ -153,10 +153,14 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
+// Home unique role-agnostique : tous les rôles atterrissent sur `/`, qui rend la
+// vue adaptée au rôle connecté (cf. app/(planit)/page.tsx). La map est conservée
+// (plutôt qu'une constante) pour rester un point d'extension si une home par rôle
+// devait diverger à nouveau.
 export const ROLE_HOME: Record<UserRole, string> = {
-  RESPONSABLE_PROGRAMME: '/rp',
-  ASSISTANT_PROGRAMME: '/rp',
-  ENSEIGNANT: '/enseignant',
-  ETUDIANT: '/etudiant',
-  RESPONSABLE_CLASSE: '/etudiant',
+  RESPONSABLE_PROGRAMME: '/',
+  ASSISTANT_PROGRAMME: '/',
+  ENSEIGNANT: '/',
+  ETUDIANT: '/',
+  RESPONSABLE_CLASSE: '/',
 };

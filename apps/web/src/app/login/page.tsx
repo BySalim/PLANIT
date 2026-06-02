@@ -36,7 +36,7 @@ function LoginPageInner() {
   // Redirige si déjà authentifié (ex. retour sur /login avec un cookie valide).
   useEffect(() => {
     if (state.status === 'authenticated') {
-      router.replace(returnUrl ?? ROLE_HOME[state.user.role] ?? '/rp');
+      router.replace(returnUrl ?? ROLE_HOME[state.user.role] ?? '/');
     }
   }, [state, router, returnUrl]);
 
@@ -50,7 +50,7 @@ function LoginPageInner() {
     setServerError(null);
     try {
       const user = await login(data.email, data.password);
-      router.replace(returnUrl ?? ROLE_HOME[user.role] ?? '/rp');
+      router.replace(returnUrl ?? ROLE_HOME[user.role] ?? '/');
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Une erreur est survenue');
     }
