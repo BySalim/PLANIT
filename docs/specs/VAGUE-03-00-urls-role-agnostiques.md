@@ -1,6 +1,6 @@
-# VAGUE-03-01 — URLs sans nom d'acteur (unification role-aware)
+# VAGUE-03-00 — URLs sans nom d'acteur (unification role-aware)
 
-> **Statut** : SPEC — en attente validation TL (plan ci-dessous). Zéro code avant GO.
+> **Statut** : **Implémenté** (PR #46, commit `62536f9`). Socle V03 (cf. V3-D13).
 > **Demandeur** : Salim (TL). **Branche** : `feat/salim` (base `develop` @ v0.2.0).
 > **Lié à** : tech-debt `FACTOR-PAGES`, `TD-022` (acteur courant hardcodé).
 

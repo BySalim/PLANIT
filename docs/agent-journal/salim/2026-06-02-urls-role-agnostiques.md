@@ -1,8 +1,8 @@
-# URLs role-agnostiques — unification des routes (V03-01)
+# URLs role-agnostiques — unification des routes (V03-00)
 
 **Date** : 2026-06-02
 **Branche** : `feat/salim` (base `develop` @ v0.2.0)
-**Spec** : [VAGUE-03-01](../../specs/VAGUE-03-01-urls-role-agnostiques.md)
+**Spec** : [VAGUE-03-00](../../specs/VAGUE-03-00-urls-role-agnostiques.md)
 
 ## 1. Directives reçues
 
@@ -50,7 +50,7 @@ Timing validé : **après la release V02**. Plan validé avant tout code.
   `(gestion)/layout.tsx`.
 - `components/rp/rp-planning-view.tsx`, `components/consult/actor-home-view.tsx`,
   `components/layout/mobile-shell.tsx` (unifié).
-- `docs/specs/VAGUE-03-01-urls-role-agnostiques.md`.
+- `docs/specs/VAGUE-03-00-urls-role-agnostiques.md`.
 
 ### Déplacés (git mv)
 
@@ -100,7 +100,7 @@ Timing validé : **après la release V02**. Plan validé avant tout code.
 
 ## 8. Mises à jour annexes
 
-- **Spec** : `docs/specs/VAGUE-03-01-urls-role-agnostiques.md` (nouveau).
+- **Spec** : `docs/specs/VAGUE-03-00-urls-role-agnostiques.md` (nouveau).
 - **CLAUDE.md / tech-debt** : pas de changement structurant ici ; le pattern
   « route groups pour RBAC + URLs role-agnostiques » pourra être cité dans les
   patterns émergés V03 au prochain passage si le TL le souhaite.
