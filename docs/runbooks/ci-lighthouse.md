@@ -61,6 +61,16 @@ Conséquence pratique : les 4 dettes Lighthouse existantes (`TD-LH-*`) doivent �
 
 Ne pas l'utiliser comme défaut sur les PRs feature. Le défaut est volontairement permissif pour éviter le "Lighthouse rouge" récurrent qui fait que personne ne regarde plus.
 
+### 5. Quelle URL est auditée — et pourquoi `/login`
+
+Le job audite **uniquement `http://localhost:3000/login`**.
+
+Depuis l'auth V02, le `middleware.ts` (edge) redirige en **307** toute route applicative (`/etudiant`, `/enseignant`, `/rp`…) vers `/login` tant qu'il n'y a pas de cookie de session. Le run Lighthouse CI est **anonyme** (pas de cookie) → auditer ces routes faisait suivre la 307 à Lighthouse et **échouer l'audit `redirects`** (score 0), un **faux négatif** : le redirect d'auth est le comportement attendu, pas une régression perf.
+
+`/login` est le **shell public commun aux 3 acteurs** (même layout, mêmes polices/CSS/JS de base) → ses scores perf/a11y sont représentatifs du chargement initial. On audite donc la seule page réellement atteignable en anonyme.
+
+> **Limite assumée + tech-debt `TD-LH-AUTH-AUDIT`** : on n'audite pas le contenu réel des pages connectées (`/etudiant`, `/enseignant`). Pour ça il faut un **run authentifié** : `lighthouse-ci-action` accepte un `puppeteerScript` qui seed un user + pose le cookie avant l'audit (cf. « Évolutions futures »). À faire quand la perf des vues connectées devient un sujet (sprint perf V03+).
+
 ---
 
 ## Seuils actuels (`.github/lighthouserc.json`)
@@ -151,5 +161,5 @@ Normal — Lighthouse tourne sur toutes les PRs et peut exhumer des dettes exist
 ## Évolutions futures
 
 - **`lhci server`** : stocker l'historique des rapports pour comparaison delta entre commits (V03+)
-- **Audit authentifié** : configurer `lighthouse-ci-action` avec un `puppeteerScript` qui pose le cookie auth, pour auditer les pages protégées avec leur vrai contenu (plus représentatif du chargement réel utilisateur)
+- **Audit authentifié** (`TD-LH-AUTH-AUDIT`) : configurer `lighthouse-ci-action` avec un `puppeteerScript` qui pose le cookie auth, pour auditer les pages protégées (`/etudiant`, `/enseignant`) avec leur vrai contenu (plus représentatif du chargement réel utilisateur). Tant que ce n'est pas fait, seul `/login` est audité (cf. § « Quelle URL est auditée »)
 - **Catégories par environnement** : seuil différent en dev vs staging (V04+ quand on aura les deux)
