@@ -43,6 +43,25 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Workspace packages shipped as TypeScript source must be transpiled by Next.
   transpilePackages: ['@planit/ui', '@planit/design-tokens', '@planit/contracts', '@planit/utils'],
+  // Redirections des anciennes URLs à nom d'acteur (`/rp`, `/enseignant`,
+  // `/etudiant`…) vers les URLs role-agnostiques (V03-01). 308 permanent : pas
+  // de 404 sur les bookmarks / liens existants après le refactor. Exécutées
+  // AVANT le middleware (ordre de routing Next), donc un returnUrl legacy
+  // (`?returnUrl=/rp`) atterrit bien sur `/` après login.
+  async redirects() {
+    return [
+      { source: '/rp', destination: '/', permanent: true },
+      { source: '/rp/enseignants', destination: '/enseignants', permanent: true },
+      { source: '/rp/filieres', destination: '/filieres', permanent: true },
+      { source: '/rp/ue-modules', destination: '/ue-modules', permanent: true },
+      { source: '/enseignant', destination: '/', permanent: true },
+      { source: '/etudiant', destination: '/', permanent: true },
+      { source: '/enseignant/planning', destination: '/planning', permanent: true },
+      { source: '/etudiant/planning', destination: '/planning', permanent: true },
+      { source: '/enseignant/seance/:id', destination: '/seance/:id', permanent: true },
+      { source: '/etudiant/seance/:id', destination: '/seance/:id', permanent: true },
+    ];
+  },
   // Proxy same-origin : toute requête `/api/*` du front est relayée vers le
   // backend. Next forwarde `Set-Cookie`/`Cookie`, donc le cookie d'auth est
   // posé et lu comme first-party. `middleware.ts` peut alors le voir.

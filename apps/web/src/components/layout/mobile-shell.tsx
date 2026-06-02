@@ -3,9 +3,15 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { BellIcon, CalendarIcon, HomeIcon } from '@planit/ui';
-import { useAuth } from '@/contexts/auth-context';
-import { useCurrentTeacher } from '@/hooks/use-current-teacher';
+import { useAuth, type UserRole } from '@/contexts/auth-context';
+import { useCurrentActor } from '@/hooks/use-current-actor';
 import { cn } from '@/lib/utils';
+
+// Shell responsive des vues consultation (Enseignant / Étudiant / Délégué).
+// Unifié et role-agnostique : URLs propres (`/`, `/planning`) identiques pour
+// tous les acteurs, le rôle est lu via useCurrentActor() (libellé + identité).
+//   • Mobile (< md) : max-w-md centré, header compact + tab bar flottante
+//   • Desktop (≥ md) : sidebar gauche, pas de tab bar
 
 export interface MobileShellProps {
   readonly children: React.ReactNode;
@@ -20,9 +26,15 @@ interface TabDef {
 }
 
 const TABS: readonly TabDef[] = [
-  { id: 'home', label: 'Accueil', href: '/enseignant', icon: HomeIcon },
-  { id: 'planning', label: 'Planning', href: '/enseignant/planning', icon: CalendarIcon },
+  { id: 'home', label: 'Accueil', href: '/', icon: HomeIcon },
+  { id: 'planning', label: 'Planning', href: '/planning', icon: CalendarIcon },
 ];
+
+const ROLE_LABEL: Partial<Record<UserRole, string>> = {
+  ENSEIGNANT: 'Enseignant',
+  ETUDIANT: 'Étudiant',
+  RESPONSABLE_CLASSE: 'Délégué',
+};
 
 function initialsFor(fullName: string): string {
   const clean = fullName.replace(/^(M\.|Mme|Mlle|Pr\.|Dr\.)\s+/i, '');
@@ -33,19 +45,17 @@ function initialsFor(fullName: string): string {
   return (first + last).toUpperCase();
 }
 
-// LOT 7 (D.2) — responsive switch :
-//   • Mobile (< md / 768px) : max-w-md centré, header compact + tab bar flottante
-//   • Desktop (≥ md)        : pleine largeur, sidebar gauche, pas de tab bar
 export function MobileShell({ children, unread = 0 }: MobileShellProps) {
   const pathname = usePathname() ?? '';
-  const teacher = useCurrentTeacher();
+  const actor = useCurrentActor();
   const { logout } = useAuth();
   const router = useRouter();
-  const initials = initialsFor(teacher.fullName);
+  const initials = initialsFor(actor.fullName);
+  const roleLabel = ROLE_LABEL[actor.role] ?? 'Compte';
 
-  const activeId: TabDef['id'] | null = pathname.startsWith('/enseignant/planning')
+  const activeId: TabDef['id'] | null = pathname.startsWith('/planning')
     ? 'planning'
-    : pathname === '/enseignant'
+    : pathname === '/'
       ? 'home'
       : null;
 
@@ -54,20 +64,18 @@ export function MobileShell({ children, unread = 0 }: MobileShellProps) {
   };
 
   return (
-    // Outer: flex-row sur desktop, flex-col sur mobile (centré max-w-md)
     <div className="flex h-dvh overflow-hidden bg-bg">
       {/* ── Sidebar desktop (md+) ──────────────────────────────────────── */}
       <DesktopSidebar
         activeId={activeId}
         initials={initials}
-        fullName={teacher.fullName}
-        role="Enseignant"
+        fullName={actor.fullName}
+        role={roleLabel}
         unread={unread}
         onLogout={handleLogout}
       />
 
       {/* ── Panneau contenu ────────────────────────────────────────────── */}
-      {/* Mobile : max-w-md centré ; Desktop : flex-1 (occupe le reste) */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden max-md:mx-auto max-md:max-w-md">
         {/* Header compact — mobile uniquement */}
         <MobileHeader unread={unread} initials={initials} className="md:hidden" />
@@ -111,9 +119,9 @@ function DesktopSidebar({
     >
       {/* Logo */}
       <Link
-        href="/enseignant"
+        href="/"
         className="flex h-16 flex-shrink-0 items-center gap-2.5 border-b border-border-soft px-5"
-        aria-label="Accueil enseignant"
+        aria-label="Accueil"
       >
         <span
           aria-hidden
@@ -222,7 +230,7 @@ function MobileHeader({
         className,
       )}
     >
-      <Link href="/enseignant" className="flex items-center gap-2" aria-label="Accueil enseignant">
+      <Link href="/" className="flex items-center gap-2" aria-label="Accueil">
         <span
           aria-hidden
           className="bg-brand-gradient flex size-9 items-center justify-center rounded-lg text-white"

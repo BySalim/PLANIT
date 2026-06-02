@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FlashProvider } from '@planit/ui';
 import { AuthProvider } from '../contexts/auth-context';
-import RpPage from '../app/(planit)/rp/page';
+import { RpPlanningView } from '../components/rp/rp-planning-view';
 
 function renderWithProviders(ui: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -17,8 +17,8 @@ function renderWithProviders(ui: React.ReactElement) {
 }
 
 describe('smoke', () => {
-  it('renders the RP planning page header without crashing', () => {
-    renderWithProviders(<RpPage />);
+  it('renders the RP planning view header without crashing', () => {
+    renderWithProviders(<RpPlanningView />);
     expect(screen.getByRole('heading', { name: 'Planning hebdomadaire' })).toBeInTheDocument();
   });
 });

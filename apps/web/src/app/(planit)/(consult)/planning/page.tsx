@@ -9,11 +9,11 @@ import type { SessionDto } from '@planit/contracts';
 import { now as nowDakar } from '@planit/utils/date';
 import { CalendarPicker } from '@/components/enseignant/calendar-picker';
 import { DayTimeline } from '@/components/enseignant/day-timeline';
-import { MobileShell } from '@/components/enseignant/mobile-shell';
+import { MobileShell } from '@/components/layout/mobile-shell';
 import { PlanningUpdateModal } from '@/components/enseignant/planning-update-modal';
 import { WeekDayHeader, WeekTimeline } from '@/components/enseignant/week-timeline';
 import { useToast } from '@/components/ui/toast-provider';
-import { useCurrentTeacher } from '@/hooks/use-current-teacher';
+import { useCurrentActor } from '@/hooks/use-current-actor';
 import { useRealtimeSessions } from '@/hooks/use-realtime-sessions';
 import { useWeekSessionsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -28,20 +28,25 @@ const FILTER_LABEL: Record<TypeFilter, string> = {
   event: 'Évén.',
 };
 
+// Vue planning semaine/jour des acteurs consultation (Enseignant / Étudiant /
+// Délégué) — URL `/planning`, role-agnostique. Fusion des anciennes pages
+// `/enseignant/planning` et `/etudiant/planning` ; `useCurrentActor().variant`
+// pilote le filtre serveur et l'affichage.
+//
 // Next 15 : useSearchParams() exige un boundary Suspense pour le prerender.
 // eslint-disable-next-line no-restricted-syntax
-export default function EnseignantPlanningPage() {
+export default function PlanningPage() {
   return (
     <Suspense fallback={null}>
-      <EnseignantPlanningPageInner />
+      <PlanningPageInner />
     </Suspense>
   );
 }
 
-function EnseignantPlanningPageInner() {
+function PlanningPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const teacher = useCurrentTeacher();
+  const actor = useCurrentActor();
   const toast = useToast();
 
   // ?date=YYYY-MM-DD : ouverture sur un jour précis (clic depuis WeekStrip).
@@ -79,7 +84,11 @@ function EnseignantPlanningPageInner() {
   const now = useMemo(() => nowDakar(), []);
   const weekStart = useMemo(() => startOfWeek(selectedDate, { weekStartsOn: 1 }), [selectedDate]);
 
-  const { data } = useWeekSessionsQuery(weekStart, { teacherId: teacher.id });
+  const queryOptions = useMemo(
+    () => (actor.variant === 'student' ? { studentId: actor.id } : { teacherId: actor.id }),
+    [actor.variant, actor.id],
+  );
+  const { data } = useWeekSessionsQuery(weekStart, queryOptions);
   const sessions = useMemo<readonly SessionDto[]>(() => data ?? [], [data]);
 
   const dateLabel = useMemo(() => {
@@ -91,7 +100,7 @@ function EnseignantPlanningPageInner() {
   }, [view, selectedDate, weekStart]);
 
   const handleSessionTap = (session: SessionDto) => {
-    router.push(`/enseignant/seance/${session.id}`);
+    router.push(`/seance/${session.id}`);
   };
 
   const handleDownloadClick = () => {
@@ -205,6 +214,7 @@ function EnseignantPlanningPageInner() {
               date={selectedDate}
               sessions={sessions}
               now={now}
+              variant={actor.variant}
               onSessionTap={handleSessionTap}
             />
           ) : (
@@ -212,6 +222,7 @@ function EnseignantPlanningPageInner() {
               weekStart={weekStart}
               sessions={sessions}
               now={now}
+              variant={actor.variant}
               onSessionTap={handleSessionTap}
               onScrollXChange={setWeekScrollX}
             />

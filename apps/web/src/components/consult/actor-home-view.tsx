@@ -9,11 +9,11 @@ import { now as nowDakar } from '@planit/utils/date';
 import { Greeting } from '@/components/enseignant/greeting';
 import { HeroCurrentSession } from '@/components/enseignant/hero-current-session';
 import { HeroSkeleton } from '@/components/enseignant/hero-skeleton';
-import { MobileShell } from '@/components/enseignant/mobile-shell';
+import { MobileShell } from '@/components/layout/mobile-shell';
 import { PlanningUpdateModal } from '@/components/enseignant/planning-update-modal';
 import { SessionsTodayList } from '@/components/enseignant/sessions-today-list';
 import { WeekStrip } from '@/components/enseignant/week-strip';
-import { useCurrentTeacher } from '@/hooks/use-current-teacher';
+import { useCurrentActor } from '@/hooks/use-current-actor';
 import { useRealtimeSessions } from '@/hooks/use-realtime-sessions';
 import { useWeekSessionsQuery } from '@/lib/queries';
 import { getCurrentWeekStart } from '@/lib/week';
@@ -22,12 +22,17 @@ function filterTodaySessions(sessions: readonly SessionDto[], now: Date): readon
   return sessions.filter((s) => isSameDay(new Date(s.startAt), now));
 }
 
-// eslint-disable-next-line no-restricted-syntax
-export default function EnseignantHomePage() {
+/**
+ * Vue d'accueil consultation (dashboard) rendue par le home role-aware (`/`) pour
+ * les acteurs non-RP (Enseignant / Étudiant / Délégué). Fusion des anciennes
+ * pages `/enseignant` et `/etudiant` : la `variant` de `useCurrentActor()` pilote
+ * le filtre planning (`teacherId` vs `studentId`) et l'affichage des composants.
+ */
+export function ActorHomeView() {
   const router = useRouter();
-  const teacher = useCurrentTeacher();
+  const actor = useCurrentActor();
 
-  // Modale au lieu du toast — UX plus visible quand l'enseignant n'est pas focus.
+  // Modale au lieu du toast — UX plus visible quand l'utilisateur n'est pas focus.
   const [updateModal, setUpdateModal] = useState<{
     open: boolean;
     sessions: readonly SessionDto[];
@@ -45,21 +50,23 @@ export default function EnseignantHomePage() {
   const now = useMemo(() => nowDakar(), []);
   const weekStart = useMemo(() => getCurrentWeekStart(now), [now]);
 
-  const { data, isLoading, isError } = useWeekSessionsQuery(weekStart, {
-    teacherId: teacher.id,
-  });
+  const queryOptions = useMemo(
+    () => (actor.variant === 'student' ? { studentId: actor.id } : { teacherId: actor.id }),
+    [actor.variant, actor.id],
+  );
+  const { data, isLoading, isError } = useWeekSessionsQuery(weekStart, queryOptions);
 
   const weekSessions = useMemo<readonly SessionDto[]>(() => data ?? [], [data]);
   const todaySessions = useMemo(() => filterTodaySessions(weekSessions, now), [weekSessions, now]);
 
   const handleSessionClick = (session: SessionDto) => {
-    router.push(`/enseignant/seance/${session.id}`);
+    router.push(`/seance/${session.id}`);
   };
 
   return (
     <MobileShell>
       <div className="flex flex-col gap-4 px-4 py-4">
-        <Greeting fullName={teacher.fullName} now={now} />
+        <Greeting fullName={actor.fullName} now={now} />
 
         {isLoading ? (
           <HeroSkeleton />
@@ -72,11 +79,12 @@ export default function EnseignantHomePage() {
           </div>
         ) : (
           <>
-            <HeroCurrentSession sessions={todaySessions} now={now} />
+            <HeroCurrentSession sessions={todaySessions} now={now} variant={actor.variant} />
 
             <SessionsTodayList
               sessions={todaySessions}
               now={now}
+              variant={actor.variant}
               onSessionClick={handleSessionClick}
             />
 
@@ -84,7 +92,7 @@ export default function EnseignantHomePage() {
               <div className="flex items-baseline justify-between px-1">
                 <h3 className="text-[13px] font-medium text-text">Dans la semaine</h3>
                 <Link
-                  href="/enseignant/planning"
+                  href="/planning"
                   className="text-[12px] font-semibold text-accent-600 transition-colors hover:text-accent-800"
                 >
                   Vue complète →
@@ -93,9 +101,7 @@ export default function EnseignantHomePage() {
               <WeekStrip
                 sessions={weekSessions}
                 now={now}
-                onDayClick={(date) =>
-                  router.push(`/enseignant/planning?date=${format(date, 'yyyy-MM-dd')}`)
-                }
+                onDayClick={(date) => router.push(`/planning?date=${format(date, 'yyyy-MM-dd')}`)}
               />
             </div>
           </>
