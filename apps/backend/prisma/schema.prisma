@@ -73,6 +73,26 @@ enum FiliereGrade {
   DOCTORAT
 }
 
+// V03 — niveau d'un plan d'études (porté par Maquette + Formation ; Classe
+// en hérite via sa Formation). Doctorat hors scope V03 (V3-D12 / ADR-0010).
+enum Niveau {
+  L1
+  L2
+  L3
+  M1
+  M2
+}
+
+// V03 — état d'une année académique (V3-D1 / ADR-0010). Au plus une année
+// `EN_COURS` à la fois, garanti par un index unique partiel Postgres ajouté
+// en SQL brut dans la migration (Prisma ne sait pas l'exprimer).
+enum AnneeEtat {
+  PLANIFIEE
+  EN_COURS
+  CLOTUREE
+  SUSPENDUE
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,6 +109,9 @@ model User {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
+  // V01/V02 — FK directe étudiant→classe. V03 : la source de vérité devient
+  // `Inscription` (cf. ADR-0011) ; `classeId` conservé en transition, drop
+  // tracé `TD-V03-CLASSEID`.
   classeId String?
   classe   Classe? @relation(fields: [classeId], references: [id])
 
@@ -98,6 +121,23 @@ model User {
   enseignant    Enseignant?
   refreshTokens RefreshToken[]
 
+  // ── V03 — rattachement AC (Attaché de Classe) ↔ RP (manager) ──────────
+  // V3-D9 / ADR-0010 : un AC (ASSISTANT_PROGRAMME) est rattaché à UN RP.
+  // Self-relation : `manager` = le RP de cet AC ; `assistants` = les AC d'un RP.
+  managerRpId String?
+  manager     User?   @relation("AcManager", fields: [managerRpId], references: [id], onDelete: SetNull)
+  assistants  User[]  @relation("AcManager")
+
+  // V03 — inscriptions de l'étudiant (ADR-0011).
+  inscriptions Inscription[]
+
+  // V03 — classes assignées à un AC par son RP (V3-D9).
+  assignedClasses AssistantClasse[]
+
+  // V03 — salles dont ce RP est responsable (V3-D10).
+  responsableSalles Salle[] @relation("SalleResponsable")
+
+  @@index([managerRpId])
   @@map("users")
 }
 
@@ -135,6 +175,10 @@ model Filiere {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
+  // V03 — plans d'études et formations de cette filière (ADR-0010 / V3-D4).
+  maquettes  Maquette[]
+  formations Formation[]
+
   @@map("filieres")
 }
 
@@ -151,10 +195,27 @@ model Classe {
   filiereId String?
   filiere   Filiere? @relation(fields: [filiereId], references: [id])
 
+  // ── V03 — refonte Classe (V3-D5 / ADR-0010) ───────────────────────────
+  // La classe est rattachée à une Formation (qui porte filière + année +
+  // niveau). `formationId` nullable EN TRANSITION (la `filiereId` directe
+  // ci-dessus reste pour compat ; bascule vers Formation au seed v3).
+  // `capaciteMax` default 0 pour que la migration atterrisse sans backfill —
+  // le seed pose les vraies capacités. « Places » = nb inscrits / capaciteMax.
+  formationId String?
+  formation   Formation? @relation(fields: [formationId], references: [id], onDelete: SetNull)
+
+  capaciteMax Int @default(0)
+
   students    User[]
   seances     Seance[] // V01 — direct FK on Seance.classeId
   seanceLinks SeanceClasse[] // V02 — N-N join, used by LOT 2 onwards
 
+  // V03
+  inscriptions    Inscription[]
+  assistants      AssistantClasse[]
+  suiviModules    SuiviModule[]
+
+  @@index([formationId])
   @@map("classes")
 }
 
@@ -191,6 +252,10 @@ model Module {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // V03 — présence du module dans des versions de maquette + suivis (ADR-0010/0012).
+  maquetteModules MaquetteModule[]
+  suiviModules    SuiviModule[]
+
   @@index([ueId])
   @@map("modules")
 }
@@ -204,6 +269,12 @@ model Salle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // V03 — RP responsable de la salle (V3-D10 / ADR-0010). Nullable : permet
+  // le filtrage « salles dont son RP est responsable » côté AC.
+  rpResponsableId String?
+  rpResponsable   User?   @relation("SalleResponsable", fields: [rpResponsableId], references: [id], onDelete: SetNull)
+
+  @@index([rpResponsableId])
   @@map("salles")
 }
 
@@ -321,4 +392,181 @@ model SeanceClasse {
   @@id([seanceId, classeId])
   @@index([classeId])
   @@map("seance_classes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Vague 03 — Référentiel académique versionné (ADR-0010 / 0011 / 0012)
+// ─────────────────────────────────────────────────────────────────────────────
+// Migration **additive** : aucun DROP, aucune transformation data. Tout est
+// nullable / defaulté pour rester compatible avec le seed V02 et le service
+// V01/V02. La règle « une seule AnneeAcademique EN_COURS » est un index unique
+// PARTIEL ajouté en SQL brut dans la migration (Prisma ne sait pas l'exprimer).
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Année académique — source de vérité de « l'année courante » (V3-D1 / ADR-0010).
+model AnneeAcademique {
+  id      String    @id @default(cuid())
+  libelle String    @unique // « 2025-2026 »
+  debut   DateTime
+  fin     DateTime
+  etat    AnneeEtat @default(PLANIFIEE)
+
+  maquetteVersions MaquetteVersion[]
+  formations       Formation[]
+  inscriptions     Inscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // NB : l'unicité « au plus une EN_COURS » est garantie par un index unique
+  // partiel Postgres (cf. migration). @@index simple ici pour les filtres.
+  @@index([etat])
+  @@map("annee_academiques")
+}
+
+// Maquette — identité stable d'un plan d'études (V3-D2 / ADR-0010).
+// Ses propres dates (createdAt/updatedAt) sont affichées dans le modal infos.
+model Maquette {
+  id        String @id @default(cuid())
+  nom       String // « Maquette GLRS L3 »
+  filiereId String
+  filiere   Filiere @relation(fields: [filiereId], references: [id])
+  niveau    Niveau
+
+  versions MaquetteVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([filiereId, niveau, nom])
+  @@index([filiereId])
+  @@map("maquettes")
+}
+
+// Version d'une maquette pour une année donnée (V3-D2 / ADR-0010).
+// « Renouveler » = cloner profondément la dernière version vers l'année courante.
+model MaquetteVersion {
+  id                String          @id @default(cuid())
+  maquetteId        String
+  maquette          Maquette        @relation(fields: [maquetteId], references: [id], onDelete: Cascade)
+  anneeAcademiqueId String
+  anneeAcademique   AnneeAcademique @relation(fields: [anneeAcademiqueId], references: [id])
+
+  modules    MaquetteModule[]
+  formations Formation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([maquetteId, anneeAcademiqueId]) // 1 version / an / maquette
+  @@index([anneeAcademiqueId])
+  @@map("maquette_versions")
+}
+
+// Module × semestre × heures saisies dans une version (V3-D2/D3 / ADR-0010).
+// VHE/VHT JAMAIS stockés — dérivés via @planit/utils (computeVHE/computeVHT).
+model MaquetteModule {
+  id                String          @id @default(cuid())
+  maquetteVersionId String
+  maquetteVersion   MaquetteVersion @relation(fields: [maquetteVersionId], references: [id], onDelete: Cascade)
+  moduleId          String
+  module            Module          @relation(fields: [moduleId], references: [id])
+
+  semestre  Int // 1 | 2 (rang dans l'année ; libellé S5/S6 dérivé du niveau)
+  heuresCM  Int @default(0)
+  heuresTD  Int @default(0)
+  heuresTP  Int @default(0)
+  heuresTPE Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([maquetteVersionId, moduleId]) // un module apparaît 1× par version
+  @@index([moduleId])
+  @@map("maquette_modules")
+}
+
+// Formation — instance annuelle d'une filière regroupant des classes (V3-D4).
+model Formation {
+  id                String          @id @default(cuid())
+  code              String          @unique // « GLRS-L3-2025 »
+  niveau            Niveau
+  filiereId         String
+  filiere           Filiere         @relation(fields: [filiereId], references: [id])
+  anneeAcademiqueId String
+  anneeAcademique   AnneeAcademique @relation(fields: [anneeAcademiqueId], references: [id])
+  maquetteVersionId String
+  maquetteVersion   MaquetteVersion @relation(fields: [maquetteVersionId], references: [id])
+  isDoubleDiplome   Boolean         @default(false)
+
+  classes Classe[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([anneeAcademiqueId])
+  @@index([filiereId])
+  @@index([maquetteVersionId])
+  @@map("formations")
+}
+
+// Inscription — etudiant × classe × année (V3-D7 / ADR-0011).
+// `isDoubleDiplome` DÉNORMALISÉ depuis la formation de la classe : la règle
+// double-diplôme (≤ 2/an, 1 par catégorie) est garantie EN BASE par le 2ᵉ
+// @@unique, pas seulement en code.
+model Inscription {
+  id                String          @id @default(cuid())
+  etudiantId        String
+  etudiant          User            @relation(fields: [etudiantId], references: [id], onDelete: Cascade)
+  classeId          String
+  classe            Classe          @relation(fields: [classeId], references: [id], onDelete: Cascade)
+  anneeAcademiqueId String
+  anneeAcademique   AnneeAcademique @relation(fields: [anneeAcademiqueId], references: [id])
+  isDoubleDiplome   Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([etudiantId, classeId, anneeAcademiqueId]) // anti-doublon strict
+  @@unique([etudiantId, anneeAcademiqueId, isDoubleDiplome]) // règle double-diplôme (cœur)
+  @@index([classeId])
+  @@index([etudiantId])
+  @@index([anneeAcademiqueId])
+  @@map("inscriptions")
+}
+
+// Suivi d'un module pour une classe (V3-D8 / ADR-0012).
+// État persistant MINIMAL : seul `estTermine` est stocké. heuresPrevues (VHE),
+// heuresFaites (dérivé des séances COURS), progression et enseignants sont
+// CALCULÉS à la lecture (LOT 2 B.5).
+model SuiviModule {
+  id         String    @id @default(cuid())
+  classeId   String
+  classe     Classe    @relation(fields: [classeId], references: [id], onDelete: Cascade)
+  moduleId   String
+  module     Module    @relation(fields: [moduleId], references: [id])
+  estTermine Boolean   @default(false)
+  termineAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([classeId, moduleId])
+  @@index([classeId])
+  @@index([moduleId])
+  @@map("suivi_modules")
+}
+
+// AC ↔ Classe — classes assignées à un AC par son RP (V3-D9 / ADR-0010).
+model AssistantClasse {
+  acId     String
+  ac       User   @relation(fields: [acId], references: [id], onDelete: Cascade)
+  classeId String
+  classe   Classe @relation(fields: [classeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([acId, classeId])
+  @@index([classeId])
+  @@map("assistant_classes")
 }
