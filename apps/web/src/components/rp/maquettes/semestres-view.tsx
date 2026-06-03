@@ -467,11 +467,19 @@ export function SemestresView({
         return (
           <div key={s} className="overflow-hidden rounded-xl border border-border">
             {/* Header semestre */}
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={isExp}
               onClick={() => toggle(s)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggle(s);
+                }
+              }}
               className={cn(
-                'flex w-full items-center gap-3 px-4 py-3 text-left transition-colors',
+                'flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors',
                 isExp ? 'rounded-t-xl bg-surface' : 'rounded-xl bg-[#FAFAF7] hover:bg-bg-warm',
               )}
             >
@@ -518,7 +526,7 @@ export function SemestresView({
                   </svg>
                 </span>
               </div>
-            </button>
+            </div>
 
             {isExp && (
               <div className="border-t border-border bg-surface">
