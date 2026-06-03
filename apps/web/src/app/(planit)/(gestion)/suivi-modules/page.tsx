@@ -6,6 +6,7 @@ import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
 import { Select } from '@/components/ui/select';
+import { SuiviSeancesDrawer } from '@/components/rp/suivi/suivi-seances-drawer';
 import { SuiviTableSkeleton } from '@/components/rp/suivi/suivi-skeleton';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouvrirSuiviMutation, useTerminerSuiviMutation } from '@/lib/mutations-v3';
@@ -26,6 +27,10 @@ export default function SuiviModulesPage() {
 
   // Multi-sélection bulk « Marquer terminés » (pattern Set du planning-grid LOT 4 V02).
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
+
+  // E.5 — drawer « Voir les séances » ouvert depuis chaque ligne.
+  const [seancesSuiviId, setSeancesSuiviId] = useState<string | null>(null);
+  const [seancesSuiviLibelle, setSeancesSuiviLibelle] = useState<string | undefined>(undefined);
 
   const query = useMemo<SuiviModuleQueryDto>(() => {
     const out: SuiviModuleQueryDto = {};
@@ -178,8 +183,21 @@ export default function SuiviModulesPage() {
           selectedIds={selectedIds}
           isRP={isRP}
           onToggleSelect={toggleSelect}
+          onViewSeances={(s) => {
+            setSeancesSuiviId(s.id);
+            setSeancesSuiviLibelle(s.module.libelle);
+          }}
         />
       )}
+
+      <SuiviSeancesDrawer
+        suiviId={seancesSuiviId}
+        moduleLibelle={seancesSuiviLibelle}
+        onClose={() => {
+          setSeancesSuiviId(null);
+          setSeancesSuiviLibelle(undefined);
+        }}
+      />
     </Shell>
   );
 }
@@ -191,11 +209,13 @@ function SuiviTable({
   selectedIds,
   isRP,
   onToggleSelect,
+  onViewSeances,
 }: {
   items: readonly SuiviModuleDto[];
   selectedIds: ReadonlySet<string>;
   isRP: boolean;
   onToggleSelect: (id: string) => void;
+  onViewSeances: (suivi: SuiviModuleDto) => void;
 }) {
   const terminer = useTerminerSuiviMutation();
   // useRouvrirSuiviMutation est importée séparément pour éviter le mix dans
@@ -247,6 +267,7 @@ function SuiviTable({
               selected={selectedIds.has(suivi.id)}
               isRP={isRP}
               onToggleSelect={() => onToggleSelect(suivi.id)}
+              onViewSeances={() => onViewSeances(suivi)}
               terminerPending={terminer.isPending && terminer.variables?.id === suivi.id}
             />
           ))}
@@ -261,12 +282,14 @@ function SuiviRow({
   selected,
   isRP,
   onToggleSelect,
+  onViewSeances,
   terminerPending,
 }: {
   suivi: SuiviModuleDto;
   selected: boolean;
   isRP: boolean;
   onToggleSelect: () => void;
+  onViewSeances: () => void;
   terminerPending: boolean;
 }) {
   const terminer = useTerminerSuiviMutation();
@@ -347,27 +370,32 @@ function SuiviRow({
         </span>
       </td>
       <td className="px-4 py-3.5 text-right">
-        {suivi.estTermine ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => rouvrir.mutate({ id: suivi.id })}
-            disabled={!isRP || isPending}
-            title={isRP ? undefined : 'Action réservée au RP'}
-          >
-            Rouvrir
+        <div className="flex items-center justify-end gap-1.5">
+          <Button variant="ghost" size="sm" onClick={onViewSeances}>
+            Voir
           </Button>
-        ) : (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => terminer.mutate({ id: suivi.id })}
-            disabled={!isRP || isPending}
-            title={isRP ? undefined : 'Action réservée au RP'}
-          >
-            Terminer
-          </Button>
-        )}
+          {suivi.estTermine ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => rouvrir.mutate({ id: suivi.id })}
+              disabled={!isRP || isPending}
+              title={isRP ? undefined : 'Action réservée au RP'}
+            >
+              Rouvrir
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => terminer.mutate({ id: suivi.id })}
+              disabled={!isRP || isPending}
+              title={isRP ? undefined : 'Action réservée au RP'}
+            >
+              Terminer
+            </Button>
+          )}
+        </div>
       </td>
     </tr>
   );
