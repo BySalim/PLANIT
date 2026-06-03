@@ -57,4 +57,26 @@ describe('GET /api/salles', () => {
     const resStudent = await api().get('/api/salles').set('Cookie', student.cookieHeader);
     expect(resStudent.status).toBe(200);
   });
+
+  // ── V03 B.7 — rpResponsable exposé + scope AC ──────────────────────────
+
+  it('expose le rpResponsable (V3-D10)', async () => {
+    const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
+    const res = await api().get('/api/salles').set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    const amphi = (res.body as { name: string; rpResponsable: { fullName: string } | null }[]).find(
+      (s) => s.name === 'Amphi A',
+    );
+    expect(amphi?.rpResponsable?.fullName).toBe('Mme Aminata Diallo');
+  });
+
+  it('un AC ne voit que les salles de son RP manager (Labo exclu)', async () => {
+    const session = await loginAs(app, 'ASSISTANT_PROGRAMME');
+    const res = await api().get('/api/salles').set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    const names = (res.body as { name: string }[]).map((s) => s.name);
+    // RP1 : Amphi A, Salle 201, Salle 202 ; PAS le Labo (RP2).
+    expect(names).toEqual(['Amphi A', 'Salle 201', 'Salle 202']);
+    expect(names).not.toContain('Labo Informatique');
+  });
 });
