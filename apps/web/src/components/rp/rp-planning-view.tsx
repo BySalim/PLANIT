@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { CreateSessionV2Dto, SessionV2Dto } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
 import { CreateSessionModal } from '@/components/planning/create-session-modal';
@@ -16,6 +16,10 @@ import { useCreateSessionV2Mutation, useDeleteSessionV2Mutation } from '@/lib/mu
 import { useV2WeekSessionsQuery } from '@/lib/queries-v2';
 import { usePlanningUndoStack } from '@/lib/undo-stack';
 import { getCurrentWeekStart } from '@/lib/week';
+import { exportNodeToImage, exportNodeToPdf } from '@/lib/export';
+import { useFlash } from '@planit/ui';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 // V1-D2 hardcoded demo counters (matchent les compteurs PLANIT-IA D.kpis).
 // À remplacer par des hooks dédiés en Vague 02.
@@ -34,10 +38,43 @@ interface CreateInit {
  * est RESPONSABLE_PROGRAMME ou ASSISTANT_PROGRAMME. (Anciennement la page `/rp`.)
  */
 export function RpPlanningView() {
+  const flash = useFlash();
   const [weekStart, setWeekStart] = useState<Date>(() => getCurrentWeekStart());
   const [createOpen, setCreateOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   // I.1 / I.2 — pré-remplissage de la modale depuis un clic/drag sur slot vide.
   const [createInit, setCreateInit] = useState<CreateInit | null>(null);
+
+  // LOT 7 (X.2) — ref sur le container de la grille planning (capturé en PNG/PDF).
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleExport = useCallback(
+    async (fmt: 'png' | 'pdf') => {
+      const node = gridContainerRef.current;
+      if (node === null) return;
+      setIsExporting(true);
+      flash.push('success', 'Génération en cours…');
+      try {
+        const weekLabel = format(weekStart, "'Semaine du' d MMMM yyyy", { locale: fr });
+        const filename = `planning-${format(weekStart, 'yyyy-MM-dd')}`;
+        if (fmt === 'png') {
+          await exportNodeToImage(node, filename);
+        } else {
+          await exportNodeToPdf(node, {
+            filename,
+            title: `PLANIT — Planning ${weekLabel}`,
+            orientation: 'landscape',
+          });
+        }
+        flash.push('success', fmt === 'png' ? 'Image exportée ✓' : 'PDF exporté ✓');
+      } catch {
+        flash.push('error', "Erreur lors de l'export — réessayez.");
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [weekStart, flash],
+  );
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('classique');
   const [scope, setScope] = useState<ViewScope>('week');
@@ -112,13 +149,16 @@ export function RpPlanningView() {
           canRedo={undoStack.canRedo}
           onUndo={undoStack.undo}
           onRedo={undoStack.redo}
+          onExport={(fmt) => void handleExport(fmt)}
+          isExporting={isExporting}
         />
 
         {/* Day/Week toggle + session counter */}
         <ViewScopeToggle scope={scope} onChange={setScope} sessionCount={sessions.length} />
 
         {/* Planning grid — fills remaining height, scrolls internally */}
-        <div className="min-h-0 flex-1">
+        {/* ref LOT 7 (X.2) : capturé par exportNodeToImage/exportNodeToPdf */}
+        <div ref={gridContainerRef} className="min-h-0 flex-1">
           {sessionsQuery.isLoading ? (
             <PlanningGridSkeleton />
           ) : (

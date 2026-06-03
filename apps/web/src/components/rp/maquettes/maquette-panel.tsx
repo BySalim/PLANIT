@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type {
   AnneeAcademiqueDto,
   FiliereRef,
@@ -17,9 +17,96 @@ import {
   useUpdateMaquetteMutation,
 } from '@/lib/mutations-v3';
 import { useMaquetteVersionDetailQuery, useMaquetteVersionsQuery } from '@/lib/queries-v3';
+import { exportNodeToImage, exportNodeToPdf } from '@/lib/export';
 import { AnneesWidget } from './annees-widget';
 import { MaquetteInfosModal } from './maquette-infos-modal';
 import { SemestresView } from './semestres-view';
+
+// ── Bouton export maquette (LOT 7 X.3) ───────────────────────────────
+
+function ExportMaquetteButton({
+  onExport,
+  isExporting,
+}: {
+  onExport: (fmt: 'png' | 'pdf') => void;
+  isExporting: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        disabled={isExporting}
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Exporter la maquette"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-semibold text-text-sec transition-colors hover:border-primary hover:text-primary disabled:cursor-wait disabled:opacity-60"
+      >
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        {isExporting ? 'Génération…' : 'Exporter'}
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          aria-hidden
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && !isExporting && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-50 mt-1 min-w-[148px] overflow-hidden rounded-xl border border-border bg-surface shadow-lg"
+          onMouseLeave={() => setOpen(false)}
+        >
+          {(['png', 'pdf'] as const).map((fmt) => (
+            <button
+              key={fmt}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onExport(fmt);
+              }}
+              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-medium text-text transition-colors hover:bg-bg-warm"
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              {fmt === 'png' ? 'Image PNG' : 'Document PDF'}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Empty state ───────────────────────────────────────────────────────
 
@@ -55,6 +142,37 @@ export interface MaquettePanelProps {
 
 export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps) {
   const flash = useFlash();
+
+  // LOT 7 (X.3) — ref sur la section semestres + état export
+  const semestresRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = useCallback(
+    async (fmt: 'png' | 'pdf') => {
+      const node = semestresRef.current;
+      if (node === null) return;
+      setIsExporting(true);
+      flash.push('success', 'Génération en cours…');
+      try {
+        const filename = `maquette-${maquette.nom.replace(/\s+/g, '-').toLowerCase()}`;
+        if (fmt === 'png') {
+          await exportNodeToImage(node, filename);
+        } else {
+          await exportNodeToPdf(node, {
+            filename,
+            title: `PLANIT — Maquette ${maquette.nom} (${maquette.niveau})`,
+            orientation: 'portrait',
+          });
+        }
+        flash.push('success', fmt === 'png' ? 'Image exportée ✓' : 'PDF exporté ✓');
+      } catch {
+        flash.push('error', "Erreur lors de l'export — réessayez.");
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [maquette, flash],
+  );
 
   // ── Versions
   const versionsQuery = useMaquetteVersionsQuery(maquette.id);
@@ -297,13 +415,11 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => flash.push('error', 'Export disponible en LOT 7')}
-                  className="rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-semibold text-text-sec transition-colors hover:border-border hover:bg-bg-warm"
-                >
-                  Exporter
-                </button>
+                {/* LOT 7 (X.3) — bouton export maquette (PNG + PDF) */}
+                <ExportMaquetteButton
+                  onExport={(fmt) => void handleExport(fmt)}
+                  isExporting={isExporting}
+                />
                 <button
                   type="button"
                   onClick={startCompose}
@@ -428,16 +544,18 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
           </div>
         )}
 
-        {/* ── Semestres ── */}
-        <SemestresView
-          version={versionDetail}
-          isLoading={versionDetailQuery.isLoading}
-          isEditing={isComposing}
-          edits={edits}
-          onFieldChange={handleFieldChange}
-          onRemoveModule={(mfId) => void handleRemoveModule(mfId)}
-          onAddModule={handleAddModule}
-        />
+        {/* ── Semestres (ref LOT 7 X.3 : capturé pour export) ── */}
+        <div ref={semestresRef}>
+          <SemestresView
+            version={versionDetail}
+            isLoading={versionDetailQuery.isLoading}
+            isEditing={isComposing}
+            edits={edits}
+            onFieldChange={handleFieldChange}
+            onRemoveModule={(mfId) => void handleRemoveModule(mfId)}
+            onAddModule={handleAddModule}
+          />
+        </div>
 
         {/* ── Stats + Classes (sous les semestres, 2 colonnes) ── */}
         {versionDetail !== null && (
