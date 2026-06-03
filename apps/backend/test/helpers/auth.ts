@@ -1,14 +1,28 @@
 import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 
-/** Mapping rôle métier → email du seed user correspondant. */
+/**
+ * Mapping rôle métier → email du seed user correspondant.
+ *
+ * `RESPONSABLE_PROGRAMME` = Aminata Diallo (RP1), manager de l'AC seedé et
+ * responsable des salles Amphi/201/202. `ASSISTANT_PROGRAMME` = Awa Touré (AC),
+ * rattachée à RP1 et assignée à la classe GL3-A (cf. seed v3 / V3-D9).
+ */
 const SEED_EMAIL: Record<SupportedRole, string> = {
   RESPONSABLE_PROGRAMME: 'aminata.diallo@planit.test',
+  ASSISTANT_PROGRAMME: 'awa.toure@planit.test',
   ENSEIGNANT: 'oumar.ndiaye@planit.test',
   ETUDIANT: 'ibrahima.sow@planit.test',
 };
 
-export type SupportedRole = 'RESPONSABLE_PROGRAMME' | 'ENSEIGNANT' | 'ETUDIANT';
+export type SupportedRole =
+  | 'RESPONSABLE_PROGRAMME'
+  | 'ASSISTANT_PROGRAMME'
+  | 'ENSEIGNANT'
+  | 'ETUDIANT';
+
+/** Email du 2ᵉ RP (Cheikh Diop) — responsable du Labo, hors périmètre AC. */
+export const RP2_EMAIL = 'cheikh.diop@planit.test';
 
 export interface LoggedInSession {
   /** Valeurs brutes des cookies (à passer en `Cookie:` header). */
@@ -41,20 +55,28 @@ export async function loginAs(
   app: INestApplication,
   role: SupportedRole,
 ): Promise<LoggedInSession> {
-  const email = SEED_EMAIL[role];
+  return loginByEmail(app, SEED_EMAIL[role]);
+}
+
+/**
+ * Login par email arbitraire d'un seed user (ex. le 2ᵉ RP `RP2_EMAIL`, qui
+ * partage le rôle `RESPONSABLE_PROGRAMME` mais un autre périmètre de salles).
+ * Tous les seeds partagent le password `Test1234!`.
+ */
+export async function loginByEmail(app: INestApplication, email: string): Promise<LoggedInSession> {
   const res = await request(app.getHttpServer())
     .post('/api/auth/login')
     .send({ email, password: 'Test1234!' });
 
   if (res.status !== 200) {
-    throw new Error(`[loginAs] login failed for ${role} (${email}) — status ${res.status}`);
+    throw new Error(`[loginByEmail] login failed for ${email} — status ${res.status}`);
   }
 
   const cookies = extractCookies(res.headers['set-cookie']);
   const accessCookie = cookies['access'];
   const refreshCookie = cookies['refresh'];
   if (!accessCookie || !refreshCookie) {
-    throw new Error(`[loginAs] login response missing access/refresh cookies`);
+    throw new Error(`[loginByEmail] login response missing access/refresh cookies`);
   }
 
   const body = res.body as { id: string; email: string; role: SupportedRole };
@@ -65,7 +87,7 @@ export async function loginAs(
     cookieHeader: `access=${accessCookie}; refresh=${refreshCookie}`,
     email,
     userId: body.id,
-    role,
+    role: body.role,
   };
 }
 
