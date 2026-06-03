@@ -1,12 +1,23 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  type ClasseV3Dto,
+  type CreateClasseV3Dto,
+  type CreateFormationDto,
   type CreateMaquetteDto,
   type CreateMaquetteModuleDto,
+  type FormationDto,
+  type InscriptionDto,
+  type InscriptionRequestDto,
   type MaquetteDto,
   type MaquetteModuleDto,
   type MaquetteVersionDto,
+  type UpdateClasseV3Dto,
+  type UpdateFormationDto,
   type UpdateMaquetteDto,
   type UpdateMaquetteModuleDto,
+  classeV3Schema,
+  formationSchema,
+  inscriptionSchema,
   maquetteModuleSchema,
   maquetteSchema,
   maquetteVersionSchema,
@@ -134,6 +145,149 @@ export function useDeleteMaquetteModuleMutation() {
     },
     onError: (err) => {
       flash.push('error', `Suppression impossible : ${err.message}`);
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Formations (A.6 / LOT 4 C.2)
+// ─────────────────────────────────────────────────────────────────────
+
+// ── POST /api/formations ──────────────────────────────────────────────
+// Toujours pour l'année courante (anneeAcademiqueId résolu côté serveur).
+
+export function useCreateFormationMutation() {
+  const invalidate = useInvalidateAcademic();
+  const flash = useFlash();
+  return useMutation<FormationDto, Error, CreateFormationDto>({
+    mutationFn: (body) => apiPost('/formations', formationSchema, body),
+    onSuccess: (data) => {
+      invalidate();
+      flash.push('success', `Formation « ${data.code} » créée`);
+    },
+    onError: (err) => {
+      flash.push(
+        'error',
+        err.message.includes('409')
+          ? 'Ce code de formation est déjà utilisé'
+          : `Création impossible : ${err.message}`,
+      );
+    },
+  });
+}
+
+// ── PUT /api/formations/:id ───────────────────────────────────────────
+
+export function useUpdateFormationMutation() {
+  const invalidate = useInvalidateAcademic();
+  const flash = useFlash();
+  return useMutation<FormationDto, Error, { id: string; body: UpdateFormationDto }>({
+    mutationFn: ({ id, body }) => apiPut(`/formations/${id}`, formationSchema, body),
+    onSuccess: () => {
+      invalidate();
+      flash.push('success', 'Formation mise à jour');
+    },
+    onError: (err) => {
+      flash.push(
+        'error',
+        err.message.includes('409')
+          ? 'Ce code de formation est déjà utilisé'
+          : `Modification impossible : ${err.message}`,
+      );
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Classes V3 (B.1 / LOT 4 C.3)
+// ─────────────────────────────────────────────────────────────────────
+
+// ── POST /api/classes ─────────────────────────────────────────────────
+
+export function useCreateClasseMutation() {
+  const invalidate = useInvalidateAcademic();
+  const flash = useFlash();
+  return useMutation<ClasseV3Dto, Error, CreateClasseV3Dto>({
+    mutationFn: (body) => apiPost('/classes', classeV3Schema, body),
+    onSuccess: (data) => {
+      invalidate();
+      flash.push('success', `Classe « ${data.name} » créée`);
+    },
+    onError: (err) => {
+      flash.push(
+        'error',
+        err.message.includes('409')
+          ? 'Ce code de classe est déjà utilisé'
+          : `Création impossible : ${err.message}`,
+      );
+    },
+  });
+}
+
+// ── PUT /api/classes/:id ──────────────────────────────────────────────
+
+export function useUpdateClasseMutation() {
+  const invalidate = useInvalidateAcademic();
+  const flash = useFlash();
+  return useMutation<ClasseV3Dto, Error, { id: string; body: UpdateClasseV3Dto }>({
+    mutationFn: ({ id, body }) => apiPut(`/classes/${id}`, classeV3Schema, body),
+    onSuccess: () => {
+      invalidate();
+      flash.push('success', 'Classe mise à jour');
+    },
+    onError: (err) => {
+      flash.push(
+        'error',
+        err.message.includes('409')
+          ? 'Ce code de classe est déjà utilisé'
+          : `Modification impossible : ${err.message}`,
+      );
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Inscriptions (B.3/B.4 / LOT 4 C.5) — partagé RP + AC
+// ─────────────────────────────────────────────────────────────────────
+
+// ── POST /api/classes/:classeId/inscriptions ──────────────────────────
+// Flux email → existant/nouveau (union discriminée). 409 = doublon ou
+// règle double-diplôme (≤ 2/an, 1 par catégorie).
+
+export function useCreateInscriptionMutation() {
+  const invalidate = useInvalidateAcademic();
+  const flash = useFlash();
+  return useMutation<InscriptionDto, Error, { classeId: string; body: InscriptionRequestDto }>({
+    mutationFn: ({ classeId, body }) =>
+      apiPost(`/classes/${classeId}/inscriptions`, inscriptionSchema, body),
+    onSuccess: () => {
+      invalidate();
+      flash.push('success', 'Étudiant inscrit');
+    },
+    onError: (err) => {
+      flash.push(
+        'error',
+        err.message.includes('409')
+          ? 'Déjà inscrit dans une classe de cette catégorie cette année'
+          : `Inscription impossible : ${err.message}`,
+      );
+    },
+  });
+}
+
+// ── DELETE /api/inscriptions/:id ──────────────────────────────────────
+
+export function useDeleteInscriptionMutation() {
+  const invalidate = useInvalidateAcademic();
+  const flash = useFlash();
+  return useMutation<void, Error, { id: string }>({
+    mutationFn: ({ id }) => apiDelete(`/inscriptions/${id}`),
+    onSuccess: () => {
+      invalidate();
+      flash.push('success', 'Étudiant désinscrit');
+    },
+    onError: (err) => {
+      flash.push('error', `Désinscription impossible : ${err.message}`);
     },
   });
 }
