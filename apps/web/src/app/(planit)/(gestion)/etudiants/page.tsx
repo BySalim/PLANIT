@@ -5,6 +5,7 @@ import type { EtudiantDto } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
+import { EtudiantDetailDrawer } from '@/components/rp/etudiants/etudiant-detail-drawer';
 import { EtudiantsTableSkeleton } from '@/components/rp/etudiants/etudiants-skeleton';
 import { useEtudiantsQuery } from '@/lib/queries-v3';
 
@@ -41,8 +42,8 @@ function getAvatarStyle(name: string) {
 // eslint-disable-next-line no-restricted-syntax
 export default function EtudiantsPage() {
   const [q, setQ] = useState('');
-  // PR3 (E.3) wirera ce state au drawer. PR2 = liste seule.
-  const [, setSelectedId] = useState<string | null>(null);
+  // E.3 — drawer fiche étudiant ouvert depuis le bouton « Voir »
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useEtudiantsQuery(q);
   const items = data ?? [];
@@ -147,6 +148,8 @@ export default function EtudiantsPage() {
           </table>
         </div>
       )}
+
+      <EtudiantDetailDrawer etudiantId={selectedId} onClose={() => setSelectedId(null)} />
     </Shell>
   );
 }
