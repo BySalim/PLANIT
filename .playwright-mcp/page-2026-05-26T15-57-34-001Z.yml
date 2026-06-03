@@ -1,0 +1,23 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e7]: PLANIT — Gestion des emplois du temps ISM
+  - button "Open Next.js Dev Tools" [ref=e13] [cursor=pointer]:
+    - img [ref=e14]
+  - generic [ref=e18]:
+    - generic [ref=e19]:
+      - heading "PLANIT" [level=1] [ref=e20]
+      - paragraph [ref=e21]: ISM Dakar — Gestion des emplois du temps
+    - generic [ref=e22]:
+      - heading "Connexion" [level=2] [ref=e23]
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e26]: Adresse e-mail
+          - textbox "Adresse e-mail" [ref=e27]:
+            - /placeholder: prenom.nom@ism.sn
+            - text: aminata.diallo@ism.edu.sn
+        - generic [ref=e28]:
+          - generic [ref=e29]: Mot de passe
+          - textbox "Mot de passe" [ref=e30]:
+            - /placeholder: ••••••••
+            - text: Test1234!
+        - alert [ref=e32]: Cannot POST /api/auth/login
+        - button "Se connecter" [ref=e31]
