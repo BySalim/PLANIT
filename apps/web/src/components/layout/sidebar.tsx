@@ -66,7 +66,7 @@ const NAV: NavGroup[] = [
       { id: 'filieres', label: 'Filières', href: '/filieres', icon: GraduationCapIcon },
       { id: 'formations', label: 'Formations', href: '#', icon: BookStackIcon },
       { id: 'modules', label: 'UE & Modules', href: '/ue-modules', icon: BookOpenIcon },
-      { id: 'maquettes', label: 'Maquettes de formation', href: '#', icon: BookStackIcon },
+      { id: 'maquettes', label: 'Maquettes de formation', href: '/maquettes', icon: BookStackIcon },
     ],
   },
   {
