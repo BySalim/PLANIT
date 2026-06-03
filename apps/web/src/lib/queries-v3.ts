@@ -2,17 +2,22 @@ import { useQuery } from '@tanstack/react-query';
 import {
   type AnneeAcademiqueDto,
   type ClasseV3Dto,
+  type EtudiantDetailDto,
   type EtudiantDto,
   type FormationDto,
   type MaquetteDto,
   type MaquetteVersionDto,
+  type SessionV2Dto,
   type SuiviModuleDto,
+  type SuiviModuleQueryDto,
   anneeAcademiqueSchema,
   classeV3Schema,
+  etudiantDetailSchema,
   etudiantSchema,
   formationSchema,
   maquetteSchema,
   maquetteVersionSchema,
+  sessionV2Schema,
   suiviModuleSchema,
 } from '@planit/contracts';
 import { useAuth } from '@/contexts/auth-context';
@@ -54,12 +59,20 @@ export const academicKeys = {
     [...academicKeys.all, 'maquette', maquetteId, 'versions'] as const,
   maquetteVersion: (versionId: string) =>
     [...academicKeys.all, 'maquette-version', versionId] as const,
+  // LOT 4 V03 (Oumy)
   formations: (filters: FormationFilters) => [...academicKeys.all, 'formations', filters] as const,
   formation: (id: string) => [...academicKeys.all, 'formation', id] as const,
   classes: (filters: ClasseFilters) => [...academicKeys.all, 'classes', filters] as const,
   classe: (id: string) => [...academicKeys.all, 'classe', id] as const,
   classeEtudiants: (id: string) => [...academicKeys.all, 'classe', id, 'etudiants'] as const,
   classeSuivi: (id: string) => [...academicKeys.all, 'classe', id, 'suivi'] as const,
+  // LOT 5 V03 (Libasse)
+  etudiants: (q: string) => [...academicKeys.all, 'etudiants', { q }] as const,
+  etudiant: (id: string) => [...academicKeys.all, 'etudiant', id] as const,
+  suiviModules: (query: SuiviModuleQueryDto) =>
+    [...academicKeys.all, 'suivi-modules', query] as const,
+  suiviSeances: (suiviId: string) =>
+    [...academicKeys.all, 'suivi-modules', suiviId, 'seances'] as const,
 };
 
 const maquetteListSchema = maquetteSchema.array();
@@ -69,6 +82,7 @@ const formationListSchema = formationSchema.array();
 const classeListSchema = classeV3Schema.array();
 const etudiantListSchema = etudiantSchema.array();
 const suiviModuleListSchema = suiviModuleSchema.array();
+const sessionV2ListSchema = sessionV2Schema.array();
 
 // ── Années académiques ────────────────────────────────────────────────
 // Utilisé par AnneesWidget + modal création formation.
@@ -217,5 +231,69 @@ export function useClasseSuiviQuery(id: string | null) {
       ),
     enabled: state.status === 'authenticated' && id !== null,
     staleTime: 30 * 1000,
+  });
+}
+
+// ── LOT 5 V03 — Étudiants ─────────────────────────────────────────────
+// Recherche par nom / matricule / email (backend `?q=`). Le cache distingue
+// chaque requête (cache key inclut `q`) pour éviter qu'un re-render
+// avec `q=""` n'écrase un cache filtré.
+
+export function useEtudiantsQuery(q: string) {
+  const { state } = useAuth();
+  return useQuery<EtudiantDto[]>({
+    queryKey: academicKeys.etudiants(q),
+    queryFn: () => {
+      const qs = q.length > 0 ? `?q=${encodeURIComponent(q)}` : '';
+      return apiGet(`/etudiants${qs}`, etudiantListSchema);
+    },
+    enabled: state.status === 'authenticated',
+    staleTime: 30 * 1000,
+  });
+}
+
+// Fiche étudiant : identité + historique d'inscriptions (E.3).
+
+export function useEtudiantDetailQuery(id: string | null) {
+  const { state } = useAuth();
+  return useQuery<EtudiantDetailDto>({
+    queryKey: academicKeys.etudiant(id ?? ''),
+    queryFn: () => apiGet(`/etudiants/${id}`, etudiantDetailSchema),
+    enabled: state.status === 'authenticated' && id !== null,
+    staleTime: 30 * 1000,
+  });
+}
+
+// ── LOT 5 V03 — Suivi des modules ────────────────────────────────────
+// Le backend reçoit tous les filtres (classeId/semestre/statut/q). Cache
+// par tuple de filtres pour permettre la navigation rapide entre filtres.
+
+export function useSuiviModulesQuery(query: SuiviModuleQueryDto) {
+  const { state } = useAuth();
+  return useQuery<SuiviModuleDto[]>({
+    queryKey: academicKeys.suiviModules(query),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (query.classeId !== undefined) params.set('classeId', query.classeId);
+      if (query.semestre !== undefined) params.set('semestre', String(query.semestre));
+      if (query.statut !== undefined) params.set('statut', query.statut);
+      if (query.q !== undefined && query.q.length > 0) params.set('q', query.q);
+      const qs = params.toString();
+      return apiGet(`/suivi-modules${qs ? `?${qs}` : ''}`, suiviModuleListSchema);
+    },
+    enabled: state.status === 'authenticated',
+    staleTime: 30 * 1000,
+  });
+}
+
+// E.5 — Séances COURS d'un module suivi (lecture lazy, drawer).
+
+export function useSuiviSeancesQuery(suiviId: string | null) {
+  const { state } = useAuth();
+  return useQuery<SessionV2Dto[]>({
+    queryKey: academicKeys.suiviSeances(suiviId ?? ''),
+    queryFn: () => apiGet(`/suivi-modules/${suiviId}/seances`, sessionV2ListSchema),
+    enabled: state.status === 'authenticated' && suiviId !== null,
+    staleTime: 60 * 1000,
   });
 }
