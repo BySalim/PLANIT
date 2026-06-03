@@ -48,7 +48,7 @@ const NAV: NavGroup[] = [
     items: [
       { id: 'dashboard', label: 'Tableau de bord', href: '#', icon: HomeIcon },
       { id: 'planning', label: 'Planning', href: '/', icon: CalendarIcon },
-      { id: 'suivi-modules', label: 'Suivi des modules', href: '#', icon: CheckSquareIcon },
+      { id: 'suivi', label: 'Suivi des modules', href: '/suivi-modules', icon: CheckSquareIcon },
       { id: 'demands', label: 'Demandes', href: '#', icon: InboxIcon, badge: 5 },
       {
         id: 'conflicts',
@@ -72,7 +72,7 @@ const NAV: NavGroup[] = [
   {
     group: 'RÉFÉRENTIELS',
     items: [
-      { id: 'students', label: 'Étudiants', href: '#', icon: UsersIcon },
+      { id: 'students', label: 'Étudiants', href: '/etudiants', icon: UsersIcon },
       { id: 'classes', label: 'Classes', href: '/classes', icon: LayersIcon },
       { id: 'teachers', label: 'Enseignants', href: '/enseignants', icon: UserCogIcon },
       { id: 'personnel', label: 'Personnel', href: '#', icon: UserIcon },
