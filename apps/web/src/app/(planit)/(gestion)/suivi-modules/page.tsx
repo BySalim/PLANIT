@@ -245,7 +245,7 @@ function SuiviTable({
               Module
             </th>
             <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-              Niveau
+              Niveau · Sem.
             </th>
             <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Classe
@@ -334,13 +334,20 @@ function SuiviRow({
         </div>
       </td>
       <td className="px-4 py-3.5">
-        {suivi.niveau ? (
-          <span className="inline-flex h-5 items-center rounded bg-primary-50 px-1.5 text-[11px] font-bold text-primary">
-            {suivi.niveau}
-          </span>
-        ) : (
-          <span className="text-text-muted">—</span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {suivi.niveau ? (
+            <span className="inline-flex h-5 items-center rounded bg-primary-50 px-1.5 text-[11px] font-bold text-primary">
+              {suivi.niveau}
+            </span>
+          ) : (
+            <span className="text-text-muted">—</span>
+          )}
+          {suivi.semestre !== null ? (
+            <span className="inline-flex h-5 items-center rounded bg-bg px-1.5 text-[11px] font-semibold tabular-nums text-text-sec">
+              S{suivi.semestre}
+            </span>
+          ) : null}
+        </div>
       </td>
       <td className="px-4 py-3.5">
         <span className="inline-flex h-5 items-center rounded bg-bg px-1.5 font-mono text-[11.5px] font-semibold text-text">

@@ -8,7 +8,7 @@ export function SuiviTableSkeleton() {
             {[
               '',
               'Module',
-              'Niveau',
+              'Niveau · Sem.',
               'Classe',
               'Prévu',
               'Fait',
@@ -35,7 +35,10 @@ export function SuiviTableSkeleton() {
                 <div className="h-3.5 w-36 animate-pulse rounded bg-border-soft" aria-hidden />
               </td>
               <td className="px-4 py-3.5">
-                <div className="h-5 w-9 animate-pulse rounded bg-border-soft" aria-hidden />
+                <div className="flex items-center gap-1.5" aria-hidden>
+                  <div className="h-5 w-9 animate-pulse rounded bg-border-soft" />
+                  <div className="h-5 w-7 animate-pulse rounded bg-border-soft" />
+                </div>
               </td>
               <td className="px-4 py-3.5">
                 <div className="h-3.5 w-16 animate-pulse rounded bg-border-soft" aria-hidden />
