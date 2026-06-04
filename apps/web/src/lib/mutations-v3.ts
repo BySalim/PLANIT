@@ -11,6 +11,7 @@ import {
   type MaquetteDto,
   type MaquetteModuleDto,
   type MaquetteVersionDto,
+  type SuiviModuleDto,
   type UpdateClasseV3Dto,
   type UpdateFormationDto,
   type UpdateMaquetteDto,
@@ -21,9 +22,10 @@ import {
   maquetteModuleSchema,
   maquetteSchema,
   maquetteVersionSchema,
+  suiviModuleSchema,
 } from '@planit/contracts';
 import { useFlash } from '@planit/ui';
-import { apiDelete, apiPost, apiPut } from './api';
+import { apiDelete, apiPatch, apiPost, apiPut } from './api';
 import { academicKeys } from './queries-v3';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -288,6 +290,42 @@ export function useDeleteInscriptionMutation() {
     },
     onError: (err) => {
       flash.push('error', `Désinscription impossible : ${err.message}`);
+    },
+  });
+}
+
+// ── PATCH /api/suivi-modules/:id/terminer (RP only) ───────────────────
+// LOT 5 V03 — un AC reçoit 403 (backend failsafe). Le frontend désactive
+// le bouton si role !== RP pour UX.
+
+export function useTerminerSuiviMutation() {
+  const invalidate = useInvalidateAcademic();
+  const flash = useFlash();
+  return useMutation<SuiviModuleDto, Error, { id: string }>({
+    mutationFn: ({ id }) => apiPatch(`/suivi-modules/${id}/terminer`, suiviModuleSchema),
+    onSuccess: (data) => {
+      invalidate();
+      flash.push('success', `Module « ${data.module.libelle} » marqué terminé`);
+    },
+    onError: (err) => {
+      flash.push('error', `Action impossible : ${err.message}`);
+    },
+  });
+}
+
+// ── PATCH /api/suivi-modules/:id/rouvrir (RP only) ────────────────────
+
+export function useRouvrirSuiviMutation() {
+  const invalidate = useInvalidateAcademic();
+  const flash = useFlash();
+  return useMutation<SuiviModuleDto, Error, { id: string }>({
+    mutationFn: ({ id }) => apiPatch(`/suivi-modules/${id}/rouvrir`, suiviModuleSchema),
+    onSuccess: (data) => {
+      invalidate();
+      flash.push('success', `Module « ${data.module.libelle} » rouvert`);
+    },
+    onError: (err) => {
+      flash.push('error', `Action impossible : ${err.message}`);
     },
   });
 }
