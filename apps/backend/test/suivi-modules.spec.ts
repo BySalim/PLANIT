@@ -50,12 +50,14 @@ describe('Suivi des modules (B.5)', () => {
     const algo = (
       res.body as {
         moduleId: string;
+        niveau: string | null;
         heuresPrevues: number;
         heuresFaites: number;
         estTermine: boolean;
         enseignants: { nom: string; heures: number }[];
       }[]
     ).find((s) => s.moduleId === 'seed-module-algo');
+    expect(algo?.niveau).toBe('L3'); // GL3-A suit GLRS L3 (niveau hérité de la formation)
     expect(algo?.heuresPrevues).toBe(36); // VHE = 20+10+6
     expect(algo?.heuresFaites).toBe(4); // 2 séances COURS × 2h (l'examen EVALUATION exclu)
     expect(algo?.estTermine).toBe(true);
@@ -133,7 +135,12 @@ describe('Suivi — terminer / rouvrir / séances (B.5/B.6)', () => {
     expect(res.status).toBe(200);
     // 2 séances COURS ALGO pour GL3-A (l'examen EVALUATION n'est pas listé).
     expect(res.body).toHaveLength(2);
-    const types = new Set((res.body as { type: string }[]).map((s) => s.type));
+    const seances = res.body as { type: string; startAt: string }[];
+    const types = new Set(seances.map((s) => s.type));
     expect([...types]).toEqual(['COURS']);
+    // Ordre chronologique inverse garanti par l'API (plus récent d'abord) :
+    // la suite des timestamps doit déjà être triée décroissante.
+    const times = seances.map((s) => new Date(s.startAt).getTime());
+    expect(times).toEqual([...times].sort((a, b) => b - a));
   });
 });

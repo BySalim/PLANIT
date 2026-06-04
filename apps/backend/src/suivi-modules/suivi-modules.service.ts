@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { SessionV2Dto, SuiviModuleDto, SuiviModuleQueryDto } from '@planit/contracts';
+import type { Niveau, SessionV2Dto, SuiviModuleDto, SuiviModuleQueryDto } from '@planit/contracts';
 import { computeVHE } from '@planit/utils';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
@@ -67,11 +67,17 @@ export class SuiviModulesService {
     });
 
     // Couples (classe, module) attendus = modules de la version suivie.
-    const expected: { classeId: string; classeCode: string; mm: VersionModule }[] = [];
+    const expected: {
+      classeId: string;
+      classeCode: string;
+      niveau: Niveau | null;
+      mm: VersionModule;
+    }[] = [];
     for (const classe of classes) {
       const modules = classe.formation?.maquetteVersion?.modules ?? [];
+      const niveau = classe.formation?.niveau ?? null;
       for (const mm of modules) {
-        expected.push({ classeId: classe.id, classeCode: classe.code, mm });
+        expected.push({ classeId: classe.id, classeCode: classe.code, niveau, mm });
       }
     }
     if (expected.length === 0) return [];
@@ -82,7 +88,7 @@ export class SuiviModulesService {
     const moduleIds = [...new Set(expected.map((e) => e.mm.moduleId))];
     const agg = await this.aggregateSeances(classeIds, moduleIds);
 
-    const items: SuiviModuleDto[] = expected.map(({ classeId, classeCode, mm }) => {
+    const items: SuiviModuleDto[] = expected.map(({ classeId, classeCode, niveau, mm }) => {
       const key = keyOf(classeId, mm.moduleId);
       const suivi = suiviByKey.get(key);
       const heuresPrevues = computeVHE(mm);
@@ -98,6 +104,7 @@ export class SuiviModulesService {
         id: suivi?.id ?? '',
         classeId,
         classeCode,
+        niveau,
         moduleId: mm.moduleId,
         module: {
           id: mm.module.id,
@@ -141,7 +148,9 @@ export class SuiviModulesService {
         seanceClasses: { some: { classeId: suivi.classeId } },
       },
       include: seanceV2Include,
-      orderBy: { startAt: 'asc' },
+      // Ordre chronologique inverse : la séance la plus récente d'abord
+      // (l'API est la source d'autorité de l'ordre affiché dans le drawer).
+      orderBy: { startAt: 'desc' },
     });
     return seances.map(toSessionV2Dto);
   }
@@ -191,6 +200,7 @@ export class SuiviModulesService {
       id: suivi.id,
       classeId,
       classeCode: classe.code,
+      niveau: classe.formation?.niveau ?? null,
       moduleId,
       module: {
         id: mm.module.id,
