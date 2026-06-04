@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { type EnseignantDto } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
+import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast-provider';
@@ -48,32 +49,6 @@ function TrashIcon() {
       <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
     </svg>
   );
-}
-
-// ── Helpers avatar ────────────────────────────────────────────────────
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
-}
-
-const AVATAR_PALETTES = [
-  { bg: 'rgba(107,45,14,0.13)', fg: '#6B2D0E' },
-  { bg: 'rgba(232,98,10,0.13)', fg: '#C44E07' },
-  { bg: 'rgba(22,163,74,0.13)', fg: '#15803D' },
-  { bg: 'rgba(37,99,235,0.13)', fg: '#1D4ED8' },
-  { bg: 'rgba(124,58,237,0.13)', fg: '#6D28D9' },
-  { bg: 'rgba(8,145,178,0.13)', fg: '#0E7490' },
-] as const;
-
-function getAvatarStyle(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length]!;
 }
 
 // ── Page ─────────────────────────────────────────────────────────────
@@ -185,8 +160,6 @@ export default function EnseignantsPage() {
                   </tr>
                 ) : (
                   items.map((enseignant: EnseignantDto) => {
-                    const palette = getAvatarStyle(enseignant.nomComplet);
-                    const initials = getInitials(enseignant.nomComplet);
                     return (
                       <tr
                         key={enseignant.id}
@@ -195,12 +168,7 @@ export default function EnseignantsPage() {
                         {/* Enseignant */}
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
-                            <div
-                              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-bold"
-                              style={{ backgroundColor: palette.bg, color: palette.fg }}
-                            >
-                              {initials}
-                            </div>
+                            <Avatar name={enseignant.nomComplet} size={36} />
                             <div className="min-w-0">
                               <div className="truncate font-semibold text-text">
                                 {enseignant.nomComplet}

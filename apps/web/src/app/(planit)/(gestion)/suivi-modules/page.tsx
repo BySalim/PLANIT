@@ -2,8 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import type { SuiviModuleDto, SuiviModuleQueryDto } from '@planit/contracts';
+import { CheckIcon, ChevronRightIcon } from '@planit/ui';
 import { Shell } from '@/components/layout/shell';
+import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { RowActionButton } from '@/components/ui/row-action-button';
 import { SearchInput } from '@/components/ui/search-input';
 import { Select } from '@/components/ui/select';
 import { SuiviSeancesDrawer } from '@/components/rp/suivi/suivi-seances-drawer';
@@ -31,6 +34,7 @@ export default function SuiviModulesPage() {
   // E.5 — drawer « Voir les séances » ouvert depuis chaque ligne.
   const [seancesSuiviId, setSeancesSuiviId] = useState<string | null>(null);
   const [seancesSuiviLibelle, setSeancesSuiviLibelle] = useState<string | undefined>(undefined);
+  const [seancesSuiviColor, setSeancesSuiviColor] = useState<string | undefined>(undefined);
 
   const query = useMemo<SuiviModuleQueryDto>(() => {
     const out: SuiviModuleQueryDto = {};
@@ -135,7 +139,10 @@ export default function SuiviModulesPage() {
       {/* Ligne sommaire */}
       <div className="mb-3 text-xs text-text-sec">
         {isLoading ? (
-          'Chargement…'
+          <span
+            className="inline-block h-3 w-48 animate-pulse rounded bg-border-soft align-middle"
+            aria-hidden
+          />
         ) : (
           <>
             <strong className="font-semibold text-text">{counts.total}</strong> modules ·{' '}
@@ -186,6 +193,7 @@ export default function SuiviModulesPage() {
           onViewSeances={(s) => {
             setSeancesSuiviId(s.id);
             setSeancesSuiviLibelle(s.module.libelle);
+            setSeancesSuiviColor(s.module.color);
           }}
         />
       )}
@@ -193,9 +201,11 @@ export default function SuiviModulesPage() {
       <SuiviSeancesDrawer
         suiviId={seancesSuiviId}
         moduleLibelle={seancesSuiviLibelle}
+        moduleColor={seancesSuiviColor}
         onClose={() => {
           setSeancesSuiviId(null);
           setSeancesSuiviLibelle(undefined);
+          setSeancesSuiviColor(undefined);
         }}
       />
     </Shell>
@@ -217,11 +227,6 @@ function SuiviTable({
   onToggleSelect: (id: string) => void;
   onViewSeances: (suivi: SuiviModuleDto) => void;
 }) {
-  const terminer = useTerminerSuiviMutation();
-  // useRouvrirSuiviMutation est importée séparément pour éviter le mix dans
-  // une seule callback ; l'idée : juste 2 hooks, on bascule selon `estTermine`.
-  // (Si on veut DRY le composant, le hook custom serait à extraire — V3.)
-
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-border-soft bg-surface px-6 py-12 text-center text-sm text-text-muted">
@@ -238,6 +243,9 @@ function SuiviTable({
             <th className="w-10 px-4 py-3 text-left" />
             <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Module
+            </th>
+            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              Niveau
             </th>
             <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Classe
@@ -268,7 +276,6 @@ function SuiviTable({
               isRP={isRP}
               onToggleSelect={() => onToggleSelect(suivi.id)}
               onViewSeances={() => onViewSeances(suivi)}
-              terminerPending={terminer.isPending && terminer.variables?.id === suivi.id}
             />
           ))}
         </tbody>
@@ -283,26 +290,18 @@ function SuiviRow({
   isRP,
   onToggleSelect,
   onViewSeances,
-  terminerPending,
 }: {
   suivi: SuiviModuleDto;
   selected: boolean;
   isRP: boolean;
   onToggleSelect: () => void;
   onViewSeances: () => void;
-  terminerPending: boolean;
 }) {
   const terminer = useTerminerSuiviMutation();
   const rouvrir = useRouvrirSuiviMutation();
-  const isPending = terminerPending || terminer.isPending || rouvrir.isPending;
+  const isPending = terminer.isPending || rouvrir.isPending;
   const progColor =
     suivi.progression >= 95 ? 'bg-ok' : suivi.progression >= 60 ? 'bg-accent' : 'bg-info';
-  const enseignantsLabel =
-    suivi.enseignants.length === 0
-      ? '—'
-      : suivi.enseignants.length === 1
-        ? `${suivi.enseignants[0]!.nom} (${formatHours(suivi.enseignants[0]!.heures)})`
-        : `${suivi.enseignants[0]!.nom} +${suivi.enseignants.length - 1}`;
 
   return (
     <tr
@@ -335,6 +334,15 @@ function SuiviRow({
         </div>
       </td>
       <td className="px-4 py-3.5">
+        {suivi.niveau ? (
+          <span className="inline-flex h-5 items-center rounded bg-primary-50 px-1.5 text-[11px] font-bold text-primary">
+            {suivi.niveau}
+          </span>
+        ) : (
+          <span className="text-text-muted">—</span>
+        )}
+      </td>
+      <td className="px-4 py-3.5">
         <span className="inline-flex h-5 items-center rounded bg-bg px-1.5 font-mono text-[11.5px] font-semibold text-text">
           {suivi.classeCode ?? '—'}
         </span>
@@ -364,36 +372,51 @@ function SuiviRow({
           </span>
         </div>
       </td>
-      <td className="px-4 py-3.5 text-xs text-text-sec">
-        <span className="truncate" title={suivi.enseignants.map((e) => e.nom).join(', ')}>
-          {enseignantsLabel}
-        </span>
+      <td className="px-4 py-3.5">
+        {suivi.enseignants.length === 0 ? (
+          <span className="text-[11.5px] italic text-text-muted">Non enseigné</span>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {suivi.enseignants.map((ens) => (
+              <li key={ens.id} className="flex items-center gap-2">
+                <Avatar name={ens.nom} size={22} />
+                <span className="min-w-0 flex-1 truncate text-[12.5px] text-text" title={ens.nom}>
+                  {ens.nom}
+                </span>
+                <span className="flex-shrink-0 text-[11.5px] font-bold tabular-nums text-ok">
+                  {formatHours(ens.heures)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </td>
       <td className="px-4 py-3.5 text-right">
         <div className="flex items-center justify-end gap-1.5">
-          <Button variant="ghost" size="sm" onClick={onViewSeances}>
+          <RowActionButton
+            onClick={onViewSeances}
+            icon={<ChevronRightIcon size={12} color="currentColor" />}
+          >
             Voir
-          </Button>
+          </RowActionButton>
           {suivi.estTermine ? (
-            <Button
-              variant="ghost"
-              size="sm"
+            <RowActionButton
               onClick={() => rouvrir.mutate({ id: suivi.id })}
               disabled={!isRP || isPending}
               title={isRP ? undefined : 'Action réservée au RP'}
             >
               Rouvrir
-            </Button>
+            </RowActionButton>
           ) : (
-            <Button
-              variant="primary"
-              size="sm"
+            <RowActionButton
+              emphasis="primary"
               onClick={() => terminer.mutate({ id: suivi.id })}
               disabled={!isRP || isPending}
               title={isRP ? undefined : 'Action réservée au RP'}
+              icon={<CheckIcon size={12} color="currentColor" />}
             >
               Terminer
-            </Button>
+            </RowActionButton>
           )}
         </div>
       </td>
