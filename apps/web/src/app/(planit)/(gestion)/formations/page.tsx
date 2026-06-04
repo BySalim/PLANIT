@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useFilieresQuery } from '@/lib/queries';
 import { useAnneesQuery, useFormationsQuery } from '@/lib/queries-v3';
 import { FormationModal } from '@/components/rp/formations/formation-modal';
+import { FormationsTableSkeleton } from '@/components/rp/formations/formations-table-skeleton';
 
 // ── Icône inline ──────────────────────────────────────────────────────
 function PencilIcon() {
@@ -136,9 +137,7 @@ export default function FormationsPage() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-sm text-text-muted">
-          Chargement des formations…
-        </div>
+        <FormationsTableSkeleton />
       ) : isError ? (
         <div className="flex items-center justify-center py-16 text-sm text-err">
           Impossible de charger les formations.

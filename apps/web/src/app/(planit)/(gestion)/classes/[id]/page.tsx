@@ -8,6 +8,11 @@ import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
 import { useClasseEtudiantsQuery, useClasseQuery, useClasseSuiviQuery } from '@/lib/queries-v3';
 import { InscriptionModal } from '@/components/inscriptions/inscription-modal';
+import {
+  ClasseEtudiantsTabSkeleton,
+  ClasseFicheSkeleton,
+  ClasseSuiviTabSkeleton,
+} from '@/components/rp/classes/classe-fiche-skeleton';
 
 // ── Atomes ────────────────────────────────────────────────────────────
 function StatTile({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -45,7 +50,7 @@ const SUIVI_COLS = 'grid grid-cols-[1.6fr_70px_70px_160px_1.2fr] items-center ga
 
 function SuiviTab({ suivi, isLoading }: { suivi: SuiviModuleDto[]; isLoading: boolean }) {
   if (isLoading) {
-    return <div className="py-10 text-center text-sm text-text-muted">Chargement du suivi…</div>;
+    return <ClasseSuiviTabSkeleton />;
   }
   if (suivi.length === 0) {
     return (
@@ -152,7 +157,7 @@ export default function ClasseFichePage() {
       </button>
 
       {classeQuery.isLoading ? (
-        <div className="py-16 text-center text-sm text-text-muted">Chargement de la classe…</div>
+        <ClasseFicheSkeleton />
       ) : classeQuery.isError || classe === undefined ? (
         <div className="py-16 text-center text-sm text-err">Classe introuvable.</div>
       ) : (
@@ -237,7 +242,7 @@ export default function ClasseFichePage() {
                 </Button>
               </div>
               {etudiantsQuery.isLoading ? (
-                <div className="py-10 text-center text-sm text-text-muted">Chargement…</div>
+                <ClasseEtudiantsTabSkeleton />
               ) : etudiants.length === 0 ? (
                 <div className="py-10 text-center text-sm text-text-muted">
                   Aucun étudiant inscrit dans cette classe.
