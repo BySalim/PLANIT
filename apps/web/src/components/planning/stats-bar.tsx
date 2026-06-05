@@ -10,6 +10,12 @@ interface PlanningFooterProps {
   isError?: boolean;
   /** Délégué à PublishButton — vide la pile undo (V2-D11). */
   onPublished?: (() => void) | undefined;
+  /**
+   * LOT 6 G.3 — mode lecture seule (AC). Masque PublishButton et le bouton
+   * Historique (placeholder V03). Les compteurs (sessions / publiées / en
+   * attente) restent affichés — c'est de la lecture.
+   */
+  readOnly?: boolean | undefined;
 }
 
 /**
@@ -29,6 +35,7 @@ export function PlanningFooter({
   isLoading = false,
   isError = false,
   onPublished,
+  readOnly = false,
 }: PlanningFooterProps) {
   const total = sessions.length;
   const pending = sessions.filter((s) => s.hasUnpublishedChanges).length;
@@ -61,22 +68,26 @@ export function PlanningFooter({
         )}
       </div>
 
-      {/* R.7 — ordre : [Publier les modifications, Historique]. */}
-      <div className="flex flex-shrink-0 items-center gap-2">
-        <span className="hidden text-[11.5px] text-text-muted lg:inline">
-          Auto-publication vendredi 22:00
-        </span>
-        <PublishButton sessions={sessions} onPublished={onPublished} />
-        <button
-          type="button"
-          disabled
-          title="Disponible V03"
-          className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text-muted"
-        >
-          <ClockIcon size={13} color="currentColor" />
-          <span>Historique</span>
-        </button>
-      </div>
+      {/* R.7 — ordre : [Publier les modifications, Historique]. En lecture seule
+          (AC), tout le cluster droit est masqué (pas de publication ni
+          historique pour l'AC en V03). */}
+      {readOnly ? null : (
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <span className="hidden text-[11.5px] text-text-muted lg:inline">
+            Auto-publication vendredi 22:00
+          </span>
+          <PublishButton sessions={sessions} onPublished={onPublished} />
+          <button
+            type="button"
+            disabled
+            title="Disponible V03"
+            className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text-muted"
+          >
+            <ClockIcon size={13} color="currentColor" />
+            <span>Historique</span>
+          </button>
+        </div>
+      )}
     </footer>
   );
 }

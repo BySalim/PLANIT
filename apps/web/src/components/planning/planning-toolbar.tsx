@@ -21,6 +21,12 @@ interface PlanningToolbarProps {
   // LOT 7 (X.2) — export planning
   onExport?: ((format: 'png' | 'pdf') => void) | undefined;
   isExporting?: boolean | undefined;
+  /**
+   * LOT 6 G.3 — mode lecture seule (acteur AC). Masque le cluster
+   * undo/redo et le bouton « + Nouvelle séance ». L'export reste actif
+   * (lecture autorisée pour l'AC) ainsi que la navigation hebdo + tabs.
+   */
+  readOnly?: boolean | undefined;
 }
 
 function ToolbarSeparator() {
@@ -202,15 +208,20 @@ export function PlanningToolbar({
   onRedo,
   onExport,
   isExporting,
+  readOnly = false,
 }: PlanningToolbarProps) {
   return (
     <div className="flex h-[52px] flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-border-soft bg-surface px-3">
       {/* Left : undo/redo + week nav + class selector */}
-      <div className="flex flex-shrink-0 items-center gap-1">
-        <UndoRedoButton direction="undo" disabled={!canUndo} onClick={onUndo} />
-        <UndoRedoButton direction="redo" disabled={!canRedo} onClick={onRedo} />
-      </div>
-      <ToolbarSeparator />
+      {readOnly ? null : (
+        <>
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <UndoRedoButton direction="undo" disabled={!canUndo} onClick={onUndo} />
+            <UndoRedoButton direction="redo" disabled={!canRedo} onClick={onRedo} />
+          </div>
+          <ToolbarSeparator />
+        </>
+      )}
       <WeekNavigator weekStart={weekStart} onChange={onWeekChange} />
       <ToolbarSeparator />
       <ClassSelector label={selectedClassLabel} />
@@ -218,11 +229,15 @@ export function PlanningToolbar({
       {/* Spacer pushes the right cluster to the edge */}
       <div className="min-w-2 flex-1" />
 
-      {/* Right : view modes + export + new session */}
+      {/* Right : view modes + export + (new session si RP) */}
       <ViewModeTabs active={viewMode} onChange={onViewModeChange} />
       <ExportButton onExport={onExport} isExporting={isExporting} />
-      <ToolbarSeparator />
-      <NewSessionButton onClick={onCreateSession} />
+      {readOnly ? null : (
+        <>
+          <ToolbarSeparator />
+          <NewSessionButton onClick={onCreateSession} />
+        </>
+      )}
     </div>
   );
 }
