@@ -16,9 +16,7 @@ import { useRouvrirSuiviMutation, useTerminerSuiviMutation } from '@/lib/mutatio
 import { useClassesQuery } from '@/lib/queries-v2';
 import { useSuiviModulesQuery } from '@/lib/queries-v3';
 
-// Next.js App Router requires default export for page
-// eslint-disable-next-line no-restricted-syntax
-export default function SuiviModulesPage() {
+export function RpSuiviView() {
   const { state } = useAuth();
   const isRP = state.status === 'authenticated' && state.user.role === 'RESPONSABLE_PROGRAMME';
 
