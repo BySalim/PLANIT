@@ -1,38 +1,13 @@
 'use client';
 
 import type { InscriptionHistoryItemDto } from '@planit/contracts';
+import { Avatar } from '@/components/ui/avatar';
 import { Drawer } from '@/components/ui/drawer';
 import { useEtudiantDetailQuery } from '@/lib/queries-v3';
 
 interface EtudiantDetailDrawerProps {
   readonly etudiantId: string | null;
   readonly onClose: () => void;
-}
-
-// ── Helpers avatar — calqués sur etudiants/page.tsx (TD-V03-AVATAR-EXTRACT)
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
-}
-
-const AVATAR_PALETTES = [
-  { bg: 'rgba(107,45,14,0.13)', fg: '#6B2D0E' },
-  { bg: 'rgba(232,98,10,0.13)', fg: '#C44E07' },
-  { bg: 'rgba(22,163,74,0.13)', fg: '#15803D' },
-  { bg: 'rgba(37,99,235,0.13)', fg: '#1D4ED8' },
-  { bg: 'rgba(124,58,237,0.13)', fg: '#6D28D9' },
-  { bg: 'rgba(8,145,178,0.13)', fg: '#0E7490' },
-] as const;
-
-function getAvatarStyle(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length]!;
 }
 
 /**
@@ -54,7 +29,7 @@ export function EtudiantDetailDrawer({ etudiantId, onClose }: EtudiantDetailDraw
       width="md"
     >
       {detailQuery.isLoading ? (
-        <p className="text-sm text-text-muted">Chargement…</p>
+        <EtudiantDetailSkeleton />
       ) : detailQuery.error ? (
         <p
           role="alert"
@@ -69,6 +44,32 @@ export function EtudiantDetailDrawer({ etudiantId, onClose }: EtudiantDetailDraw
   );
 }
 
+/** Skeleton de la fiche pendant le lazy load (aucun texte « Chargement »). */
+function EtudiantDetailSkeleton() {
+  return (
+    <div
+      className="flex flex-col gap-5"
+      role="status"
+      aria-busy="true"
+      aria-label="Chargement de la fiche étudiant"
+    >
+      <div className="flex items-center gap-4 border-b border-border-soft pb-4">
+        <div className="size-14 flex-shrink-0 animate-pulse rounded-full bg-border-soft" />
+        <div className="flex flex-col gap-2">
+          <div className="h-4 w-40 animate-pulse rounded bg-border-soft" />
+          <div className="h-3 w-56 animate-pulse rounded bg-border-soft" />
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <div className="h-3 w-32 animate-pulse rounded bg-border-soft" />
+        {Array.from({ length: 2 }, (_, i) => (
+          <div key={i} className="h-16 animate-pulse rounded-lg bg-border-soft" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DetailContent({
   etudiant,
 }: {
@@ -80,20 +81,11 @@ function DetailContent({
     inscriptions: InscriptionHistoryItemDto[];
   };
 }) {
-  const palette = getAvatarStyle(etudiant.nomComplet);
-  const initials = getInitials(etudiant.nomComplet);
-
   return (
     <div className="flex flex-col gap-5">
       {/* En-tête : avatar + identité */}
       <div className="flex items-center gap-4 border-b border-border-soft pb-4">
-        <div
-          className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full text-base font-bold"
-          style={{ background: palette.bg, color: palette.fg }}
-          aria-hidden
-        >
-          {initials}
-        </div>
+        <Avatar name={etudiant.nomComplet} size={56} />
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="truncate font-display text-base font-semibold text-text">
             {etudiant.nomComplet}

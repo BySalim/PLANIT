@@ -2,40 +2,14 @@
 
 import { useState } from 'react';
 import type { EtudiantDto } from '@planit/contracts';
+import { ChevronRightIcon } from '@planit/ui';
 import { Shell } from '@/components/layout/shell';
-import { Button } from '@/components/ui/button';
+import { Avatar } from '@/components/ui/avatar';
+import { RowActionButton } from '@/components/ui/row-action-button';
 import { SearchInput } from '@/components/ui/search-input';
 import { EtudiantDetailDrawer } from '@/components/rp/etudiants/etudiant-detail-drawer';
 import { EtudiantsTableSkeleton } from '@/components/rp/etudiants/etudiants-skeleton';
 import { useEtudiantsQuery } from '@/lib/queries-v3';
-
-// ── Helpers avatar (calqués sur enseignants page — duplication tracée
-// en TD-V03-AVATAR-EXTRACT, à factoriser dans @/lib/avatar.ts en V4). ──
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
-}
-
-const AVATAR_PALETTES = [
-  { bg: 'rgba(107,45,14,0.13)', fg: '#6B2D0E' },
-  { bg: 'rgba(232,98,10,0.13)', fg: '#C44E07' },
-  { bg: 'rgba(22,163,74,0.13)', fg: '#15803D' },
-  { bg: 'rgba(37,99,235,0.13)', fg: '#1D4ED8' },
-  { bg: 'rgba(124,58,237,0.13)', fg: '#6D28D9' },
-  { bg: 'rgba(8,145,178,0.13)', fg: '#0E7490' },
-] as const;
-
-function getAvatarStyle(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length]!;
-}
 
 // ── Page ─────────────────────────────────────────────────────────────
 // Next.js App Router requires default export for page
@@ -104,8 +78,6 @@ export default function EtudiantsPage() {
                 </tr>
               ) : (
                 items.map((etudiant: EtudiantDto) => {
-                  const palette = getAvatarStyle(etudiant.nomComplet);
-                  const initials = getInitials(etudiant.nomComplet);
                   return (
                     <tr
                       key={etudiant.id}
@@ -113,13 +85,7 @@ export default function EtudiantsPage() {
                     >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div
-                            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-bold"
-                            style={{ background: palette.bg, color: palette.fg }}
-                            aria-hidden
-                          >
-                            {initials}
-                          </div>
+                          <Avatar name={etudiant.nomComplet} size={36} />
                           <span className="font-medium text-text">{etudiant.nomComplet}</span>
                         </div>
                       </td>
@@ -132,13 +98,12 @@ export default function EtudiantsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <Button
-                          variant="secondary"
-                          size="sm"
+                        <RowActionButton
                           onClick={() => setSelectedId(etudiant.id)}
+                          icon={<ChevronRightIcon size={12} color="currentColor" />}
                         >
                           Voir
-                        </Button>
+                        </RowActionButton>
                       </td>
                     </tr>
                   );

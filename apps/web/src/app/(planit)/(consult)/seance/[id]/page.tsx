@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { ChevronLeftIcon } from '@planit/ui';
 import { MobileShell } from '@/components/layout/mobile-shell';
 import { SessionDetailView } from '@/components/enseignant/session-detail-view';
+import { SessionDetailViewSkeleton } from '@/components/enseignant/session-detail-view-skeleton';
 import { useRealtimeSessions } from '@/hooks/use-realtime-sessions';
 import { useSessionDetailQuery } from '@/lib/queries';
 
@@ -35,9 +36,7 @@ export default function SeanceDetailPage() {
         </div>
 
         {isLoading ? (
-          <div className="rounded-2xl border border-border bg-surface px-6 py-10 text-center text-sm text-text-sec">
-            Chargement de la séance…
-          </div>
+          <SessionDetailViewSkeleton />
         ) : isError ? (
           <div
             role="alert"

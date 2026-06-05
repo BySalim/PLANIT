@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useFilieresQuery } from '@/lib/queries';
 import { useAnneesQuery, useClassesV3Query } from '@/lib/queries-v3';
 import { ClasseModal } from '@/components/rp/classes/classe-modal';
+import { ClassesTableSkeleton } from '@/components/rp/classes/classes-table-skeleton';
 
 // ── Icône inline ──────────────────────────────────────────────────────
 function PencilIcon() {
@@ -175,9 +176,7 @@ function ClassesPageInner() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-sm text-text-muted">
-          Chargement des classes…
-        </div>
+        <ClassesTableSkeleton />
       ) : isError ? (
         <div className="flex items-center justify-center py-16 text-sm text-err">
           Impossible de charger les classes.

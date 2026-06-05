@@ -5,16 +5,24 @@ export function SuiviTableSkeleton() {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border-soft bg-bg">
-            {['', 'Module', 'Classe', 'Prévu', 'Fait', 'Progression', 'Enseignants', 'Action'].map(
-              (h, i) => (
-                <th
-                  key={i}
-                  className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted"
-                >
-                  {h}
-                </th>
-              ),
-            )}
+            {[
+              '',
+              'Module',
+              'Niveau · Sem.',
+              'Classe',
+              'Prévu',
+              'Fait',
+              'Progression',
+              'Enseignants',
+              'Action',
+            ].map((h, i) => (
+              <th
+                key={i}
+                className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted"
+              >
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -25,6 +33,12 @@ export function SuiviTableSkeleton() {
               </td>
               <td className="px-4 py-3.5">
                 <div className="h-3.5 w-36 animate-pulse rounded bg-border-soft" aria-hidden />
+              </td>
+              <td className="px-4 py-3.5">
+                <div className="flex items-center gap-1.5" aria-hidden>
+                  <div className="h-5 w-9 animate-pulse rounded bg-border-soft" />
+                  <div className="h-5 w-7 animate-pulse rounded bg-border-soft" />
+                </div>
               </td>
               <td className="px-4 py-3.5">
                 <div className="h-3.5 w-16 animate-pulse rounded bg-border-soft" aria-hidden />
@@ -39,7 +53,10 @@ export function SuiviTableSkeleton() {
                 <div className="h-2 w-32 animate-pulse rounded bg-border-soft" aria-hidden />
               </td>
               <td className="px-4 py-3.5">
-                <div className="h-3.5 w-28 animate-pulse rounded bg-border-soft" aria-hidden />
+                <div className="flex items-center gap-2" aria-hidden>
+                  <div className="h-[22px] w-[22px] animate-pulse rounded-full bg-border-soft" />
+                  <div className="h-3.5 w-24 animate-pulse rounded bg-border-soft" />
+                </div>
               </td>
               <td className="px-4 py-3.5">
                 <div

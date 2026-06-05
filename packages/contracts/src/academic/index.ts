@@ -375,6 +375,9 @@ export const suiviModuleSchema = z.object({
   id: cuid,
   classeId: cuid,
   classeCode: z.string().optional(),
+  // Niveau de la classe (hérité de sa formation). Affiché en colonne dédiée
+  // sur la page Suivi. Nullable : une classe peut ne pas avoir de formation.
+  niveau: niveauSchema.nullable(),
   moduleId: cuid,
   module: academicModuleRefSchema,
   semestre: z.number().int().min(1).max(2).nullable(),
