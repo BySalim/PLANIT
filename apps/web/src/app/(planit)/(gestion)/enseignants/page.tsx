@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast-provider';
+import { useIsRp } from '@/hooks/use-role';
 import { useEnseignantsQuery } from '@/lib/queries';
 import { useDeleteEnseignantMutation } from '@/lib/mutations';
 import { EnseignantModal } from '@/components/rp/enseignants/enseignant-modal';
@@ -54,6 +55,7 @@ function TrashIcon() {
 // ── Page ─────────────────────────────────────────────────────────────
 export default function EnseignantsPage() {
   const toast = useToast();
+  const isRp = useIsRp();
 
   const [page, setPage] = useState(1);
   const [statut, setStatut] = useState('');
@@ -116,9 +118,11 @@ export default function EnseignantsPage() {
             <option value="VACATAIRE">Vacataire</option>
           </Select>
         </div>
-        <Button variant="primary" size="sm" onClick={openCreate}>
-          + Ajouter un enseignant
-        </Button>
+        {isRp ? (
+          <Button variant="primary" size="sm" onClick={openCreate}>
+            + Ajouter un enseignant
+          </Button>
+        ) : null}
       </div>
 
       {/* Content */}
@@ -206,23 +210,27 @@ export default function EnseignantsPage() {
                         {/* Actions */}
                         <td className="px-4 py-3.5">
                           <div className="flex items-center justify-end gap-1">
-                            <button
-                              type="button"
-                              title="Modifier"
-                              onClick={() => openEdit(enseignant)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-text"
-                            >
-                              <PencilIcon />
-                            </button>
-                            <button
-                              type="button"
-                              title="Supprimer"
-                              onClick={() => handleDelete(enseignant)}
-                              disabled={deleteMutation.isPending}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-err-100 hover:text-err disabled:opacity-50"
-                            >
-                              <TrashIcon />
-                            </button>
+                            {isRp ? (
+                              <>
+                                <button
+                                  type="button"
+                                  title="Modifier"
+                                  onClick={() => openEdit(enseignant)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-text"
+                                >
+                                  <PencilIcon />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Supprimer"
+                                  onClick={() => handleDelete(enseignant)}
+                                  disabled={deleteMutation.isPending}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-err-100 hover:text-err disabled:opacity-50"
+                                >
+                                  <TrashIcon />
+                                </button>
+                              </>
+                            ) : null}
                             <button
                               type="button"
                               onClick={() => openEdit(enseignant)}
