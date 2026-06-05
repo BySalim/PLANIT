@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BellIcon, CalendarIcon, HomeIcon } from '@planit/ui';
+import { BellIcon, CalendarIcon, CheckSquareIcon, HomeIcon } from '@planit/ui';
 import { useAuth, type UserRole } from '@/contexts/auth-context';
 import { useCurrentActor } from '@/hooks/use-current-actor';
 import { cn } from '@/lib/utils';
@@ -19,15 +19,17 @@ export interface MobileShellProps {
 }
 
 interface TabDef {
-  readonly id: 'home' | 'planning';
+  readonly id: 'home' | 'planning' | 'suivi';
   readonly label: string;
   readonly href: string;
   readonly icon: typeof HomeIcon;
 }
 
+// LOT 9 (S.6) : ajout du tab Suivi (V3-D14 — URL /suivi-modules role-aware).
 const TABS: readonly TabDef[] = [
   { id: 'home', label: 'Accueil', href: '/', icon: HomeIcon },
   { id: 'planning', label: 'Planning', href: '/planning', icon: CalendarIcon },
+  { id: 'suivi', label: 'Suivi', href: '/suivi-modules', icon: CheckSquareIcon },
 ];
 
 const ROLE_LABEL: Partial<Record<UserRole, string>> = {
@@ -55,9 +57,11 @@ export function MobileShell({ children, unread = 0 }: MobileShellProps) {
 
   const activeId: TabDef['id'] | null = pathname.startsWith('/planning')
     ? 'planning'
-    : pathname === '/'
-      ? 'home'
-      : null;
+    : pathname.startsWith('/suivi-modules')
+      ? 'suivi'
+      : pathname === '/'
+        ? 'home'
+        : null;
 
   const handleLogout = () => {
     void logout().then(() => router.push('/login'));
