@@ -1,6 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { Niveau, SessionV2Dto, SuiviModuleDto, SuiviModuleQueryDto } from '@planit/contracts';
+import type {
+  EnseignantSuiviItemDto,
+  Niveau,
+  SessionV2Dto,
+  SuiviModuleDto,
+  SuiviModuleQueryDto,
+} from '@planit/contracts';
 import { computeVHE } from '@planit/utils';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
@@ -165,6 +171,195 @@ export class SuiviModulesService {
     return this.setTermine(suiviId, false);
   }
 
+  /**
+   * S.3 — pivot enseignant (V3-D15).
+   *
+   * Renvoie pour chaque module enseigné la liste des classes avec :
+   * - `heuresFaites` ventilées CM/TD/TP (via `Seance.sousType`)
+   * - `heuresPrevues` = VHE du MaquetteModule de la version suivie par la classe
+   * - `sessionsCount` = nombre de séances COURS du module pour la classe
+   * - `estTermine` = flag du SuiviModule correspondant
+   * - `status` global du module : `completed` si toutes les classes terminées,
+   *   `ongoing` si au moins une a des heures faites, sinon `upcoming`.
+   */
+  async mesEnseignements(userId: string): Promise<EnseignantSuiviItemDto[]> {
+    const enseignant = await this.prisma.enseignant.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!enseignant) return [];
+
+    // Séances COURS de l'enseignant avec module + classes (select strict, pas d'include).
+    // Le filtre moduleId IS NOT NULL est appliqué en JS (`if (!s.moduleId) continue`)
+    // car Prisma v6 TypeScript refuse null dans NOT pour un champ StringNullable.
+    const seances = await this.prisma.seance.findMany({
+      where: {
+        typeV2: 'COURS',
+        enseignantId: enseignant.id,
+      },
+      select: {
+        id: true,
+        moduleId: true,
+        sousType: true,
+        startAt: true,
+        endAt: true,
+        seanceClasses: { select: { classeId: true } },
+        module: {
+          select: {
+            id: true,
+            code: true,
+            libelle: true,
+            color: true,
+            ue: { select: { id: true, code: true, libelle: true } },
+          },
+        },
+      },
+    });
+
+    if (seances.length === 0) return [];
+
+    const moduleIds = [...new Set(seances.map((s) => s.moduleId as string))];
+    const classeIds = [...new Set(seances.flatMap((s) => s.seanceClasses.map((c) => c.classeId)))];
+
+    // Classes avec maquette pour heuresPrevues (select strict — pas d'include imbriqué).
+    const classes = await this.prisma.classe.findMany({
+      where: { id: { in: classeIds } },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        formation: {
+          select: {
+            maquetteVersion: {
+              select: {
+                modules: {
+                  select: {
+                    moduleId: true,
+                    heuresCM: true,
+                    heuresTD: true,
+                    heuresTP: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const classeMap = new Map(classes.map((c) => [c.id, c]));
+
+    // estTermine par (classeId, moduleId).
+    const suiviRows = await this.prisma.suiviModule.findMany({
+      where: { classeId: { in: classeIds }, moduleId: { in: moduleIds } },
+      select: { classeId: true, moduleId: true, estTermine: true },
+    });
+    const suiviMap = new Map<string, boolean>(
+      suiviRows.map((r) => [keyOf(r.classeId, r.moduleId), r.estTermine]),
+    );
+
+    // Agrégat heures par (moduleId, classeId).
+    type ModRef = NonNullable<(typeof seances)[number]['module']>;
+    interface ClasseAgg {
+      heuresCM: number;
+      heuresTD: number;
+      heuresTP: number;
+      heuresFaites: number;
+      sessionsCount: number;
+      moduleRef: ModRef | null;
+    }
+    const agg = new Map<string, Map<string, ClasseAgg>>();
+
+    for (const s of seances) {
+      if (!s.moduleId) continue;
+      const hours = seanceHours(s.startAt, s.endAt);
+
+      for (const link of s.seanceClasses) {
+        const cid = link.classeId;
+        let byClasse = agg.get(s.moduleId);
+        if (!byClasse) {
+          byClasse = new Map();
+          agg.set(s.moduleId, byClasse);
+        }
+        let ca = byClasse.get(cid);
+        if (!ca) {
+          ca = {
+            heuresCM: 0,
+            heuresTD: 0,
+            heuresTP: 0,
+            heuresFaites: 0,
+            sessionsCount: 0,
+            moduleRef: s.module,
+          };
+          byClasse.set(cid, ca);
+        }
+        ca.heuresFaites += hours;
+        ca.sessionsCount += 1;
+        if (s.sousType === 'CM') ca.heuresCM += hours;
+        else if (s.sousType === 'TD') ca.heuresTD += hours;
+        else if (s.sousType === 'TP') ca.heuresTP += hours;
+      }
+    }
+
+    const items: EnseignantSuiviItemDto[] = [];
+
+    for (const moduleId of agg.keys()) {
+      const byClasse = agg.get(moduleId);
+      if (!byClasse) continue;
+      const firstEntry = [...byClasse.values()][0];
+      if (!firstEntry) continue;
+      const mod = firstEntry.moduleRef;
+
+      const classeItems = [...byClasse.entries()].map(([cid, ca]) => {
+        const classeInfo = classeMap.get(cid);
+        const mms = classeInfo?.formation?.maquetteVersion?.modules ?? [];
+        const mm = mms.find((m) => m.moduleId === moduleId);
+        const heuresPrevues = mm ? computeVHE(mm) : 0;
+        const progression =
+          heuresPrevues > 0
+            ? Math.min(100, Math.round((ca.heuresFaites / heuresPrevues) * 100))
+            : 0;
+        const estTermine = suiviMap.get(keyOf(cid, moduleId)) ?? false;
+
+        return {
+          classeId: cid,
+          classeCode: classeInfo?.code ?? cid,
+          className: classeInfo?.name ?? cid,
+          heuresFaites: ca.heuresFaites,
+          heuresCM: ca.heuresCM,
+          heuresTD: ca.heuresTD,
+          heuresTP: ca.heuresTP,
+          heuresPrevues,
+          progression,
+          sessionsCount: ca.sessionsCount,
+          estTermine,
+        };
+      });
+
+      const allDone = classeItems.every((c) => c.estTermine);
+      const anyStarted = classeItems.some((c) => c.heuresFaites > 0);
+      const status: EnseignantSuiviItemDto['status'] = allDone
+        ? 'completed'
+        : anyStarted
+          ? 'ongoing'
+          : 'upcoming';
+
+      items.push({
+        moduleId,
+        module: {
+          id: mod?.id ?? moduleId,
+          code: mod?.code ?? '',
+          libelle: mod?.libelle ?? '',
+          color: mod?.color ?? '#A8A29E',
+          ue: mod?.ue ? { id: mod.ue.id, code: mod.ue.code, libelle: mod.ue.libelle } : null,
+        },
+        classes: classeItems,
+        status,
+      });
+    }
+
+    return items;
+  }
+
   // ── internes ─────────────────────────────────────────────────────────
 
   private async setTermine(suiviId: string, estTermine: boolean): Promise<SuiviModuleDto> {
@@ -228,6 +423,24 @@ export class SuiviModulesService {
     };
   }
 
+  /**
+   * S.2 — self-scope ETUDIANT : classes de l'étudiant via Inscription, année courante.
+   * Si l'étudiant n'est inscrit dans aucune classe pour l'année courante → liste vide.
+   */
+  private async resolveEtudiantClasseIds(userId: string): Promise<string[]> {
+    const current = await this.prisma.anneeAcademique.findFirst({
+      where: { etat: 'EN_COURS' },
+      select: { id: true },
+    });
+    if (!current) return [];
+
+    const inscriptions = await this.prisma.inscription.findMany({
+      where: { etudiantId: userId, anneeAcademiqueId: current.id },
+      select: { classeId: true },
+    });
+    return inscriptions.map((i) => i.classeId);
+  }
+
   private async resolveScopeClasseIds(
     user: CurrentUserPayload,
     classeId?: string,
@@ -240,6 +453,9 @@ export class SuiviModulesService {
     }
     if (this.acScope.isAc(user.role)) {
       return this.acScope.getAssignedClasseIds(user.id);
+    }
+    if (user.role === 'ETUDIANT' || user.role === 'RESPONSABLE_CLASSE') {
+      return this.resolveEtudiantClasseIds(user.id);
     }
     const rows = await this.prisma.classe.findMany({
       where: { formationId: { not: null } },
