@@ -5,9 +5,9 @@
 
 ## Ressources sous lock actif
 
-| Ressource             | Membre | Depuis     | Motif                                                                 |
-| --------------------- | ------ | ---------- | --------------------------------------------------------------------- |
-| `packages/contracts/` | Oumar  | 2026-06-04 | Ajout `EnseignantSuiviDto` (LOT 9 S.3) — additive, pas de suppression |
+| Ressource            | Membre | Depuis | Motif |
+| -------------------- | ------ | ------ | ----- |
+| _(aucun lock actif)_ | —      | —      | —     |
 
 ## Ressources partagées sensibles
 
