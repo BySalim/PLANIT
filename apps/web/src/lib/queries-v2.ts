@@ -16,6 +16,7 @@ import {
   ueSchema,
   z,
 } from '@planit/contracts';
+import { useIsRp } from '@/hooks/use-role';
 import { apiGet } from './api';
 import { toWeekStartParam } from './week';
 
@@ -132,13 +133,19 @@ const paginatedEnseignantsSchema = z.object({
   pageSize: z.number().int().min(1),
 });
 
+// Référentiel d'ÉDITION : ne sert qu'aux selects de `<CreateSessionModal>` et
+// `<SessionDetailDrawer>` (mode édition). L'endpoint est RP-only ; un AC en
+// lecture seule n'a pas à le charger (sinon 403 → toast « Accès refusé »).
+// `enabled: isRp` ⇒ pas de fetch hors RP. (V3-D9 / fix LOT 6.)
 export function useEnseignantsQuery() {
+  const isRp = useIsRp();
   return useQuery<EnseignantDto[]>({
     queryKey: referentialKeys.enseignants,
     queryFn: async () => {
       const paginated = await apiGet(`/enseignants?pageSize=200`, paginatedEnseignantsSchema);
       return paginated.items;
     },
+    enabled: isRp,
     staleTime: 60 * 1000,
   });
 }
@@ -149,10 +156,14 @@ export function useEnseignantsQuery() {
 // liste aplatie des modules pour son select Module. La page UE & Modules
 // utilise un endpoint distinct (queries.ts → useUesQuery, mode lite).
 
+// Référentiel d'ÉDITION (select Module). RP-only côté backend ; gaté `isRp`
+// pour que l'AC en lecture seule ne déclenche pas de 403. (fix LOT 6.)
 export function useUesQuery() {
+  const isRp = useIsRp();
   return useQuery<UEDto[]>({
     queryKey: referentialKeys.ues,
     queryFn: () => apiGet(`/ues?withModules=true`, ueListSchema),
+    enabled: isRp,
     staleTime: 60 * 1000,
   });
 }
@@ -169,14 +180,17 @@ export function useClassesQuery() {
   });
 }
 
-// ── Salles (GET /api/salles — référentiel partagé tous rôles) ──────────
-// Utilisé par le select Salle dans CreateSessionModal + SessionDetailDrawer.
-// Mirror exact de useClassesQuery : staleTime long, peu de churn attendu.
-
+// ── Salles (GET /api/salles) — select Salle d'ÉDITION ──────────────────
+// Consommé uniquement par CreateSessionModal + SessionDetailDrawer (mode
+// édition). L'endpoint est partagé tous rôles, mais l'AC en lecture seule
+// n'édite pas → inutile de charger. Gaté `isRp` par cohérence avec les
+// autres référentiels d'édition (et la liste scoped AC vit dans useAcScope).
 export function useSallesQuery() {
+  const isRp = useIsRp();
   return useQuery<SalleRef[]>({
     queryKey: referentialKeys.salles,
     queryFn: () => apiGet(`/salles`, salleRefListSchema),
+    enabled: isRp,
     staleTime: 5 * 60 * 1000,
   });
 }

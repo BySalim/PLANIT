@@ -30,9 +30,13 @@ type ListQueryDto = z.infer<typeof listQuerySchema>;
 export class EnseignantsController {
   constructor(private readonly enseignants: EnseignantsService) {}
 
-  /** B.6 — liste paginée + filtres optionnels. */
+  /** B.6 — liste paginée + filtres optionnels. Lecture ouverte au RP + AC
+   * (V3-D9 G.6 : l'AC consulte les enseignants en lecture seule). Le
+   * `@Roles` méthode override le `@Roles` classe (RP-only) → les writes
+   * ci-dessous restent réservés au RP. */
   @Get()
-  @ApiOperation({ summary: 'Liste des enseignants (RP)' })
+  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME')
+  @ApiOperation({ summary: 'Liste des enseignants (RP + AC lecture)' })
   @ApiResponse({ status: 200, description: 'Liste paginée' })
   @ApiResponse({ status: 403, description: 'Rôle insuffisant' })
   list(
@@ -47,7 +51,8 @@ export class EnseignantsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Détail enseignant' })
+  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME')
+  @ApiOperation({ summary: 'Détail enseignant (RP + AC lecture)' })
   @ApiResponse({ status: 200, description: 'Enseignant trouvé' })
   @ApiResponse({ status: 404, description: 'Enseignant introuvable' })
   findOne(@Param('id') id: string): Promise<EnseignantDto> {
