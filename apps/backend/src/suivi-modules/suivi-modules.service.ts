@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type {
   EnseignantSuiviItemDto,
@@ -230,6 +230,7 @@ export class SuiviModulesService {
         name: true,
         formation: {
           select: {
+            anneeAcademique: { select: { etat: true } },
             maquetteVersion: {
               select: {
                 modules: {
@@ -247,6 +248,10 @@ export class SuiviModulesService {
       },
     });
     const classeMap = new Map(classes.map((c) => [c.id, c]));
+    // Spec S.3 : le pivot enseignant ne couvre que l'année académique EN_COURS.
+    const currentYearClasseIds = new Set(
+      classes.filter((c) => c.formation?.anneeAcademique?.etat === 'EN_COURS').map((c) => c.id),
+    );
 
     // estTermine par (classeId, moduleId).
     const suiviRows = await this.prisma.suiviModule.findMany({
@@ -275,6 +280,7 @@ export class SuiviModulesService {
 
       for (const link of s.seanceClasses) {
         const cid = link.classeId;
+        if (!currentYearClasseIds.has(cid)) continue; // Spec S.3 : année courante uniquement
         let byClasse = agg.get(s.moduleId);
         if (!byClasse) {
           byClasse = new Map();
@@ -445,16 +451,22 @@ export class SuiviModulesService {
     user: CurrentUserPayload,
     classeId?: string,
   ): Promise<string[]> {
+    const isStudent = user.role === 'ETUDIANT' || user.role === 'RESPONSABLE_CLASSE';
     if (classeId) {
       if (this.acScope.isAc(user.role)) {
         await this.acScope.assertCanAccessClasse(user.id, classeId);
+      } else if (isStudent) {
+        const own = await this.resolveEtudiantClasseIds(user.id);
+        if (!own.includes(classeId)) {
+          throw new ForbiddenException('Classe hors de votre périmètre');
+        }
       }
       return [classeId];
     }
     if (this.acScope.isAc(user.role)) {
       return this.acScope.getAssignedClasseIds(user.id);
     }
-    if (user.role === 'ETUDIANT' || user.role === 'RESPONSABLE_CLASSE') {
+    if (isStudent) {
       return this.resolveEtudiantClasseIds(user.id);
     }
     const rows = await this.prisma.classe.findMany({
