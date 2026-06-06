@@ -229,6 +229,39 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 
 ---
 
+## Patterns émergés Vague 03 (référentiel académique + acteur AC + exports)
+
+> Capitalisation de clôture V03 (LOT 8, 2026-06-06). Tout nouveau code suit ces conventions. ADR-0010, ADR-0011, ADR-0012 **confirmés mergés sur develop** — acquis, remettre en cause = nouvel ADR.
+
+### Modèle académique versionné (ADR-0010, LOT 0/1)
+
+- **Année courante = source de vérité unique `AnneeAcademique.etat = 'EN_COURS'`**, avec invariant « **au plus une** EN_COURS » **garanti en base** par un index unique partiel Postgres (`WHERE etat = 'EN_COURS'`), pas seulement applicatif. Résoudre l'année courante via `resolveCurrentYear` (`@planit/utils`) — jamais une date `new Date()`. Toute requête « par défaut année courante » (formations, classes, suivi) filtre sur cette année.
+- **Maquette versionnée immuable inter-versions** : `Maquette` → `MaquetteVersion` (1 par année) → `MaquetteModule` (CM/TD/TP/TPE + semestre). « Renouveler » = **cloner** la dernière version vers l'année courante (409 si déjà une version pour l'année). On ne réécrit jamais une version passée — l'historique est préservé.
+- **VHE/VHT jamais persistés** : toujours **calculés** via `computeVHE/computeVHT` (`@planit/utils`) à partir du `MaquetteModule`. Aucune colonne d'heures dérivées en base. Même principe que le suivi (heures faites dérivées).
+- **Filtre année courante obligatoire sur les agrégats multi-années** : depuis le correctif LOT 9, tout agrégat de séances/classes (ex. pivot enseignant `mesEnseignements`) doit restreindre aux classes dont la formation est sur l'année `EN_COURS` — le modèle V03 a des classes multi-années (2024/2025/2026), un oubli de filtre agrège l'historique. L'angle mort résiduel côté scope RP est tracé `TD-V03-SUIVI-ANNEE`.
+
+### Scope-aware RBAC AC (ADR-0010 V3-D9, LOT 2/6)
+
+- **`AcScopeService` transverse** ([apps/backend/src/ac/ac-scope.service.ts](apps/backend/src/ac/ac-scope.service.ts)) : un AC ne voit que ses **classes assignées** (`AssistantClasse`) + les **salles dont son RP manager est responsable** (`Salle.rpResponsableId`). Le filtrage est **toujours côté serveur**, jamais un masquage UI. Les services scoped (classes, étudiants, salles, suivi, planning) appellent `isAc(role)` puis `getAssignedClasseIds` / `assertCanAccessClasse`. Pour les non-AC, `isAc()` renvoie `false` → aucune restriction (les guards `@Roles` font le reste).
+- **Pattern de durcissement scope (LOT 9)** : quand un endpoint accepte un `?classeId=` explicite, **contrôler l'appartenance** avant de renvoyer le scope — AC via `assertCanAccessClasse`, étudiant via ses inscriptions de l'année courante. Sinon fuite de périmètre (un acteur scopé lit une classe hors de son périmètre). Le test de non-régression doit couvrir le cas « acteur scopé + classeId d'une autre classe → 403 ».
+- **Assignation RP→AC bornée au management** : un RP n'assigne/retire des classes qu'aux AC qu'il **manage** (`User.managerRpId`). `assertManages` lève 404 (AC inconnu) / 403 (AC d'un autre RP) avant toute mutation.
+
+### Inscriptions + double-diplôme (ADR-0011, LOT 2)
+
+- **Règle double-diplôme garantie en base** : `Inscription` porte `isDoubleDiplome` **dénormalisé** (recopié depuis `Formation.isDoubleDiplome` à l'inscription) + contrainte `@@unique([etudiantId, anneeAcademiqueId, isDoubleDiplome])`. → au plus 1 classe non-DD **et** 1 classe DD par an (≤ 2 inscriptions/an). La violation = contrainte unique Postgres → traduite en **409** par le backend. On dénormalise parce que Postgres ne peut pas indexer à travers une jointure (même arbitrage que smart-dirty V02 : stocker pour garantir).
+- **Flow d'inscription email-first + DTO discriminated union** : l'inscription part **toujours de l'email** (`GET /api/etudiants/lookup?email=`), puis `POST /api/classes/:id/inscriptions` avec un body **discriminated union** `{ mode: 'existant', etudiantId }` | `{ mode: 'nouveau', nomComplet, matricule, … }` (Zod `z.discriminatedUnion` dans `@planit/contracts`). Partagé RP **et** AC (AC restreint à ses classes via le scope).
+
+### Exports client-side (V3-D11, LOT 7)
+
+- **Export image/PDF 100% côté client** ([apps/web/src/lib/export.ts](apps/web/src/lib/export.ts)) : `html-to-image` (`toPng`, capture DOM → data-URL) + `jspdf` (PDF A4). Libs validées au spike LOT 0.8 (décision sensible 2 deps actée). Pas de rendu serveur. `toPng` requiert un vrai navigateur (canvas) → **ne pas appeler dans jsdom sans mock** ; les tests mockent le canvas et testent la logique séparément. Le backend n'expose que les **données** d'export (`GET /api/maquette-versions/:vid/export`), le rendu visuel est client.
+
+### Frontend V03
+
+- **Skeletons de chargement par page** ([apps/web/src/components/rp/\*/\*-skeleton.tsx](apps/web/src/components/rp/)) : chaque liste/fiche lourde (classes, formations, étudiants, suivi) a son skeleton dédié monté pendant le `isLoading` TanStack Query. À répliquer pour toute nouvelle page liste/fiche.
+- **Routing role-aware sans segment d'acteur (V3-D14)** : une URL unique `/suivi-modules` rend la variante RP/AC · Enseignant · Étudiant selon le rôle (`useRole()`), pas de `/rp/...` vs `/etudiant/...` dupliqués. Les hooks `useRole()` / `useAcScope()` ([apps/web/src/hooks/](apps/web/src/hooks/)) pilotent l'affichage. Pattern à suivre pour toute future vue multi-acteurs.
+
+---
+
 ## Sécurité — règles dès jour 1
 
 - Aucun secret en dur — `.env.example` documenté, `.env` gitignored, gitleaks actif
