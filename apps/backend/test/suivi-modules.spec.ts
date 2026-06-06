@@ -144,3 +144,104 @@ describe('Suivi — terminer / rouvrir / séances (B.5/B.6)', () => {
     expect(times).toEqual([...times].sort((a, b) => b - a));
   });
 });
+
+/**
+ * S.2 — Suivi ETUDIANT self-scope (V3-D15).
+ * Ibrahima Sow est inscrit en GL3-A 2025 (seed-insc-ibrahima-2025).
+ * GET /api/suivi-modules sans paramètre → les 5 modules de sa classe.
+ */
+describe('Suivi des modules — ETUDIANT self-scope (S.2)', () => {
+  it("liste les modules de sa classe (GL3-A, 5 modules) via l'inscription courante", async () => {
+    const session = await loginAs(app, 'ETUDIANT');
+    const res = await api().get('/api/suivi-modules').set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(5);
+    const classeIds = new Set((res.body as { classeId: string }[]).map((s) => s.classeId));
+    expect([...classeIds]).toEqual(['seed-classe-gl3a']);
+  });
+
+  it('filtre par semestre fonctionne pour un ETUDIANT (S1 = 3 modules)', async () => {
+    const session = await loginAs(app, 'ETUDIANT');
+    const res = await api()
+      .get('/api/suivi-modules?semestre=1')
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(3);
+  });
+
+  it('un ETUDIANT ne peut pas terminer un module → 403', async () => {
+    const rpSession = await loginAs(app, 'RESPONSABLE_PROGRAMME');
+    const id = await suiviId('seed-classe-gl3a', 'seed-module-bdd');
+
+    const session = await loginAs(app, 'ETUDIANT');
+    const res = await api()
+      .patch(`/api/suivi-modules/${id}/terminer`)
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(403);
+    // S'assurer que le rpSession était bien là (pas d'erreur de seed).
+    expect(rpSession.role).toBe('RESPONSABLE_PROGRAMME');
+  });
+});
+
+/**
+ * S.3 — Suivi pivot ENSEIGNANT (V3-D15).
+ * oumar.ndiaye enseigne ALGO en GL3-A : seance-01 (CM 2h) + seance-02 (TD 2h).
+ * GET /api/suivi-modules/mes-enseignements → 1 item (ALGO) avec 1 classe (GL3-A).
+ */
+describe('Suivi des modules — ENSEIGNANT pivot (S.3)', () => {
+  it('retourne les modules enseignés ventilés CM/TD/TP par classe', async () => {
+    const session = await loginAs(app, 'ENSEIGNANT');
+    const res = await api()
+      .get('/api/suivi-modules/mes-enseignements')
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+
+    const items = res.body as {
+      moduleId: string;
+      module: { code: string };
+      classes: {
+        classeId: string;
+        classeCode: string;
+        heuresFaites: number;
+        heuresCM: number;
+        heuresTD: number;
+        heuresTP: number;
+        sessionsCount: number;
+        estTermine: boolean;
+      }[];
+      status: string;
+    }[];
+
+    // oumar.ndiaye a des séances sur ALGO (seance-01 CM 2h, seance-02 TD 2h).
+    const algo = items.find((i) => i.moduleId === 'seed-module-algo');
+    expect(algo).toBeDefined();
+    expect(algo?.module.code).toBe('ALGO');
+
+    const gl3a = algo?.classes.find((c) => c.classeId === 'seed-classe-gl3a');
+    expect(gl3a).toBeDefined();
+    expect(gl3a?.heuresFaites).toBe(4); // 2h CM + 2h TD
+    expect(gl3a?.heuresCM).toBe(2);
+    expect(gl3a?.heuresTD).toBe(2);
+    expect(gl3a?.heuresTP).toBe(0);
+    expect(gl3a?.sessionsCount).toBe(2);
+    // ALGO est terminé au seed pour GL3-A.
+    expect(gl3a?.estTermine).toBe(true);
+    expect(algo?.status).toBe('completed');
+  });
+
+  it('un ENSEIGNANT ne peut pas accéder à la liste gestion (RP/AC) → 403', async () => {
+    const session = await loginAs(app, 'ENSEIGNANT');
+    const res = await api()
+      .get('/api/suivi-modules?classeId=seed-classe-gl3a')
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(403);
+  });
+
+  it('un ETUDIANT ne peut pas accéder au pivot enseignant → 403', async () => {
+    const session = await loginAs(app, 'ETUDIANT');
+    const res = await api()
+      .get('/api/suivi-modules/mes-enseignements')
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(403);
+  });
+});

@@ -398,6 +398,36 @@ export const suiviModuleQuerySchema = z.object({
 });
 export type SuiviModuleQueryDto = z.infer<typeof suiviModuleQuerySchema>;
 
+// Pivot enseignant (S.3 / V3-D15) — GET /api/suivi-modules/mes-enseignements
+export const enseignantSuiviClasseItemSchema = z.object({
+  classeId: z.string(),
+  classeCode: z.string(),
+  className: z.string(),
+  heuresFaites: z.number().min(0),
+  heuresCM: z.number().min(0),
+  heuresTD: z.number().min(0),
+  heuresTP: z.number().min(0),
+  heuresPrevues: z.number().min(0),
+  progression: z.number().min(0).max(100),
+  sessionsCount: z.number().int().min(0),
+  estTermine: z.boolean(),
+});
+export type EnseignantSuiviClasseItemDto = z.infer<typeof enseignantSuiviClasseItemSchema>;
+
+export const enseignantSuiviItemSchema = z.object({
+  moduleId: z.string(),
+  module: z.object({
+    id: z.string(),
+    code: z.string(),
+    libelle: z.string(),
+    color: z.string(),
+    ue: z.object({ id: z.string(), code: z.string(), libelle: z.string() }).nullable(),
+  }),
+  classes: z.array(enseignantSuiviClasseItemSchema),
+  status: z.enum(['completed', 'ongoing', 'upcoming']),
+});
+export type EnseignantSuiviItemDto = z.infer<typeof enseignantSuiviItemSchema>;
+
 // ─────────────────────────────────────────────────────────────────────
 // Salle (+ rpResponsable — V3-D10)
 // ─────────────────────────────────────────────────────────────────────

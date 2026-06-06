@@ -19,6 +19,7 @@ import {
   maquetteVersionSchema,
   sessionV2Schema,
   suiviModuleSchema,
+  z,
 } from '@planit/contracts';
 import { useAuth } from '@/contexts/auth-context';
 import { useIsRp } from '@/hooks/use-role';
@@ -287,6 +288,106 @@ export function useSuiviModulesQuery(query: SuiviModuleQueryDto) {
     },
     enabled: state.status === 'authenticated',
     staleTime: 30 * 1000,
+  });
+}
+
+// ── LOT 9 — Suivi Étudiant (S.4 — lit la même API, self-scope géré backend) ─
+// Alias sémantique de useSuiviModulesQuery — le backend filtrera sur les classes
+// de l'étudiant connecté une fois S.2 livré. Séparé pour permettre
+// une queryKey distincte (pas de cache partagé avec la vue RP).
+
+export const studentSuiviKeys = {
+  all: ['student-suivi'] as const,
+  suivi: (classeId?: string, semestre?: 1 | 2) =>
+    [...studentSuiviKeys.all, classeId ?? 'all', semestre ?? 'all'] as const,
+};
+
+export function useStudentSuiviQuery(classeId?: string, semestre?: 1 | 2) {
+  const { state } = useAuth();
+  const params = new URLSearchParams();
+  if (classeId !== undefined) params.set('classeId', classeId);
+  if (semestre !== undefined) params.set('semestre', String(semestre));
+  const qs = params.toString();
+  return useQuery<SuiviModuleDto[]>({
+    queryKey: studentSuiviKeys.suivi(classeId, semestre),
+    queryFn: () => apiGet(`/suivi-modules${qs ? `?${qs}` : ''}`, suiviModuleListSchema),
+    enabled: state.status === 'authenticated',
+    staleTime: 60 * 1000,
+  });
+}
+
+// ── LOT 9 — Suivi Enseignant (S.5 — endpoint pivot S.3, stub jusqu'à livraison) ─
+// L'endpoint `GET /api/suivi-modules/mes-enseignements` sera livré en S.3.
+// On prépare le hook maintenant ; il retournera 404/403 tant que S.3 n'est pas mergé.
+
+export interface EnseignantSuiviClasseItem {
+  classeId: string;
+  classeCode: string;
+  className: string;
+  heuresFaites: number;
+  heuresCM: number;
+  heuresTD: number;
+  heuresTP: number;
+  heuresPrevues: number;
+  progression: number;
+  sessionsCount: number;
+  estTermine: boolean;
+}
+
+export interface EnseignantSuiviItem {
+  moduleId: string;
+  module: {
+    id: string;
+    code: string;
+    libelle: string;
+    color: string;
+    ue: { id: string; code: string; libelle: string } | null;
+  };
+  classes: EnseignantSuiviClasseItem[];
+  status: 'completed' | 'ongoing' | 'upcoming';
+}
+
+const enseignantSuiviClasseSchema = z.object({
+  classeId: z.string(),
+  classeCode: z.string(),
+  className: z.string(),
+  heuresFaites: z.number(),
+  heuresCM: z.number(),
+  heuresTD: z.number(),
+  heuresTP: z.number(),
+  heuresPrevues: z.number(),
+  progression: z.number(),
+  sessionsCount: z.number(),
+  estTermine: z.boolean(),
+});
+
+const enseignantSuiviItemSchema = z.object({
+  moduleId: z.string(),
+  module: z.object({
+    id: z.string(),
+    code: z.string(),
+    libelle: z.string(),
+    color: z.string(),
+    ue: z.object({ id: z.string(), code: z.string(), libelle: z.string() }).nullable(),
+  }),
+  classes: z.array(enseignantSuiviClasseSchema),
+  status: z.enum(['completed', 'ongoing', 'upcoming']),
+});
+
+const enseignantSuiviListSchema = z.array(enseignantSuiviItemSchema);
+
+export const enseignantSuiviKeys = {
+  all: ['enseignant-suivi'] as const,
+  suivi: () => [...enseignantSuiviKeys.all, 'mes-enseignements'] as const,
+};
+
+export function useEnseignantSuiviQuery() {
+  const { state } = useAuth();
+  return useQuery<EnseignantSuiviItem[]>({
+    queryKey: enseignantSuiviKeys.suivi(),
+    queryFn: () => apiGet('/suivi-modules/mes-enseignements', enseignantSuiviListSchema),
+    enabled: state.status === 'authenticated',
+    staleTime: 60 * 1000,
   });
 }
 
