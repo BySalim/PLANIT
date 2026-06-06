@@ -25,6 +25,8 @@ import {
   ChevronDownIcon,
 } from '@planit/ui';
 import { cn } from '@/lib/utils';
+import { useAuth, type UserRole } from '@/contexts/auth-context';
+import { roleLabel } from '@/hooks/use-role';
 
 type IconComponent = ComponentType<IconProps>;
 
@@ -42,14 +44,17 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const NAV: NavGroup[] = [
+// ── Menu RP (état pré-V3-LOT 6 + branchement TdB/Demandes/Salles sur leurs
+//    pages réelles — placeholders V03 pour TdB/Demandes/Salles, fonctionnels
+//    pour les autres). Inchangé sur les items déjà routés.
+const NAV_RP: NavGroup[] = [
   {
     group: 'PRINCIPAL',
     items: [
-      { id: 'dashboard', label: 'Tableau de bord', href: '#', icon: HomeIcon },
+      { id: 'dashboard', label: 'Tableau de bord', href: '/tableau-de-bord', icon: HomeIcon },
       { id: 'planning', label: 'Planning', href: '/', icon: CalendarIcon },
       { id: 'suivi', label: 'Suivi des modules', href: '/suivi-modules', icon: CheckSquareIcon },
-      { id: 'demands', label: 'Demandes', href: '#', icon: InboxIcon, badge: 5 },
+      { id: 'demands', label: 'Demandes', href: '/demandes', icon: InboxIcon },
       {
         id: 'conflicts',
         label: 'Conflits',
@@ -76,7 +81,7 @@ const NAV: NavGroup[] = [
       { id: 'classes', label: 'Classes', href: '/classes', icon: LayersIcon },
       { id: 'teachers', label: 'Enseignants', href: '/enseignants', icon: UserCogIcon },
       { id: 'personnel', label: 'Personnel', href: '#', icon: UserIcon },
-      { id: 'rooms', label: 'Salles', href: '#', icon: DoorIcon },
+      { id: 'rooms', label: 'Salles', href: '/salles', icon: DoorIcon },
     ],
   },
   {
@@ -89,14 +94,50 @@ const NAV: NavGroup[] = [
   },
 ];
 
-const PROFILE = {
-  firstName: 'Aïssatou',
-  lastName: 'Diallo',
-  role: 'Responsable de programme',
-};
+// ── Menu AC (V3-D9, LOT 6 G.2) — strictement 8 entrées, aucun item
+//    « offre de formation » (Maquettes/Formations/Filières/UE&Modules sont
+//    RP-only via le route group `(rp-only)`).
+const NAV_AC: NavGroup[] = [
+  {
+    group: 'PRINCIPAL',
+    items: [
+      { id: 'dashboard', label: 'Tableau de bord', href: '/tableau-de-bord', icon: HomeIcon },
+      { id: 'planning', label: 'Planning', href: '/', icon: CalendarIcon },
+      { id: 'suivi', label: 'Suivi des modules', href: '/suivi-modules', icon: CheckSquareIcon },
+      { id: 'demands', label: 'Demandes', href: '/demandes', icon: InboxIcon },
+    ],
+  },
+  {
+    group: 'MES CLASSES',
+    items: [
+      { id: 'students', label: 'Étudiants', href: '/etudiants', icon: UsersIcon },
+      { id: 'classes', label: 'Classes', href: '/classes', icon: LayersIcon },
+    ],
+  },
+  {
+    group: 'RÉFÉRENTIELS',
+    items: [
+      { id: 'teachers', label: 'Enseignants', href: '/enseignants', icon: UserCogIcon },
+      { id: 'rooms', label: 'Salles', href: '/salles', icon: DoorIcon },
+    ],
+  },
+];
 
-function initials(first: string, last: string): string {
-  return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+function navForRole(role: UserRole | null): NavGroup[] {
+  // Seuls RP et AC consomment cette sidebar (les rôles consult ont leur propre
+  // layout `(consult)`). On retombe sur NAV_RP par défaut — c'est le comportement
+  // legacy de cette sidebar, le RBAC réel (route groups + guards serveur) coupe
+  // l'accès aux pages que ces items pointeraient.
+  return role === 'ASSISTANT_PROGRAMME' ? NAV_AC : NAV_RP;
+}
+
+function computeInitials(fullName: string): string {
+  return fullName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
 }
 
 // Sidebar drag-resize constants (calqué sur PLANIT-IA/rp/components/shell.jsx).
@@ -108,6 +149,9 @@ const SB_COLLAPSE_THRESHOLD = 100;
 export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefined }) {
   // Vitest / premier paint : usePathname() peut être null hors Next router.
   const pathname = usePathname() ?? '';
+  const { state } = useAuth();
+  const role = state.status === 'authenticated' ? state.user.role : null;
+  const NAV = navForRole(role);
   const [width, setWidth] = useState<number>(SB_DEF);
   const draggingRef = useRef(false);
   const collapsed = width < SB_COLLAPSE_THRESHOLD;
@@ -115,6 +159,7 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     PRINCIPAL: true,
     'OFFRE DE FORMATION': true,
+    'MES CLASSES': true,
     RÉFÉRENTIELS: true,
     CONSULTATION: true,
   });
@@ -257,14 +302,16 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
             )}
           >
             <div className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full bg-sb-dark-2 text-[12px] font-bold text-primary-100">
-              {initials(PROFILE.firstName, PROFILE.lastName)}
+              {state.status === 'authenticated' ? computeInitials(state.user.fullName) : '…'}
             </div>
             {!collapsed ? (
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13px] font-semibold text-white">
-                  {PROFILE.firstName} {PROFILE.lastName}
+                  {state.status === 'authenticated' ? state.user.fullName : '—'}
                 </div>
-                <div className="truncate text-[11px] text-sb-dark-muted">{PROFILE.role}</div>
+                <div className="truncate text-[11px] text-sb-dark-muted">
+                  {state.status === 'authenticated' ? roleLabel(state.user.role) : ''}
+                </div>
               </div>
             ) : null}
           </div>

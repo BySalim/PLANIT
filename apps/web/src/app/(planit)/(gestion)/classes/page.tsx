@@ -6,6 +6,7 @@ import { type ClasseV3Dto } from '@planit/contracts';
 import { ChevronRightIcon } from '@planit/ui';
 import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
+import { useIsRp } from '@/hooks/use-role';
 import { useFilieresQuery } from '@/lib/queries';
 import { useAnneesQuery, useClassesV3Query } from '@/lib/queries-v3';
 import { ClasseModal } from '@/components/rp/classes/classe-modal';
@@ -81,6 +82,7 @@ const COLS = 'grid grid-cols-[1.7fr_120px_110px_190px_auto] items-center gap-3';
 function ClassesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isRp = useIsRp();
 
   const [searchInput, setSearchInput] = useState('');
   const [q, setQ] = useState('');
@@ -137,19 +139,23 @@ function ClassesPageInner() {
             aria-label="Rechercher une classe"
             className="h-9 w-56 rounded-lg border border-border bg-surface px-3 text-sm text-text placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           />
-          <select
-            value={filiereFilter}
-            onChange={(e) => setFiliereFilter(e.target.value)}
-            className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            aria-label="Filtrer par filière"
-          >
-            <option value="">Toutes les filières</option>
-            {filieres.map((f) => (
-              <option key={f.id} value={f.sigle}>
-                {f.sigle}
-              </option>
-            ))}
-          </select>
+          {/* Filtre filière réservé au RP : la liste des filières est RP-only
+              (useFilieresQuery gaté isRp) et l'AC est scopé à ses classes. */}
+          {isRp ? (
+            <select
+              value={filiereFilter}
+              onChange={(e) => setFiliereFilter(e.target.value)}
+              className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              aria-label="Filtrer par filière"
+            >
+              <option value="">Toutes les filières</option>
+              {filieres.map((f) => (
+                <option key={f.id} value={f.sigle}>
+                  {f.sigle}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <select
             value={anneeFilter}
             onChange={(e) => setAnneeFilter(e.target.value)}
@@ -165,13 +171,15 @@ function ClassesPageInner() {
             ))}
           </select>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setModal({ open: true, mode: 'create' })}
-        >
-          + Nouvelle classe
-        </Button>
+        {isRp ? (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setModal({ open: true, mode: 'create' })}
+          >
+            + Nouvelle classe
+          </Button>
+        ) : null}
       </div>
 
       {/* Content */}
@@ -184,13 +192,15 @@ function ClassesPageInner() {
       ) : !classes || classes.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16">
           <p className="text-sm text-text-muted">Aucune classe pour ce filtre.</p>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setModal({ open: true, mode: 'create' })}
-          >
-            Créer une classe
-          </Button>
+          {isRp ? (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setModal({ open: true, mode: 'create' })}
+            >
+              Créer une classe
+            </Button>
+          ) : null}
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border-soft bg-surface shadow-sm">
@@ -258,26 +268,32 @@ function ClassesPageInner() {
                   Voir
                   <ChevronRightIcon size={12} color="currentColor" />
                 </button>
-                <button
-                  type="button"
-                  title="Modifier la classe"
-                  onClick={() => setModal({ open: true, mode: 'edit', initial: c })}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-text"
-                >
-                  <PencilIcon />
-                </button>
+                {isRp ? (
+                  <button
+                    type="button"
+                    title="Modifier la classe"
+                    onClick={() => setModal({ open: true, mode: 'edit', initial: c })}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-text"
+                  >
+                    <PencilIcon />
+                  </button>
+                ) : null}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      <ClasseModal
-        isOpen={modal.open}
-        onClose={() => setModal({ open: false })}
-        mode={modal.open ? modal.mode : 'create'}
-        initial={modal.open && modal.mode === 'edit' ? modal.initial : undefined}
-      />
+      {/* Modale création/édition réservée au RP : non montée pour l'AC (sinon
+          son useFormationsQuery partirait inutilement). */}
+      {isRp ? (
+        <ClasseModal
+          isOpen={modal.open}
+          onClose={() => setModal({ open: false })}
+          mode={modal.open ? modal.mode : 'create'}
+          initial={modal.open && modal.mode === 'edit' ? modal.initial : undefined}
+        />
+      ) : null}
     </Shell>
   );
 }
