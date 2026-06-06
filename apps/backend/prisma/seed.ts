@@ -10,8 +10,11 @@ const prisma = new PrismaClient();
 seedDatabase(prisma)
   .then(() => {
     console.log(
-      'Seed complete (vague-02): 2 filières, 3 classes, 1 RP, 3 enseignants, 1 étudiant (argon2id), ' +
-        '3 UE, 6 modules, 4 salles, settings singleton, 10 séances (incl. 1 multi-classes + 1 évaluation + 2 drafts).',
+      'Seed complete (vague-03): socle V02 (2 filières, classes, RP, 3 enseignants, ' +
+        '3 UE, 6 modules, 4 salles, 10 séances) + V03 : 3 années (2025-2026 EN_COURS), ' +
+        '2ᵉ RP + 1 AC, 6 étudiants, 4 maquettes versionnées, 4 formations, classes ' +
+        '(formation + capacité) dont 1 MASTER double-diplôme, salles rpResponsable, ' +
+        '5 inscriptions (dont 1 double-diplôme + 1 historique), suivi des modules.',
     );
   })
   .catch((error: unknown) => {

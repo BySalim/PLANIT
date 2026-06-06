@@ -20,6 +20,10 @@
     "./json-stable": {
       "types": "./src/json-stable.ts",
       "default": "./dist/json-stable.js"
+    },
+    "./academic": {
+      "types": "./src/academic/index.ts",
+      "default": "./dist/academic/index.js"
     }
   },
   "scripts": {

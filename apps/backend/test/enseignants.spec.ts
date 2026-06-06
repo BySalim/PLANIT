@@ -60,6 +60,13 @@ describe('GET /api/enseignants (B.6)', () => {
     const res = await api().get('/api/enseignants').set('Cookie', session.cookieHeader);
     expect(res.status).toBe(403);
   });
+
+  it('autorise un AC en lecture (V3-D9 G.6)', async () => {
+    const session = await loginAs(app, 'ASSISTANT_PROGRAMME');
+    const res = await api().get('/api/enseignants').set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    expect(res.body.items).toHaveLength(3);
+  });
 });
 
 describe('POST /api/enseignants (B.6)', () => {
@@ -83,6 +90,15 @@ describe('POST /api/enseignants (B.6)', () => {
     const dupe = { ...validBody(), emailInstitutionnel: 'oumar.ndiaye@planit.test' };
     const res = await api().post('/api/enseignants').set('Cookie', session.cookieHeader).send(dupe);
     expect(res.status).toBe(409);
+  });
+
+  it('refuse 403 à un AC (écriture réservée au RP)', async () => {
+    const session = await loginAs(app, 'ASSISTANT_PROGRAMME');
+    const res = await api()
+      .post('/api/enseignants')
+      .set('Cookie', session.cookieHeader)
+      .send(validBody());
+    expect(res.status).toBe(403);
   });
 
   it('refuse 400 si body invalide', async () => {

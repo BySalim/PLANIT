@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AcademicModule } from './academic/academic.module';
+import { AcModule } from './ac/ac.module';
+import { AnneesModule } from './annees/annees.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
@@ -10,9 +12,14 @@ import { LoggerModule } from './common/logger.module';
 import { SallesModule } from './salles/salles.module';
 import { PrismaModule } from './common/prisma.module';
 import { EnseignantsModule } from './enseignants/enseignants.module';
+import { EtudiantsModule } from './etudiants/etudiants.module';
 import { FilieresModule } from './filieres/filieres.module';
+import { FormationsModule } from './formations/formations.module';
 import { HealthModule } from './health/health.module';
+import { InscriptionsModule } from './inscriptions/inscriptions.module';
+import { MaquettesModule } from './maquettes/maquettes.module';
 import { SeanceModule } from './seance/seance.module';
+import { SuiviModulesModule } from './suivi-modules/suivi-modules.module';
 import { SeanceV2Module } from './seance-v2/seance-v2.module';
 import { SettingsModule } from './settings/settings.module';
 import { WsModule } from './ws/ws.module';
@@ -47,6 +54,15 @@ const DEFAULT_LIMIT = isTest ? 10_000 : 100;
     // V02 — référentiel salles (mirror de classes/), exposé pour combler
     // TD-V02-LOT3-A (select Salle restait vide tant que l'endpoint manquait)
     SallesModule,
+    // V03 LOT 1 — référentiel académique : années, maquettes versionnées, formations
+    AnneesModule,
+    MaquettesModule,
+    FormationsModule,
+    // V03 LOT 2 — classes (refonte) + étudiants + inscriptions + suivi + scope AC
+    AcModule,
+    EtudiantsModule,
+    InscriptionsModule,
+    SuiviModulesModule,
   ],
   providers: [
     // Ordre important : throttler → auth → RBAC.

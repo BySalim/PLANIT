@@ -17,6 +17,10 @@
       "types": "./src/planning/index.ts",
       "default": "./dist/planning/index.js"
     },
+    "./academic": {
+      "types": "./src/academic/index.ts",
+      "default": "./dist/academic/index.js"
+    },
     "./notifications": {
       "types": "./src/notifications/index.ts",
       "default": "./dist/notifications/index.js"

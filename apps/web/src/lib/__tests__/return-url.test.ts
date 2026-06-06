@@ -3,11 +3,9 @@ import { safeReturnUrl } from '../return-url';
 
 describe('safeReturnUrl', () => {
   it('accepte un chemin interne absolu', () => {
-    expect(safeReturnUrl('/rp')).toBe('/rp');
-    expect(safeReturnUrl('/rp/enseignants')).toBe('/rp/enseignants');
-    expect(safeReturnUrl('/etudiant/planning?date=2026-05-31')).toBe(
-      '/etudiant/planning?date=2026-05-31',
-    );
+    expect(safeReturnUrl('/')).toBe('/');
+    expect(safeReturnUrl('/enseignants')).toBe('/enseignants');
+    expect(safeReturnUrl('/planning?date=2026-05-31')).toBe('/planning?date=2026-05-31');
   });
 
   it('rejette une URL protocol-relative (open redirect)', () => {

@@ -43,6 +43,13 @@ interface PlanningGridProps {
         readonly endTime: string;
       }) => void)
     | undefined;
+  /**
+   * LOT 6 G.3 — lecture seule (acteur AC). Désactive toutes les interactions
+   * d'écriture : drag/resize/copier-coller, sélection de créneau vide,
+   * poignées resize, glisser-déposer. Reste actif : clic simple (sélection),
+   * double-clic (drawer détail), navigation hebdo, scroll.
+   */
+  readOnly?: boolean | undefined;
 }
 
 const DAY_START = 8;
@@ -205,6 +212,7 @@ export function PlanningGrid({
   onRetry,
   onPushUndo,
   onCreateAtSlot,
+  readOnly = false,
 }: PlanningGridProps) {
   // I.3 — multi-sélection : `selectedIds` est un Set immuable. Ctrl/Meta+clic
   // toggle l'appartenance ; clic simple réduit la sélection à 1 élément.
@@ -415,6 +423,7 @@ export function PlanningGrid({
   }
 
   function handleDragOver(event: React.DragEvent<HTMLDivElement>, dayIndex: number) {
+    if (readOnly) return;
     if (!drag) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -422,6 +431,7 @@ export function PlanningGrid({
   }
 
   function handleDrop(event: React.DragEvent<HTMLDivElement>, dayIndex: number) {
+    if (readOnly) return;
     if (!drag) return;
     event.preventDefault();
     const startHour = startHourFromEvent(event, drag);
@@ -518,6 +528,7 @@ export function PlanningGrid({
     dayIndex: number,
     event: React.MouseEvent,
   ) {
+    if (readOnly) return;
     event.preventDefault();
     event.stopPropagation();
     const start = new Date(session.startAt);
@@ -646,6 +657,7 @@ export function PlanningGrid({
   // Raccourcis copier/coller : Ctrl/Cmd+C copie la séance sélectionnée,
   // Ctrl/Cmd+V crée une copie au créneau situé sous le curseur.
   useEffect(() => {
+    if (readOnly) return;
     function onKey(event: KeyboardEvent) {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
@@ -692,7 +704,7 @@ export function PlanningGrid({
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sessions, selectedIds, copiedSessions, weekStart, pasteSession]);
+  }, [sessions, selectedIds, copiedSessions, weekStart, pasteSession, readOnly]);
 
   if (error) {
     return (
@@ -804,6 +816,7 @@ export function PlanningGrid({
               onDragOver={(event) => handleDragOver(event, dayIndex)}
               onDrop={(event) => handleDrop(event, dayIndex)}
               onMouseMove={(event) => {
+                if (readOnly) return;
                 const rect = event.currentTarget.getBoundingClientRect();
                 const y = event.clientY - rect.top;
                 lastMousePosRef.current = { dayIndex, y };
@@ -862,12 +875,14 @@ export function PlanningGrid({
                 }
               }}
               onMouseLeave={() => {
+                if (readOnly) return;
                 // Le hover passif disparaît à la sortie ; la sélection pending
                 // reste affichée (elle n'est annulée que par un clic explicite
                 // ou Escape).
                 setSlotSelection((prev) => (prev?.kind === 'hover' ? null : prev));
               }}
               onMouseDown={(event) => {
+                if (readOnly) return;
                 // mouseDown sur fond colonne (pas sur une SessionCard, pas sur
                 // le bouton + du SlotPreview qui stopPropagation) → démarre
                 // un drag d'extension à partir de la case 1h sous le curseur.
@@ -896,6 +911,7 @@ export function PlanningGrid({
                 });
               }}
               onMouseUp={() => {
+                if (readOnly) return;
                 // Fin du drag d'extension : fige la sélection en `pending`.
                 // Le curseur peut bouger ailleurs, la sélection reste visible
                 // tant qu'on ne clique pas ailleurs. Le flag `justFinishedSlotDragRef`
@@ -1047,22 +1063,37 @@ export function PlanningGrid({
                           isDragging={drag?.session.id === p.session.id}
                           onSelect={handleSelect}
                           onOpen={onSessionOpen}
-                          onDragStart={(s, event) => {
-                            const rect = event.currentTarget.getBoundingClientRect();
-                            setDrag({ session: s, grabOffsetY: event.clientY - rect.top });
-                            event.dataTransfer.effectAllowed = 'move';
-                          }}
+                          {...(readOnly
+                            ? {}
+                            : {
+                                onDragStart: (s, event) => {
+                                  const rect = event.currentTarget.getBoundingClientRect();
+                                  setDrag({
+                                    session: s,
+                                    grabOffsetY: event.clientY - rect.top,
+                                  });
+                                  event.dataTransfer.effectAllowed = 'move';
+                                },
+                              })}
                         />
-                        <ResizeHandle
-                          edge="top"
-                          color={barColor}
-                          onMouseDown={(event) => startResize(p.session, 'top', dayIndex, event)}
-                        />
-                        <ResizeHandle
-                          edge="bottom"
-                          color={barColor}
-                          onMouseDown={(event) => startResize(p.session, 'bottom', dayIndex, event)}
-                        />
+                        {readOnly ? null : (
+                          <>
+                            <ResizeHandle
+                              edge="top"
+                              color={barColor}
+                              onMouseDown={(event) =>
+                                startResize(p.session, 'top', dayIndex, event)
+                              }
+                            />
+                            <ResizeHandle
+                              edge="bottom"
+                              color={barColor}
+                              onMouseDown={(event) =>
+                                startResize(p.session, 'bottom', dayIndex, event)
+                              }
+                            />
+                          </>
+                        )}
                       </div>
                     );
                   })

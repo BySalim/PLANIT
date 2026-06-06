@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { ChevronDownIcon, DownloadIcon, LayersIcon, PlusIcon } from '@planit/ui';
 import { cn } from '@/lib/utils';
 import { ViewModeTabs, type ViewMode } from './view-mode-tabs';
@@ -17,6 +18,15 @@ interface PlanningToolbarProps {
   canRedo?: boolean | undefined;
   onUndo?: (() => void) | undefined;
   onRedo?: (() => void) | undefined;
+  // LOT 7 (X.2) — export planning
+  onExport?: ((format: 'png' | 'pdf') => void) | undefined;
+  isExporting?: boolean | undefined;
+  /**
+   * LOT 6 G.3 — mode lecture seule (acteur AC). Masque le cluster
+   * undo/redo et le bouton « + Nouvelle séance ». L'export reste actif
+   * (lecture autorisée pour l'AC) ainsi que la navigation hebdo + tabs.
+   */
+  readOnly?: boolean | undefined;
 }
 
 function ToolbarSeparator() {
@@ -92,18 +102,78 @@ function ClassSelector({ label = 'M1 IA' }: { label?: string | undefined }) {
   );
 }
 
-function ExportButton() {
+// LOT 7 (X.2) — bouton export câblé sur onExport. Affiche un menu
+// déroulant PNG / PDF. Désactivé si onExport est absent (état chargement).
+function ExportButton({
+  onExport,
+  isExporting,
+}: {
+  onExport?: ((format: 'png' | 'pdf') => void) | undefined;
+  isExporting?: boolean | undefined;
+}) {
+  const [open, setOpen] = useState(false);
+  const busy = isExporting === true;
+
+  if (onExport === undefined) {
+    return (
+      <button
+        type="button"
+        disabled
+        title="Export non disponible"
+        className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border-soft bg-surface px-2.5 text-[12px] font-medium text-text-muted"
+      >
+        <DownloadIcon size={13} color="currentColor" />
+        <span>Exporter</span>
+        <ChevronDownIcon size={11} color="currentColor" />
+      </button>
+    );
+  }
+
   return (
-    <button
-      type="button"
-      disabled
-      title="Exporter (V2)"
-      className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border-soft bg-surface px-2.5 text-[12px] font-medium text-text-muted"
-    >
-      <DownloadIcon size={13} color="currentColor" />
-      <span>Exporter</span>
-      <ChevronDownIcon size={11} color="currentColor" />
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Exporter le planning"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className={cn(
+          'inline-flex h-8 flex-shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium transition-colors',
+          busy
+            ? 'cursor-wait border-border-soft bg-surface text-text-muted'
+            : 'border-border bg-surface text-text hover:border-primary hover:text-primary',
+        )}
+      >
+        <DownloadIcon size={13} color="currentColor" />
+        <span>{busy ? 'Génération…' : 'Exporter'}</span>
+        <ChevronDownIcon size={11} color="currentColor" />
+      </button>
+
+      {open && !busy && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-50 mt-1 min-w-[148px] overflow-hidden rounded-xl border border-border bg-surface shadow-lg"
+          onMouseLeave={() => setOpen(false)}
+        >
+          {(['png', 'pdf'] as const).map((fmt) => (
+            <button
+              key={fmt}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onExport(fmt);
+              }}
+              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-medium text-text transition-colors hover:bg-bg-warm"
+            >
+              <DownloadIcon size={13} color="currentColor" />
+              {fmt === 'png' ? 'Image PNG' : 'Document PDF'}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -136,15 +206,22 @@ export function PlanningToolbar({
   canRedo = false,
   onUndo,
   onRedo,
+  onExport,
+  isExporting,
+  readOnly = false,
 }: PlanningToolbarProps) {
   return (
     <div className="flex h-[52px] flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-border-soft bg-surface px-3">
       {/* Left : undo/redo + week nav + class selector */}
-      <div className="flex flex-shrink-0 items-center gap-1">
-        <UndoRedoButton direction="undo" disabled={!canUndo} onClick={onUndo} />
-        <UndoRedoButton direction="redo" disabled={!canRedo} onClick={onRedo} />
-      </div>
-      <ToolbarSeparator />
+      {readOnly ? null : (
+        <>
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <UndoRedoButton direction="undo" disabled={!canUndo} onClick={onUndo} />
+            <UndoRedoButton direction="redo" disabled={!canRedo} onClick={onRedo} />
+          </div>
+          <ToolbarSeparator />
+        </>
+      )}
       <WeekNavigator weekStart={weekStart} onChange={onWeekChange} />
       <ToolbarSeparator />
       <ClassSelector label={selectedClassLabel} />
@@ -152,11 +229,15 @@ export function PlanningToolbar({
       {/* Spacer pushes the right cluster to the edge */}
       <div className="min-w-2 flex-1" />
 
-      {/* Right : view modes + export + new session */}
+      {/* Right : view modes + export + (new session si RP) */}
       <ViewModeTabs active={viewMode} onChange={onViewModeChange} />
-      <ExportButton />
-      <ToolbarSeparator />
-      <NewSessionButton onClick={onCreateSession} />
+      <ExportButton onExport={onExport} isExporting={isExporting} />
+      {readOnly ? null : (
+        <>
+          <ToolbarSeparator />
+          <NewSessionButton onClick={onCreateSession} />
+        </>
+      )}
     </div>
   );
 }

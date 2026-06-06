@@ -29,7 +29,7 @@ export class ApiError extends Error {
 let pendingRefresh: Promise<void> | null = null;
 
 async function request<T>(
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   parser: ResponseParser<T>,
   body?: unknown,
@@ -113,6 +113,10 @@ export function apiPost<T>(path: string, parser: ResponseParser<T>, body?: unkno
 
 export function apiPut<T>(path: string, parser: ResponseParser<T>, body?: unknown): Promise<T> {
   return request('PUT', path, parser, body);
+}
+
+export function apiPatch<T>(path: string, parser: ResponseParser<T>, body?: unknown): Promise<T> {
+  return request('PATCH', path, parser, body);
 }
 
 export async function apiDelete(path: string): Promise<void> {

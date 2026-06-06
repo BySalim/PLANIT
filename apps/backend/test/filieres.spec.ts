@@ -92,11 +92,17 @@ describe('DELETE /api/filieres/:id (B.9)', () => {
     expect(res.status).toBe(409);
   });
 
-  it('supprime une filière sans classes', async () => {
+  it('supprime une filière sans dépendances', async () => {
     const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
-    // La filière GL n'a pas de classe en seed
+    // Crée une filière jetable (sans classe/maquette/formation). En V03 la
+    // filière GL porte désormais une formation MASTER double-diplôme + sa
+    // classe, donc on ne peut plus s'en servir comme filière « vide ».
+    const created = await api()
+      .post('/api/filieres')
+      .set('Cookie', session.cookieHeader)
+      .send({ sigle: 'TMP', libelle: 'Filière jetable', isDoubleDiplome: false, grade: 'LICENCE' });
     const res = await api()
-      .delete('/api/filieres/seed-filiere-gl')
+      .delete(`/api/filieres/${created.body.id}`)
       .set('Cookie', session.cookieHeader);
     expect(res.status).toBe(204);
   });
