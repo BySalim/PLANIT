@@ -181,6 +181,14 @@ describe('Suivi des modules — ETUDIANT self-scope (S.2)', () => {
     // S'assurer que le rpSession était bien là (pas d'erreur de seed).
     expect(rpSession.role).toBe('RESPONSABLE_PROGRAMME');
   });
+
+  it("un ETUDIANT avec le classeId d'une autre classe → 403", async () => {
+    const session = await loginAs(app, 'ETUDIANT'); // Ibrahima, inscrit GL3-A
+    const res = await api()
+      .get('/api/suivi-modules?classeId=seed-classe-gl3b') // pas sa classe
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(403);
+  });
 });
 
 /**
@@ -239,6 +247,14 @@ describe('Suivi des modules — ENSEIGNANT pivot (S.3)', () => {
 
   it('un ETUDIANT ne peut pas accéder au pivot enseignant → 403', async () => {
     const session = await loginAs(app, 'ETUDIANT');
+    const res = await api()
+      .get('/api/suivi-modules/mes-enseignements')
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(403);
+  });
+
+  it('un RP ne peut pas accéder au pivot enseignant → 403', async () => {
+    const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
     const res = await api()
       .get('/api/suivi-modules/mes-enseignements')
       .set('Cookie', session.cookieHeader);
