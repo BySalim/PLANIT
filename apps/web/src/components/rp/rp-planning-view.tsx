@@ -217,7 +217,11 @@ export function RpPlanningView() {
             : {})}
         />
       )}
-      <SessionDetailDrawer sessionId={detailSessionId} onClose={() => setDetailSessionId(null)} />
+      <SessionDetailDrawer
+        sessionId={detailSessionId}
+        onClose={() => setDetailSessionId(null)}
+        readOnly={readOnly}
+      />
     </Shell>
   );
 }

@@ -46,6 +46,12 @@ import { SessionDetailSkeleton } from './session-detail-skeleton';
 interface SessionDetailDrawerProps {
   readonly sessionId: string | null;
   readonly onClose: () => void;
+  /**
+   * LOT 6 G.3 — lecture seule (acteur AC). Masque « Modifier » / « Supprimer »
+   * et neutralise l'entrée en édition. L'AC consulte le détail d'une séance
+   * mais ne peut pas la muter (le backend renverrait 403 de toute façon).
+   */
+  readonly readOnly?: boolean;
 }
 
 // ── Schema de formulaire (édition uniquement, type immuable) ───────────
@@ -207,7 +213,11 @@ function toUpdatePayload(values: EditValues, type: SessionTypeV2): UpdateSession
 
 // ── Composant ────────────────────────────────────────────────────────
 
-export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerProps) {
+export function SessionDetailDrawer({
+  sessionId,
+  onClose,
+  readOnly = false,
+}: SessionDetailDrawerProps) {
   const detailQuery = useV2SessionDetailQuery(sessionId);
   const session = detailQuery.data;
   const settingsQuery = useSettingsQuery();
@@ -310,7 +320,9 @@ export function SessionDetailDrawer({ sessionId, onClose }: SessionDetailDrawerP
       title={isEditing ? 'Modifier la séance' : 'Détail de la séance'}
       width="md"
       footer={
-        session && !detailQuery.isLoading ? (
+        // En lecture seule (AC) : aucun footer d'actions — pas de Modifier,
+        // pas de Supprimer. Le corps reste consultable.
+        session && !detailQuery.isLoading && !readOnly ? (
           // ⚠️ `key` distinctes obligatoires entre les deux modes. Sans elles,
           // React réutilise le nœud DOM du bouton primary en position : le
           // « Modifier » (type=button) devient « Enregistrer »
