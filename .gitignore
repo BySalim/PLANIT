@@ -20,6 +20,8 @@ prisma/*.db-journal
 .env.*.local
 .env.production
 .env.staging
+.env.prod
+.env.prod.local
 
 # Logs
 *.log
@@ -39,9 +41,22 @@ Thumbs.db
 # Test coverage
 coverage/
 .nyc_output/
+tests/perf/results/
 
 # Misc
 *.tsbuildinfo
 .cache/
 
 settings.local.json
+
+# Local agent / Codex files
+AGENTS.md
+.codex/
+.agents/
+.playwright-mcp/
+
+# Local production secrets / inventories
+infra/prod/env/*.local
+infra/prod/env/*.secret
+infra/ansible/inventory*.yml
+infra/ansible/*.vault.yml
