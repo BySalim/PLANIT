@@ -45,3 +45,9 @@ coverage/
 .cache/
 
 settings.local.json
+
+# Local agent / Codex files
+AGENTS.md
+.codex/
+.agents/
+.playwright-mcp/
