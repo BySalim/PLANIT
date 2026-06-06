@@ -154,8 +154,9 @@ export default function SuiviModulesPage() {
         )}
       </div>
 
-      {/* Barre de sélection bulk */}
-      {selectedIds.size > 0 ? (
+      {/* Barre de sélection bulk — RP uniquement (G.4 : l'AC n'a pas la
+          permission de terminer, donc pas de checkbox/bulk côté UI). */}
+      {isRP && selectedIds.size > 0 ? (
         <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-primary bg-primary-50 px-4 py-2">
           <span className="text-sm font-medium text-text">
             {selectedIds.size} module{selectedIds.size > 1 ? 's' : ''} sélectionné
@@ -166,8 +167,7 @@ export default function SuiviModulesPage() {
               variant="primary"
               size="sm"
               onClick={bulkTerminer}
-              disabled={!isRP || terminer.isPending}
-              title={isRP ? undefined : 'Action réservée au RP'}
+              disabled={terminer.isPending}
             >
               Marquer terminés
             </Button>
@@ -188,7 +188,7 @@ export default function SuiviModulesPage() {
         <SuiviTable
           items={items}
           selectedIds={selectedIds}
-          isRP={isRP}
+          canEdit={isRP}
           onToggleSelect={toggleSelect}
           onViewSeances={(s) => {
             setSeancesSuiviId(s.id);
@@ -217,13 +217,13 @@ export default function SuiviModulesPage() {
 function SuiviTable({
   items,
   selectedIds,
-  isRP,
+  canEdit,
   onToggleSelect,
   onViewSeances,
 }: {
   items: readonly SuiviModuleDto[];
   selectedIds: ReadonlySet<string>;
-  isRP: boolean;
+  canEdit: boolean;
   onToggleSelect: (id: string) => void;
   onViewSeances: (suivi: SuiviModuleDto) => void;
 }) {
@@ -240,7 +240,7 @@ function SuiviTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border-soft bg-bg">
-            <th className="w-10 px-4 py-3 text-left" />
+            {canEdit ? <th className="w-10 px-4 py-3 text-left" /> : null}
             <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Module
             </th>
@@ -273,7 +273,7 @@ function SuiviTable({
               key={suivi.id}
               suivi={suivi}
               selected={selectedIds.has(suivi.id)}
-              isRP={isRP}
+              canEdit={canEdit}
               onToggleSelect={() => onToggleSelect(suivi.id)}
               onViewSeances={() => onViewSeances(suivi)}
             />
@@ -287,13 +287,13 @@ function SuiviTable({
 function SuiviRow({
   suivi,
   selected,
-  isRP,
+  canEdit,
   onToggleSelect,
   onViewSeances,
 }: {
   suivi: SuiviModuleDto;
   selected: boolean;
-  isRP: boolean;
+  canEdit: boolean;
   onToggleSelect: () => void;
   onViewSeances: () => void;
 }) {
@@ -310,16 +310,18 @@ function SuiviRow({
         suivi.estTermine ? 'bg-ok-100/40' : selected ? 'bg-primary-50/60' : 'hover:bg-bg',
       ].join(' ')}
     >
-      <td className="px-4 py-3.5">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={onToggleSelect}
-          disabled={suivi.estTermine}
-          aria-label={`Sélectionner ${suivi.module.code}`}
-          className="size-4 cursor-pointer accent-primary disabled:cursor-not-allowed"
-        />
-      </td>
+      {canEdit ? (
+        <td className="px-4 py-3.5">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+            disabled={suivi.estTermine}
+            aria-label={`Sélectionner ${suivi.module.code}`}
+            className="size-4 cursor-pointer accent-primary disabled:cursor-not-allowed"
+          />
+        </td>
+      ) : null}
       <td className="px-4 py-3.5">
         <div className="flex items-center gap-2.5">
           <span
@@ -406,25 +408,21 @@ function SuiviRow({
           >
             Voir
           </RowActionButton>
-          {suivi.estTermine ? (
-            <RowActionButton
-              onClick={() => rouvrir.mutate({ id: suivi.id })}
-              disabled={!isRP || isPending}
-              title={isRP ? undefined : 'Action réservée au RP'}
-            >
+          {canEdit && suivi.estTermine ? (
+            <RowActionButton onClick={() => rouvrir.mutate({ id: suivi.id })} disabled={isPending}>
               Rouvrir
             </RowActionButton>
-          ) : (
+          ) : null}
+          {canEdit && !suivi.estTermine ? (
             <RowActionButton
               emphasis="primary"
               onClick={() => terminer.mutate({ id: suivi.id })}
-              disabled={!isRP || isPending}
-              title={isRP ? undefined : 'Action réservée au RP'}
+              disabled={isPending}
               icon={<CheckIcon size={12} color="currentColor" />}
             >
               Terminer
             </RowActionButton>
-          )}
+          ) : null}
         </div>
       </td>
     </tr>

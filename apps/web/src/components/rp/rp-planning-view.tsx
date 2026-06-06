@@ -11,6 +11,7 @@ import { PlanningToolbar } from '@/components/planning/planning-toolbar';
 import { SessionDetailDrawer } from '@/components/planning/session-detail-drawer';
 import { ViewScopeToggle, type ViewScope } from '@/components/planning/view-scope-toggle';
 import type { ViewMode } from '@/components/planning/view-mode-tabs';
+import { useIsAc } from '@/hooks/use-role';
 import { useGlobalShortcut } from '@/lib/keyboard';
 import { useCreateSessionV2Mutation, useDeleteSessionV2Mutation } from '@/lib/mutations-v2';
 import { useV2WeekSessionsQuery } from '@/lib/queries-v2';
@@ -36,9 +37,14 @@ interface CreateInit {
 /**
  * Vue planning RP/AC — rendue par le home role-aware (`/`) quand l'acteur connecté
  * est RESPONSABLE_PROGRAMME ou ASSISTANT_PROGRAMME. (Anciennement la page `/rp`.)
+ *
+ * LOT 6 G.3 — Mode AC : tout en lecture seule (pas de drag/resize/create/publish/
+ * undo/redo). Le breadcrumb passe à « Mon espace » au lieu de « Espace RP ».
  */
 export function RpPlanningView() {
   const flash = useFlash();
+  const isAc = useIsAc();
+  const readOnly = isAc;
   const [weekStart, setWeekStart] = useState<Date>(() => getCurrentWeekStart());
   const [createOpen, setCreateOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -130,11 +136,14 @@ export function RpPlanningView() {
     <Shell
       fullBleed
       title="Planning hebdomadaire"
-      breadcrumb={[{ label: 'Espace RP', href: '/' }, { label: 'Planning' }]}
+      breadcrumb={[
+        { label: readOnly ? 'Mon espace' : 'Espace RP', href: '/' },
+        { label: 'Planning' },
+      ]}
       activeNavId="planning"
-      conflicts={DEMO_CONFLICTS}
-      pendingDemands={DEMO_PENDING_DEMANDS}
-      unreadNotifs={DEMO_UNREAD_NOTIFS}
+      conflicts={readOnly ? 0 : DEMO_CONFLICTS}
+      pendingDemands={readOnly ? 0 : DEMO_PENDING_DEMANDS}
+      unreadNotifs={readOnly ? 0 : DEMO_UNREAD_NOTIFS}
     >
       {/* Pleine page : barres figées, grille scrollable au centre (calqué PLANIT-IA/rp). */}
       <div className="flex h-full flex-col">
@@ -151,6 +160,7 @@ export function RpPlanningView() {
           onRedo={undoStack.redo}
           onExport={(fmt) => void handleExport(fmt)}
           isExporting={isExporting}
+          readOnly={readOnly}
         />
 
         {/* Day/Week toggle + session counter */}
@@ -169,8 +179,13 @@ export function RpPlanningView() {
               error={sessionsQuery.error}
               onSessionOpen={handleSessionOpen}
               onRetry={() => sessionsQuery.refetch()}
-              onPushUndo={undoStack.push}
-              onCreateAtSlot={handleCreateAtSlot}
+              readOnly={readOnly}
+              {...(readOnly
+                ? {}
+                : {
+                    onPushUndo: undoStack.push,
+                    onCreateAtSlot: handleCreateAtSlot,
+                  })}
             />
           )}
         </div>
@@ -181,23 +196,27 @@ export function RpPlanningView() {
           isLoading={sessionsQuery.isLoading}
           isError={sessionsQuery.isError}
           onPublished={undoStack.clear}
+          readOnly={readOnly}
         />
       </div>
 
-      <CreateSessionModal
-        isOpen={createOpen}
-        onClose={handleCloseCreate}
-        onCreated={pushCreateUndo}
-        {...(createInit
-          ? {
-              initialValues: {
-                date: createInit.date,
-                startTime: createInit.startTime,
-                endTime: createInit.endTime,
-              },
-            }
-          : {})}
-      />
+      {/* Modale de création : inutile en lecture seule (AC). */}
+      {readOnly ? null : (
+        <CreateSessionModal
+          isOpen={createOpen}
+          onClose={handleCloseCreate}
+          onCreated={pushCreateUndo}
+          {...(createInit
+            ? {
+                initialValues: {
+                  date: createInit.date,
+                  startTime: createInit.startTime,
+                  endTime: createInit.endTime,
+                },
+              }
+            : {})}
+        />
+      )}
       <SessionDetailDrawer sessionId={detailSessionId} onClose={() => setDetailSessionId(null)} />
     </Shell>
   );
