@@ -139,19 +139,23 @@ function ClassesPageInner() {
             aria-label="Rechercher une classe"
             className="h-9 w-56 rounded-lg border border-border bg-surface px-3 text-sm text-text placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           />
-          <select
-            value={filiereFilter}
-            onChange={(e) => setFiliereFilter(e.target.value)}
-            className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            aria-label="Filtrer par filière"
-          >
-            <option value="">Toutes les filières</option>
-            {filieres.map((f) => (
-              <option key={f.id} value={f.sigle}>
-                {f.sigle}
-              </option>
-            ))}
-          </select>
+          {/* Filtre filière réservé au RP : la liste des filières est RP-only
+              (useFilieresQuery gaté isRp) et l'AC est scopé à ses classes. */}
+          {isRp ? (
+            <select
+              value={filiereFilter}
+              onChange={(e) => setFiliereFilter(e.target.value)}
+              className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              aria-label="Filtrer par filière"
+            >
+              <option value="">Toutes les filières</option>
+              {filieres.map((f) => (
+                <option key={f.id} value={f.sigle}>
+                  {f.sigle}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <select
             value={anneeFilter}
             onChange={(e) => setAnneeFilter(e.target.value)}
@@ -280,12 +284,16 @@ function ClassesPageInner() {
         </div>
       )}
 
-      <ClasseModal
-        isOpen={modal.open}
-        onClose={() => setModal({ open: false })}
-        mode={modal.open ? modal.mode : 'create'}
-        initial={modal.open && modal.mode === 'edit' ? modal.initial : undefined}
-      />
+      {/* Modale création/édition réservée au RP : non montée pour l'AC (sinon
+          son useFormationsQuery partirait inutilement). */}
+      {isRp ? (
+        <ClasseModal
+          isOpen={modal.open}
+          onClose={() => setModal({ open: false })}
+          mode={modal.open ? modal.mode : 'create'}
+          initial={modal.open && modal.mode === 'edit' ? modal.initial : undefined}
+        />
+      ) : null}
     </Shell>
   );
 }

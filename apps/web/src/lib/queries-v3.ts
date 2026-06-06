@@ -21,6 +21,7 @@ import {
   suiviModuleSchema,
 } from '@planit/contracts';
 import { useAuth } from '@/contexts/auth-context';
+import { useIsRp } from '@/hooks/use-role';
 import { apiGet } from './api';
 
 // Filtres de liste — sérialisés dans la queryKey (TanStack gère l'égalité
@@ -150,8 +151,11 @@ export function useMaquetteVersionDetailQuery(versionId: string | null) {
 // ── Formations (A.6) ──────────────────────────────────────────────────
 // Défaut serveur = année courante quand `anneeId` absent.
 
+// `/api/formations` est RP-only (offre de formation). Le seul appel
+// atteignable par un AC vient de `<ClasseModal>` (monté mais jamais ouvert
+// pour l'AC) — gaté `isRp` pour éviter un 403 parasite. (fix LOT 6.)
 export function useFormationsQuery(filters: FormationFilters = {}) {
-  const { state } = useAuth();
+  const isRp = useIsRp();
   return useQuery<FormationDto[]>({
     queryKey: academicKeys.formations(filters),
     queryFn: () =>
@@ -159,7 +163,7 @@ export function useFormationsQuery(filters: FormationFilters = {}) {
         `/formations${toQueryString({ anneeId: filters.anneeId, filiereId: filters.filiereId })}`,
         formationListSchema,
       ),
-    enabled: state.status === 'authenticated',
+    enabled: isRp,
     staleTime: 30 * 1000,
   });
 }
