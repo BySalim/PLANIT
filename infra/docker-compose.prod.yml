@@ -76,6 +76,9 @@ services:
       context: ..
       dockerfile: apps/backend/Dockerfile
       target: build
+    # Image GHCR (publiée par build-images.yml) → la VM pull-based l'applique
+    # sans builder sur place. En local, `--build` régénère depuis le stage build.
+    image: ghcr.io/bysalim/planit-migrate:${IMAGE_TAG:-local}
     command: ['pnpm', '--filter', '@planit/backend', 'exec', 'prisma', 'migrate', 'deploy']
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL requis (.env.prod)}

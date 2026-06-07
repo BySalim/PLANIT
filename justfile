@@ -45,13 +45,15 @@ logs service="backend":
     docker compose -f infra/docker-compose.prod.yml logs -f {{service}}
 
 deploy-beta:
-    Write-Error "deploy-beta sera implemente au LOT 5 (Railway beta)."
+    Write-Output "Beta externe (Railway) differe en V04 (essai expire). Voir docs/runbooks/deploy.md + TD-V04-BETA-EXTERNE."
 
+# Les recettes suivantes s'executent SUR LA VM (Linux). Depuis le host Windows,
+# elles pointent vers la procedure ; sur la VM, lancer les scripts directement.
 deploy-vm:
-    Write-Error "deploy-vm sera implemente au LOT 5 (VM pull-based)."
+    Write-Output "Sur la VM: voir docs/runbooks/vm-self-host.md (CD pull-based via planit-cd.timer)."
 
 backup:
-    Write-Error "backup prod sera implemente au LOT 5 avec TrueNAS."
+    Write-Output "Sur la VM: /opt/planit/src/infra/prod/scripts/backup.sh"
 
 restore:
-    Write-Error "restore prod sera implemente au LOT 5 avec test de restauration."
+    Write-Output "Sur la VM: /opt/planit/src/infra/prod/scripts/restore.sh <dump.sql.gz>"
