@@ -3,7 +3,7 @@
 # (V04 LOT 1.2, ADR-0013 §2). Build depuis la RACINE : `docker build -f apps/web/Dockerfile .`
 
 # ── base : Node 24 + pnpm ─────────────────────────────────────────────────────
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 RUN corepack enable
 # Store pnpm sur un volume de cache BuildKit + réseau tolérant (cf. Dockerfile backend).
 ENV npm_config_store_dir=/pnpm/store
