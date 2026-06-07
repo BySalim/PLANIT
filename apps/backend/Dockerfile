@@ -3,7 +3,7 @@
 # Build depuis la RACINE du monorepo : `docker build -f apps/backend/Dockerfile .`
 
 # ── base : Node 24 (.nvmrc) + pnpm via corepack + tini (PID 1) ────────────────
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 RUN corepack enable && apk add --no-cache tini
 # Store pnpm sur un volume de cache BuildKit + réseau tolérant (cet env a un
 # réseau instable sur les gros downloads → sinon ECONNRESET).
