@@ -3,7 +3,8 @@ name: Build & push images (GHCR)
 # V04 LOT 5 — socle du CD pull-based (ADR-0013 §2/§6).
 # Construit et publie les images prod sur GitHub Container Registry. La VM
 # self-host (agent `cd-pull.sh`) tire ensuite ces images (connexion sortante
-# seule). Images PUBLIQUES (repo public) → pas d'auth registre côté VM.
+# seule). Images PRIVÉES → la VM s'authentifie au pull (docker login ghcr.io,
+# PAT read:packages ; cf. docs/runbooks/vm-self-host.md §3bis).
 #
 # Tags produits (metadata-action) :
 #   - :<branch>      (`:develop`, `:main`) — tag mouvant suivi par le CD

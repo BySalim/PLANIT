@@ -29,12 +29,26 @@ img_id() { docker image inspect --format '{{.Id}}' "$1" 2>/dev/null || echo "non
 exec 9>"${APP_DIR}/.cd.lock"
 flock -n 9 || { log "déjà en cours, abandon"; exit 0; }
 
-log "poll ${IMAGE_TAG} (api/web/migrate)…"
+log "poll ${IMAGE_TAG} (backend/web/migrate)…"
 PREV_API="$(img_id "${API_IMG}")"
 PREV_WEB="$(img_id "${WEB_IMG}")"
 
-# Pull silencieux ; on ne déploie que si quelque chose a bougé.
-dc pull --quiet api web migrate backend web >>"${LOG_FILE}" 2>&1 || dc pull >>"${LOG_FILE}" 2>&1
+# Pull des services dont l'image vient de GHCR (noms de SERVICES compose).
+# Garde-fou : distingue un échec d'AUTH (token read:packages expiré/absent sur
+# images privées) d'un échec réseau, et loggue l'action corrective.
+pull_out="$(mktemp)"
+if ! dc pull backend web migrate >"${pull_out}" 2>&1; then
+  cat "${pull_out}" >>"${LOG_FILE}"
+  if grep -qiE "denied|unauthorized|authentication required|403|forbidden" "${pull_out}"; then
+    log "ÉCHEC AUTH GHCR (images privées) — token read:packages expiré/absent ?"
+    log "  → corrige : echo <PAT> | sudo -u deploy docker login ghcr.io -u BySalim --password-stdin"
+  else
+    log "pull GHCR échoué (réseau ?) — détails dans ${LOG_FILE}"
+  fi
+  rm -f "${pull_out}"
+  exit 1
+fi
+rm -f "${pull_out}"
 
 NEW_API="$(img_id "${API_IMG}")"
 NEW_WEB="$(img_id "${WEB_IMG}")"
