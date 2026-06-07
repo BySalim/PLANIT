@@ -10,7 +10,7 @@
   "devDependencies": {
     "@planit/config": "workspace:*",
     "@types/node": "^22.15.21",
-    "typescript": "^5.8.3",
+    "typescript": "^6.0.3",
     "ts-node": "^10.9.2"
   }
 }
