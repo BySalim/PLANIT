@@ -365,3 +365,126 @@ jobs:
           path: apps/backend/backend.log
           retention-days: 7
           if-no-files-found: ignore
+
+  # Perf smoke k6 — endpoints chauds (LOT 3, ADR-0014 §5).
+  #
+  # Mesure login + planning + suivi-modules + inscription(lookup) + classes sous
+  # charge légère (profil `smoke`), avec seuils p95 < 800 ms, erreur < 1 %, 0 5xx.
+  #
+  # **Informationnel** en V04 (`continue-on-error` sur le run k6) : la baseline
+  # se stabilise sans bloquer les PRs. Devient **bloquant** au LOT 5.9 (branch
+  # protection) — il suffira de retirer le `continue-on-error`.
+  #
+  # Le backend tourne en `NODE_ENV=test` : relâche le throttle login
+  # (5/min/IP → 10000, sinon le smoke prendrait des 429) et rend les cookies
+  # non-Secure (acceptés sur http://localhost). La sécurité réelle (throttle
+  # 5/min, cookies Secure) reste active en prod (HTTPS via Caddy).
+  #
+  # Cible = backend direct (:3001) pour isoler la latence API sans le proxy Next.
+  # Voir `docs/runbooks/perf-k6.md`.
+  perf-smoke:
+    name: Perf smoke (k6)
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: planit
+          POSTGRES_PASSWORD: planit
+          POSTGRES_DB: planit_perf
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U planit -d planit_perf"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://planit:planit@localhost:5432/planit_perf
+      JWT_ACCESS_SECRET: perf_dummy_access_secret_at_least_32_chars_long
+      JWT_REFRESH_SECRET: perf_dummy_refresh_secret_at_least_32_chars_long
+      JWT_ACCESS_TTL: '900'
+      JWT_REFRESH_TTL: '604800'
+      FRONTEND_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma migrate deploy + generate
+        working-directory: apps/backend
+        run: |
+          pnpm prisma migrate deploy
+          pnpm prisma generate
+
+      # Le smoke a besoin des comptes des 4 rôles + des données (classes,
+      # séances de la semaine courante, modules) pour mesurer des endpoints
+      # non vides.
+      - name: Seed database (perf data)
+        working-directory: apps/backend
+        run: pnpm db:seed
+
+      - name: Build internal packages (contracts + utils)
+        run: |
+          pnpm --filter @planit/contracts build
+          pnpm --filter @planit/utils build
+
+      - name: Build backend
+        working-directory: apps/backend
+        run: pnpm build
+
+      # NODE_ENV=test → throttle login relâché + cookies non-Secure (cf. en-tête).
+      - name: Start backend (background)
+        working-directory: apps/backend
+        run: nohup pnpm start > backend.log 2>&1 &
+        env:
+          NODE_ENV: test
+
+      - name: Wait for backend
+        run: npx --yes wait-on http://localhost:3001/api/health --timeout 60000
+
+      # Binaire k6 pinné (download direct — pas d'action tierce à SHA-pinner).
+      - name: Install k6
+        run: |
+          curl -fsSL https://github.com/grafana/k6/releases/download/v2.0.0/k6-v2.0.0-linux-amd64.tar.gz | tar xz
+          sudo mv k6-v2.0.0-linux-amd64/k6 /usr/local/bin/k6
+          k6 version
+
+      - name: Run k6 perf smoke (informational)
+        # Informationnel en V04 (DoD LOT 3) ; bloquant au LOT 5.9.
+        continue-on-error: true
+        env:
+          BASE_URL: http://localhost:3001
+          PROFILE: smoke
+        run: |
+          set -o pipefail
+          mkdir -p tests/perf/results
+          k6 run tests/perf/scenarios/smoke.js | tee tests/perf/results/smoke-summary.txt
+
+      - name: Upload k6 summary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: perf-smoke-summary
+          path: tests/perf/results/smoke-summary.txt
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload backend log on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: perf-backend-log
+          path: apps/backend/backend.log
+          retention-days: 7
+          if-no-files-found: ignore
