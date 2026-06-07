@@ -8,7 +8,13 @@ on:
 
 jobs:
   quality:
-    name: Lint · Typecheck · Test · Coverage
+    # ⚠️ Ce `name:` est un *contexte de status check requis* par la branch
+    # protection de `develop` et `main` (contexts: "Lint · Typecheck · Test").
+    # NE PAS le renommer sans mettre à jour la branch protection des 2 branches
+    # (sinon GitHub attend un check qui n'arrive jamais → PR bloquée sur
+    # "Expected — Waiting for status to be reported"). Le coverage gate est un
+    # step interne (cf. "Test + coverage gate"), pas une partie du nom.
+    name: Lint · Typecheck · Test
     runs-on: ubuntu-latest
     services:
       postgres:
