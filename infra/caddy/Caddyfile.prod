@@ -1,0 +1,22 @@
+# Caddyfile.prod — reverse proxy unique de la stack (V04 LOT 1.4, ADR-0013 §4).
+# Sert front + API + WebSocket sur la MÊME origine (cookies first-party).
+#
+# TLS piloté par $CADDY_TLS (défaut `internal`) :
+#   - `internal`           → CA interne Caddy (localhost / VM on-prem sans domaine ; curl -k).
+#   - `admin@exemple.com`  → cert Let's Encrypt automatique pour un domaine public réel.
+
+{$PLANIT_DOMAIN:localhost} {
+	encode zstd gzip
+	tls {$CADDY_TLS:internal}
+
+	# API REST + docs Swagger + WebSocket → backend NestJS.
+	@backend path /api/* /docs /docs/*
+	handle @backend {
+		reverse_proxy backend:3001
+	}
+
+	# Tout le reste → web Next.js (serveur standalone).
+	handle {
+		reverse_proxy web:3000
+	}
+}

@@ -98,6 +98,18 @@ et des guards de rôles.
 
 ---
 
+## Vague 04 — Déploiement & Qualité (conteneurisation / CI / infra)
+
+> Dette sortie du LOT 1 (conteneurisation). Tracée pour optimisation ultérieure ;
+> n'empêche pas le « Done LOT 1 » (smoke vert sur les 3 critères).
+
+| ID                  | Description                                                                                                                                                                                            | Impact                                                                                                                                                                                                                                           | Priorité |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| TD-V04-IMG-SIZE     | Image backend runtime **646 MB** (`pnpm deploy --legacy` recopie aussi `src/` ; engines Prisma lourds). Service `migrate` = stage `build` **2.45 GB** (devDeps + sources complètes).                   | Pull/stockage plus lourds (GHCR, Railway, VM). Optimiser : image `migrate` dédiée slim (prisma + schema + migrations seuls), élaguer `src/` du bundle backend, n'embarquer que l'engine ciblé. À traiter avec LOT 4.4 (scan image) / LOT 5 (CD). | Faible   |
+| TD-V04-DOCKER-CACHE | `COPY . .` **avant** `pnpm install` invalide le cache d'install dès qu'un fichier source change. Le cache mount du store pnpm atténue (downloads réutilisés) mais l'install se ré-exécute entièrement. | Builds CI plus lents que nécessaire. Optimiser via layering des manifestes (copier les `package.json` + `pnpm-lock.yaml`, `pnpm fetch`/install, puis copier la source).                                                                          | Faible   |
+
+---
+
 ## Nice-to-have (sans vague-cible)
 
 | ID           | Description                                                                                 | Impact                                                                                                                                                                                                                                  | Priorité |
