@@ -5,6 +5,9 @@ useDefault = true
 description = "PLANIT allowlist"
 paths = [
   ".env.example",
+  # Tout fichier *.example est un template (placeholders, pas de vrai secret) :
+  # .env.example, infra/prod/env/.env.prod.example, etc. (V04 LOT 4.8).
+  '''\.example$''',
   "docs/",
   "*.md",
 ]

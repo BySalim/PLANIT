@@ -1,0 +1,30 @@
+# Règles Semgrep propres à PLANIT (V04 LOT 4.3).
+# Complètent `--config auto` (registre communautaire). On garde peu de règles,
+# fiables et sans faux positif — la couverture large vient du registre.
+# Conventions sécurité : voir SECURITY.md et CLAUDE.md.
+rules:
+  - id: planit-no-eval
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      eval() est interdit (exécution de code arbitraire / RCE). Cf. SECURITY.md.
+    pattern: eval(...)
+
+  - id: planit-no-function-constructor
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      new Function(...) équivaut à eval() (RCE). Interdit.
+    pattern: new Function(...)
+
+  - id: planit-no-child-process-exec
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      child_process.exec() lance une shell (risque d'injection si l'argument est
+      construit dynamiquement). Préférer execFile/spawn avec des arguments séparés.
+    patterns:
+      - pattern: $CP.exec(...)
+      - metavariable-regex:
+          metavariable: $CP
+          regex: (childProcess|child_process|cp)
