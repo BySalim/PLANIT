@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 
 // CSP pragmatique pour PLANIT.
@@ -19,13 +20,19 @@ const isDev = process.env.NODE_ENV !== 'production';
 const scriptSrc = isDev
   ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
   : "script-src 'self' 'unsafe-inline'";
+// En dev, le front parle au backend direct sur :3001 (HTTP + WS). En prod, Caddy
+// sert front + API + WebSocket sur la **même origine** → `'self'` suffit. Un WS
+// sur un hôte distinct devra être ajouté ici (cf. TD CSP prod, ADR-0013).
+const connectSrc = isDev
+  ? "connect-src 'self' http://localhost:3001 ws://localhost:3001 wss://localhost:3001"
+  : "connect-src 'self'";
 const CSP_DIRECTIVES = [
   "default-src 'self'",
   scriptSrc,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   "img-src 'self' data: blob:",
-  "connect-src 'self' http://localhost:3001 ws://localhost:3001 wss://localhost:3001",
+  connectSrc,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -41,6 +48,13 @@ const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN ?? 'http://localhost:3001';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Build conteneurisé (V04 LOT 1.2) : `standalone` émet un serveur Node autonome
+  // (`.next/standalone/.../server.js`) avec un node_modules minimal tracé — pas
+  // besoin d'embarquer tout le workspace dans l'image runtime.
+  output: 'standalone',
+  // En monorepo, le tracing des fichiers doit partir de la **racine** du repo
+  // (sinon les packages workspace `@planit/*` ne sont pas inclus dans standalone).
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   // Workspace packages shipped as TypeScript source must be transpiled by Next.
   transpilePackages: ['@planit/ui', '@planit/design-tokens', '@planit/contracts', '@planit/utils'],
   // Redirections des anciennes URLs à nom d'acteur (`/rp`, `/enseignant`,
