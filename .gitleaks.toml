@@ -3,11 +3,12 @@ useDefault = true
 
 [allowlist]
 description = "PLANIT allowlist"
+# NB : ces motifs sont des **regex RE2** (pas des globs). `*.md` était invalide
+# (`no argument for repetition operator`) et faisait échouer gitleaks 8.24+ en CI.
 paths = [
-  ".env.example",
   # Tout fichier *.example est un template (placeholders, pas de vrai secret) :
   # .env.example, infra/prod/env/.env.prod.example, etc. (V04 LOT 4.8).
   '''\.example$''',
-  "docs/",
-  "*.md",
+  '''^docs/''',
+  '''\.md$''',
 ]
