@@ -1,0 +1,162 @@
+---
+# V04 LOT 5.7 — Provisioning + durcissement OS de la VM self-host (ADR-0013, V4-D14/D16).
+#
+# Exécution recommandée DIRECTEMENT SUR LA VM (pas besoin de control node) :
+#   sudo apt-get update && sudo apt-get install -y ansible git
+#   git clone <repo> /opt/planit/src && cd /opt/planit/src/infra/ansible
+#   sudo ansible-playbook -i inventory.ini site.yml --connection=local
+#
+# Idempotent : ré-exécutable sans effet de bord. Vérif à blanc : ajouter --check.
+
+- name: Provision PLANIT self-host VM (Ubuntu 24.04)
+  hosts: planit_vm
+  become: true
+
+  vars:
+    deploy_user: deploy
+    app_dir: /opt/planit
+    # SSH par clé : passe à true UNIQUEMENT après avoir confirmé que ta clé
+    # publique fonctionne (sinon lockout). Laisse false au 1er run.
+    harden_ssh_disable_password: false
+
+  tasks:
+    # ── Paquets de base + sécurité ──────────────────────────────
+    - name: Install base + security packages
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - git
+          - ufw
+          - fail2ban
+          - unattended-upgrades
+        state: present
+        update_cache: true
+
+    # ── Docker CE (dépôt officiel) ──────────────────────────────
+    - name: Add Docker APT keyring
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+    - name: Add Docker APT repository
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
+          https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        filename: docker
+        state: present
+
+    - name: Install Docker Engine + compose plugin
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Enable & start Docker
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    # ── Utilisateur de déploiement ──────────────────────────────
+    - name: Create deploy user (in docker group)
+      ansible.builtin.user:
+        name: "{{ deploy_user }}"
+        groups: docker
+        shell: /bin/bash
+        create_home: true
+
+    - name: Create app directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: '0750'
+      loop:
+        - "{{ app_dir }}"
+        - "{{ app_dir }}/backups"
+
+    # ── Pare-feu (ufw) ──────────────────────────────────────────
+    # Local/LAN : on autorise SSH + HTTP/HTTPS (Caddy). Pas d'exposition Internet
+    # ici, mais le filet reste posé (V4-D16).
+    - name: UFW allow OpenSSH/HTTP/HTTPS
+      community.general.ufw:
+        rule: allow
+        name: "{{ item }}"
+      loop: [OpenSSH]
+    - name: UFW allow web ports
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop: ['80', '443']
+    - name: Enable UFW (default deny incoming)
+      community.general.ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    # ── fail2ban + MAJ auto ─────────────────────────────────────
+    - name: Enable fail2ban
+      ansible.builtin.systemd:
+        name: fail2ban
+        enabled: true
+        state: started
+
+    - name: Enable unattended-upgrades
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+        mode: '0644'
+
+    # ── Durcissement SSH (opt-in) ───────────────────────────────
+    - name: Disable SSH password auth (opt-in)
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+        validate: '/usr/sbin/sshd -t -f %s'
+      when: harden_ssh_disable_password
+      notify: Restart sshd
+
+    # ── Agent CD pull-based (systemd timer) ─────────────────────
+    - name: Install CD pull script
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../prod/scripts/cd-pull.sh"
+        dest: "{{ app_dir }}/cd-pull.sh"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: '0750'
+
+    - name: Install CD systemd unit + timer
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../prod/scripts/{{ item }}"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: '0644'
+      loop:
+        - planit-cd.service
+        - planit-cd.timer
+
+    - name: Enable CD timer
+      ansible.builtin.systemd:
+        name: planit-cd.timer
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Restart sshd
+      ansible.builtin.systemd:
+        name: ssh
+        state: restarted

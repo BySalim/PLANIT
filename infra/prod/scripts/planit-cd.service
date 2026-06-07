@@ -1,0 +1,14 @@
+# V04 LOT 5.8 — Agent CD pull-based (déclenché par planit-cd.timer).
+[Unit]
+Description=PLANIT — déploiement continu pull-based (poll GHCR)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=deploy
+ExecStart=/opt/planit/cd-pull.sh
+# Le script gère son propre verrou (flock) et journalise dans /opt/planit/cd.log.
+TimeoutStartSec=600
