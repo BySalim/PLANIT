@@ -1,3 +1,11 @@
+# ⏸️ DEPENDABOT GELÉ — décision TL, 2026-06-07.
+# Ce fichier est volontairement nommé `.disabled` : GitHub ne lit que
+# `.github/dependabot.yml`, donc Dependabot est inactif tant que ce suffixe
+# est présent. La configuration ci-dessous est conservée INTACTE.
+#
+# ▶ RÉACTIVER : renommer `.github/dependabot.yml.disabled` →
+#   `.github/dependabot.yml` (via une PR vers `develop`). Rien d'autre à faire.
+#
 # Dependabot — V04 LOT 4.7 (V4-D15).
 # MAJ automatiques : dépendances npm (monorepo pnpm), actions GitHub (met à jour
 # les SHA épinglés + commentaire de version → complète les scans : détecter ➜ corriger),
