@@ -26,6 +26,15 @@ typecheck:
 e2e:
     pnpm test:e2e
 
+# Perf smoke k6 (endpoints chauds, profil court). Requiert k6 + la stack lancée
+# (backend en NODE_ENV=test). BASE_URL surchargeable (défaut backend direct).
+perf-smoke base_url="http://localhost:3001":
+    $env:BASE_URL="{{base_url}}"; $env:PROFILE="smoke"; k6 run tests/perf/scenarios/smoke.js
+
+# Perf charge légère k6 (baseline, manuel/nocturne).
+perf-load base_url="http://localhost:3001":
+    $env:BASE_URL="{{base_url}}"; $env:PROFILE="load-leger"; k6 run tests/perf/scenarios/smoke.js
+
 dev-infra-up:
     docker compose -f infra/docker-compose.dev.yml up -d
 
