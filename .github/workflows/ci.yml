@@ -8,6 +8,12 @@ on:
 
 jobs:
   quality:
+    # ⚠️ Ce `name:` est un *contexte de status check requis* par la branch
+    # protection de `develop` et `main` (contexts: "Lint · Typecheck · Test").
+    # NE PAS le renommer sans mettre à jour la branch protection des 2 branches
+    # (sinon GitHub attend un check qui n'arrive jamais → PR bloquée sur
+    # "Expected — Waiting for status to be reported"). Le coverage gate est un
+    # step interne (cf. "Test + coverage gate"), pas une partie du nom.
     name: Lint · Typecheck · Test
     runs-on: ubuntu-latest
     services:
@@ -66,8 +72,24 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
-        run: pnpm test
+      # LOT 2 V04 — `test:coverage` runs the full Vitest suite with the v8
+      # coverage gate (per-package thresholds, ADR-0014 §2). Folded into the
+      # already-required `quality` check so coverage gates without running the
+      # (slow) backend integration suite twice. The dedicated `e2e` job below
+      # covers the Playwright layer.
+      - name: Test + coverage gate
+        run: pnpm test:coverage
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            apps/*/coverage
+            packages/*/coverage
+          retention-days: 7
+          if-no-files-found: ignore
 
   build:
     name: Build
@@ -227,3 +249,119 @@ jobs:
           configPath: ./.github/lighthouserc.json
           uploadArtifacts: true
           temporaryPublicStorage: true
+
+  # E2E Playwright — parcours d'authentification des 4 rôles (ADR-0014 §4).
+  # Démarre la stack prod-like en CI : Postgres + backend (build + start) +
+  # web (next build + start), DB **seedée** (comptes des 4 rôles), puis lance
+  # Playwright headless. Bloquant (pas de continue-on-error) — DoD LOT 2.
+  e2e:
+    name: E2E Playwright (4 rôles)
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: planit
+          POSTGRES_PASSWORD: planit
+          POSTGRES_DB: planit_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U planit -d planit_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://planit:planit@localhost:5432/planit_e2e
+      # Secrets factices (≥32 chars) : signés/vérifiés par le même process
+      # backend pendant l'e2e — suffisants pour l'auth bout-en-bout.
+      JWT_ACCESS_SECRET: e2e_dummy_access_secret_at_least_32_chars_long
+      JWT_REFRESH_SECRET: e2e_dummy_refresh_secret_at_least_32_chars_long
+      JWT_ACCESS_TTL: '900'
+      JWT_REFRESH_TTL: '604800'
+      FRONTEND_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma migrate deploy + generate
+        working-directory: apps/backend
+        run: |
+          pnpm prisma migrate deploy
+          pnpm prisma generate
+
+      # La prod ne seed pas (V4-D11) ; l'e2e a besoin des comptes des 4 rôles
+      # pour exercer le login (tous au mot de passe seed `Test1234!`).
+      - name: Seed database (e2e accounts)
+        working-directory: apps/backend
+        run: pnpm db:seed
+
+      - name: Build internal packages (contracts + utils)
+        run: |
+          pnpm --filter @planit/contracts build
+          pnpm --filter @planit/utils build
+
+      - name: Build backend
+        working-directory: apps/backend
+        run: pnpm build
+
+      - name: Build web (production)
+        working-directory: apps/web
+        run: pnpm build
+
+      - name: Install Playwright chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # NODE_ENV=development → cookies d'auth **non-Secure** : sur http://localhost
+      # un cookie `Secure` serait refusé par le navigateur (cf. cookies.ts), le
+      # login échouerait silencieusement. La sécurité réelle (Secure=true) reste
+      # active en prod réelle (HTTPS via Caddy).
+      - name: Start backend (background)
+        working-directory: apps/backend
+        run: nohup pnpm start > backend.log 2>&1 &
+        env:
+          NODE_ENV: development
+
+      - name: Wait for backend
+        run: npx --yes wait-on http://localhost:3001/api/health --timeout 60000
+
+      - name: Start web (background)
+        working-directory: apps/web
+        run: nohup pnpm start > web.log 2>&1 &
+        env:
+          PORT: '3000'
+
+      - name: Wait for web
+        run: npx --yes wait-on http://localhost:3000/login --timeout 60000
+
+      - name: Run Playwright e2e
+        run: pnpm exec playwright test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload backend log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-backend-log
+          path: apps/backend/backend.log
+          retention-days: 7
+          if-no-files-found: ignore
