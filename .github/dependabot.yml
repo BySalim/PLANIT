@@ -1,0 +1,52 @@
+# Dependabot — V04 LOT 4.7 (V4-D15).
+# MAJ automatiques : dépendances npm (monorepo pnpm), actions GitHub (met à jour
+# les SHA épinglés + commentaire de version → complète les scans : détecter ➜ corriger),
+# et images de base Docker. PRs groupées pour limiter le bruit.
+version: 2
+updates:
+  # Dépendances npm du monorepo (pnpm workspace).
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: ['dependencies']
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      npm-minor-patch:
+        update-types: ['minor', 'patch']
+
+  # Actions GitHub (épinglées au SHA dans .github/workflows/) — Dependabot bump
+  # le SHA et le commentaire `# vX`.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ['dependencies', 'ci']
+    commit-message:
+      prefix: 'chore(ci)'
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  # Images de base des Dockerfiles (V04 LOT 1).
+  - package-ecosystem: docker
+    directory: '/apps/backend'
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ['dependencies', 'docker']
+    commit-message:
+      prefix: 'chore(docker)'
+
+  - package-ecosystem: docker
+    directory: '/apps/web'
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ['dependencies', 'docker']
+    commit-message:
+      prefix: 'chore(docker)'

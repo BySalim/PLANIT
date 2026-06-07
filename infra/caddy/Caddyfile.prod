@@ -12,6 +12,16 @@
 	# API REST + docs Swagger + WebSocket → backend NestJS.
 	@backend path /api/* /docs /docs/*
 	handle @backend {
+		# Durcissement headers des réponses API (V04 LOT 4.5) : les réponses JSON
+		# du backend n'ont pas les headers que Next pose sur le HTML. On les ajoute
+		# ici (0 dépendance npm ; helmet écarté). Le web garde ses headers via
+		# next.config.ts — pas de doublon (scope limité à @backend).
+		header {
+			X-Content-Type-Options nosniff
+			X-Frame-Options DENY
+			Referrer-Policy no-referrer
+			-Server
+		}
 		reverse_proxy backend:3001
 	}
 
