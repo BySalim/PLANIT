@@ -41,7 +41,8 @@ Thumbs.db
 # Test coverage
 coverage/
 .nyc_output/
-tests/perf/results/
+tests/perf/results/*
+!tests/perf/results/.gitkeep
 
 # Playwright e2e
 playwright-report/
