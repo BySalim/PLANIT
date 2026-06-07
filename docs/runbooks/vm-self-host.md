@@ -7,7 +7,7 @@
 ## 0. Prérequis
 
 - VM Ubuntu Server 24.04 (2 vCPU / 4 Go RAM / 20 Go conseillés).
-- Les images sont publiées sur GHCR par le workflow **Build & push images** (`.github/workflows/build-images.yml`) — vérifie qu'un run est passé sur `main` (packages `planit-api`, `planit-web`, `planit-migrate` visibles, **publics**).
+- Les images sont publiées sur GHCR par le workflow **Build & push images** (`.github/workflows/build-images.yml`) — un run doit être passé sur `develop` (packages `planit-api`, `planit-web`, `planit-migrate` présents). **Packages privés** : prévois un **fine-grained PAT GitHub à scope `read:packages` uniquement** (cf. §3bis) pour que la VM puisse les tirer.
 
 ## 1. Réseau VirtualBox (rendre la VM joignable)
 
@@ -44,7 +44,7 @@ sudo nano /opt/planit/.env.prod
 À remplir impérativement :
 
 ```ini
-IMAGE_TAG=main
+IMAGE_TAG=develop
 POSTGRES_PASSWORD=<openssl rand -hex 24>
 DATABASE_URL=postgresql://planit:<MEME_MOT_DE_PASSE>@postgres:5432/planit
 JWT_ACCESS_SECRET=<openssl rand -hex 32>
@@ -58,9 +58,26 @@ FRONTEND_URL=https://planit.local
 `chmod 600 /opt/planit/.env.prod`. Crée aussi `/opt/planit/cd.env` (lu par l'agent CD) :
 
 ```ini
-IMAGE_TAG=main
+IMAGE_TAG=develop
 PLANIT_DOMAIN=planit.local
 ```
+
+> 🔀 La VM suit **`develop`** pendant le développement de la Vague 04. La bascule sur **`main`** (release `develop → main` puis `IMAGE_TAG=develop` → `main` dans **`.env.prod` ET `cd.env`**, V4-D9 : `main` → VM) se fera **à la clôture de la vague (LOT 7)**.
+
+## 3bis. Authentification GHCR (images privées)
+
+Les packages GHCR sont **privés** → la VM doit s'authentifier pour les tirer (à faire **avant** le §4).
+
+1. Crée un **fine-grained PAT** GitHub (_Settings → Developer settings → Personal access tokens → Fine-grained_) avec le **seul** scope **`read:packages`** (lecture seule). Note-le.
+2. Login Docker **en tant qu'utilisateur `deploy`** (celui qui exécute le CD) — sinon l'agent ne verra pas le credential :
+
+```bash
+echo "<TON_PAT>" | sudo -u deploy docker login ghcr.io -u BySalim --password-stdin
+```
+
+Docker stocke le credential dans `/home/deploy/.docker/config.json` (**persistant**, survit aux reboots). `docker compose pull` et l'agent `cd-pull.sh` le réutilisent automatiquement — **aucune autre étape**.
+
+> 🔁 **Rotation** : un fine-grained PAT expire (max 1 an). À l'expiration, le pull échoue et `cd-pull.sh` loggue un message explicite (« ÉCHEC AUTH GHCR … relancer docker login »). Relance simplement la commande ci-dessus avec un nouveau token.
 
 ## 4. Premier déploiement (pull, pas de build)
 
@@ -101,7 +118,7 @@ Teste : ouvre **https://planit.local** → l'app PLANIT (login), **cadenas valid
 
 ## 7. Déploiement continu (déjà armé par Ansible)
 
-Le timer `planit-cd.timer` lance `cd-pull.sh` toutes les 5 min : poll GHCR `:main` → si nouvelle image → `pull` + `migrate` + `up` + **smoke** → **rollback** au digest précédent si le smoke échoue. Connexion **sortante seule**.
+Le timer `planit-cd.timer` lance `cd-pull.sh` toutes les 5 min : poll GHCR sur le tag de `cd.env` (`:develop` ici, `:main` après bascule) → si nouvelle image → `pull` + `migrate` + `up` + **smoke** → **rollback** au digest précédent si le smoke échoue. Connexion **sortante seule** ; réutilise le `docker login` du §3bis.
 
 ```bash
 systemctl status planit-cd.timer
@@ -109,7 +126,7 @@ journalctl -u planit-cd.service --no-pager | tail -30
 tail -f /opt/planit/cd.log
 ```
 
-→ pousse un commit sur `main` ; après le run `build-images.yml`, la VM se met à jour seule au prochain tick.
+→ pousse sur `develop` (ou `main` après bascule) ; après le run `build-images.yml`, la VM se met à jour seule au prochain tick.
 
 ## 8. Backups + restauration
 

@@ -11,7 +11,7 @@ Le workflow **Build & push images** ([build-images.yml](../../.github/workflows/
 - `ghcr.io/bysalim/planit-web:<tag>` (web standalone)
 - `ghcr.io/bysalim/planit-migrate:<tag>` (one-shot `prisma migrate deploy`)
 
-Tags : `:develop`, `:main` (mouvants), `:sha-xxxx` (immuable, rollback), `:latest` (main). Images **publiques** (repo public).
+Tags : `:develop`, `:main` (mouvants), `:sha-xxxx` (immuable, rollback), `:latest` (main). Images **privées** — la VM s'authentifie au pull (`docker login ghcr.io`, PAT `read:packages` ; cf. [vm-self-host.md §3bis](vm-self-host.md)).
 
 ## Cible 1 — Per-dev (poste local)
 
