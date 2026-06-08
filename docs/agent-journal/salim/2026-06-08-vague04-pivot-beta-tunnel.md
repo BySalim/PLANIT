@@ -20,7 +20,7 @@ livrer la variante Koyeb sur `develop`.
 - **Revert pré-PR4** de `next.config.ts` (retrait `prodWsConnectSrc` → prod `connect-src 'self'`) et
   `middleware.ts` (retrait basic-auth + matcher `/api`) : sur la topo VM/Caddy, `/api` est servi par
   Caddy **hors** middleware Next → la prémisse « le middleware couvre `/api` » était fausse. Le rideau
-  passe à CF Access. Effet de bord : supprime le fix Semgrep `ws://` (devenu sans objet).
+  passe à CF Access. Effet de bord : supprime le fix Semgrep du scheme websocket non-TLS (sans objet).
 - **Suppression `deploy-beta.yml`** (spécifique Neon/Koyeb) : la beta réutilise le **CD VM** (5.8), pas
   de deploy cloud séparé.
 - ADR + runbook **renommés** (`…-cloudflare-tunnel-vm.md`, `beta-tunnel.md`). `SEED_PASSWORD` conservé.
@@ -58,7 +58,7 @@ déjà éprouvé). CI PR #80 rejoue lint/typecheck/test/e2e/sécu.
 - `next.config.ts` / `middleware.ts` = versions **pré-PR4** (déjà vertes sur `develop`).
 - `compose.prod` : service `cloudflared` valide (anchor logging, profil, depends_on caddy) — `docker
 compose config` à confirmer dans le run CI.
-- Semgrep : le `ws://` qui avait déclenché l'alerte a disparu (revert next.config).
+- Semgrep : le littéral de scheme websocket non-TLS qui avait déclenché l'alerte a disparu (revert next.config).
 - ⚠️ Non validable ici (= côté Salim) : tunnel réel + Cloudflare Access + login/realtime bout en bout.
 
 ## 6. Surprises
