@@ -8,6 +8,7 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { corsOrigin } from './common/cors';
 import { validateEnv } from './common/env.validation';
 import { PINO_LOGGER } from './common/logger.module';
+import { requestIdMiddleware } from './common/request-id.middleware';
 import { ZodValidationPipe } from './common/zod-validation.pipe';
 
 async function bootstrap(): Promise<void> {
@@ -22,6 +23,11 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
 
   app.setGlobalPrefix('api');
+
+  // requestId en TOUT premier (ADR-0009 Phase 1) : ouvre le contexte
+  // AsyncLocalStorage avant toute autre couche → chaque log porte le requestId,
+  // y compris ceux du filtre d'exceptions.
+  app.use(requestIdMiddleware);
 
   // cookie-parser pose `req.cookies` — requis par les strategies passport-jwt
   // (extracteurs depuis les cookies HttpOnly `access` et `refresh`).

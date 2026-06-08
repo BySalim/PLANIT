@@ -3,19 +3,20 @@
 > Comment lire les logs, vérifier la santé du service, et comprendre ce qui est
 > capturé (ou non) en production. Décisions et roadmap complète : [ADR-0009](../architecture/adr/0009-observabilite-strategie.md).
 
-## 1. État actuel (Phase 0)
+## 1. État actuel (Phase 0 + Phases 1-2 en cours, activées 2026-06-08)
 
-| Capacité                       | État                                          | Où                                                 |
-| ------------------------------ | --------------------------------------------- | -------------------------------------------------- |
-| Logs structurés backend        | ✅ pino (JSON prod, pretty dev) + redaction   | `apps/backend/src/common/logger.module.ts`         |
-| Capture des exceptions backend | ✅ 5xx en `error` (avec stack), 4xx en `warn` | `apps/backend/src/common/all-exceptions.filter.ts` |
-| Liveness                       | ✅ `GET /api/health`                          | `apps/backend/src/health/health.controller.ts`     |
-| Readiness (check BD)           | ✅ `GET /api/health/ready`                    | idem                                               |
-| Error boundaries frontend      | ✅ repli UI (pas d'écran blanc)               | `apps/web/src/app/error.tsx`, `global-error.tsx`   |
-| Error tracking (Sentry…)       | ❌ Phase 1                                    | —                                                  |
-| Agrégation/recherche de logs   | ❌ Phase 1 (`docker logs` seulement)          | —                                                  |
-| Métriques / dashboards         | ❌ Phase 2                                    | —                                                  |
-| Uptime / alerting              | ❌ Phase 2                                    | —                                                  |
+| Capacité                       | État                                                        | Où                                                                       |
+| ------------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Logs structurés backend        | ✅ pino (JSON prod, pretty dev) + redaction                 | `apps/backend/src/common/logger.module.ts`                               |
+| Corrélation `requestId`        | ✅ chaque log + en-tête `X-Request-Id`                      | `apps/backend/src/common/request-context.ts`, `request-id.middleware.ts` |
+| Capture des exceptions backend | ✅ 5xx en `error` (avec stack), 4xx en `warn`               | `apps/backend/src/common/all-exceptions.filter.ts`                       |
+| Liveness                       | ✅ `GET /api/health`                                        | `apps/backend/src/health/health.controller.ts`                           |
+| Readiness (check BD)           | ✅ `GET /api/health/ready`                                  | idem                                                                     |
+| Error boundaries frontend      | ✅ repli UI (pas d'écran blanc)                             | `apps/web/src/app/error.tsx`, `global-error.tsx`                         |
+| Inspection des logs (web)      | ✅ **Dozzle** (profil `observability`)                      | `infra/docker-compose.prod.yml`                                          |
+| Uptime / alerting              | ✅ **Uptime Kuma** (profil `observability`) + alerte backup | `infra/docker-compose.prod.yml`                                          |
+| Error tracking (Sentry…)       | ⏳ increment 3 (déps `@sentry/*` + DSN)                     | —                                                                        |
+| Métriques / dashboards         | ⏳ increment 3 (`prom-client` + Prometheus + Grafana)       | —                                                                        |
 
 ## 2. Logs
 
@@ -66,9 +67,38 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3001/api/health/ready
 - **En dev** : l'overlay Next.js affiche la stack normalement.
 - **En prod** : l'erreur n'est **pas encore reportée à distance** (Phase 1 — `TD-OBS-SINK`). Pour l'instant, la seule trace d'une erreur frontend est ce que l'utilisateur signale.
 
-## 5. Activer la Phase 1 (error tracking) — checklist
+## 5. Stack d'observabilité self-host (profil `observability`)
 
-Quand l'équipe décide de brancher Sentry (ou GlitchTip) — **décision sensible** (dépendance + compte) :
+Lancer les outils self-host (opt-in, ne tourne pas par défaut) :
+
+```bash
+docker compose --env-file /opt/planit/.env.prod -f infra/docker-compose.prod.yml \
+  --profile observability up -d
+```
+
+Les UIs sont bindées sur **127.0.0.1** (pas d'exposition LAN/Internet, pas de port ufw à ouvrir) →
+accès par **SSH local-forward** depuis ton poste :
+
+```bash
+ssh -L 8081:localhost:8081 -L 3011:localhost:3011 deploy@<IP_VM>
+# puis dans le navigateur : http://localhost:8081 (Dozzle)  ·  http://localhost:3011 (Uptime Kuma)
+```
+
+| Outil           | Rôle                                                | Premier réglage                                                                |
+| --------------- | --------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **Dozzle**      | Lecture web des logs de tous les conteneurs.        | Aucun — lit `docker.sock` (lecture seule).                                     |
+| **Uptime Kuma** | Ping `/api/health/ready` + alerte (e-mail/webhook). | Créer un monitor HTTP(s) sur `http://caddy/api/health/ready` (réseau compose). |
+
+**Alerte d'échec de sauvegarde** : dans Uptime Kuma, créer un monitor **Push** → copier son URL
+(`http://127.0.0.1:3011/api/push/<token>`) dans `PLANIT_BACKUP_PUSH_URL` (`/opt/planit/cd.env`).
+`backup.sh` envoie `status=up` à chaque succès et `status=down` en cas d'échec (cf. [truenas-backup.md §6](truenas-backup.md)).
+
+> **`requestId`** : chaque réponse porte un en-tête `X-Request-Id` et chaque ligne de log le champ
+> `requestId`. Dans Dozzle, filtrer sur cette valeur regroupe toutes les traces d'une même requête.
+
+## 6. Activer l'error tracking Sentry (increment 3) — checklist
+
+Quand l'équipe branche Sentry (ou GlitchTip) — **décision sensible** (dépendance + compte) :
 
 1. Créer le projet Sentry (front + back) → récupérer les **DSN**.
 2. Ajouter `@sentry/nextjs` (web) et `@sentry/node` (backend) — passer par un ADR/validation (ajout de dépendances).
@@ -78,7 +108,7 @@ Quand l'équipe décide de brancher Sentry (ou GlitchTip) — **décision sensib
 6. Activer l'upload des **source maps** en CI (sinon stacks minifiées illisibles).
 7. Ajouter le `requestId` (`TD-OBS-REQID`) pour corréler logs ↔ événements Sentry.
 
-## 6. Références
+## 7. Références
 
 - [ADR-0009 — Stratégie d'observabilité](../architecture/adr/0009-observabilite-strategie.md) (architecture cible + phasage)
 - [Runbook CI Lighthouse](ci-lighthouse.md) (perf frontend « labo »)
