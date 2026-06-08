@@ -32,7 +32,8 @@ function prodWsConnectSrc(): string {
   if (!raw) return '';
   try {
     const origin = new URL(raw).origin; // ex. https://planit-api.koyeb.app
-    return ` ${origin} ${origin.replace(/^http/, 'ws')}`; // + wss:// (ou ws://)
+    // origine HTTP + sa variante WebSocket (https -> scheme securise wss).
+    return ` ${origin} ${origin.replace(/^http/, 'ws')}`;
   } catch {
     return ''; // valeur non-URL → CSP reste stricte
   }
