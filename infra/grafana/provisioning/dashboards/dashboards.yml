@@ -1,0 +1,13 @@
+# Provider de dashboards provisionnés (lit les .json du même dossier) — ADR-0009 Phase 2.
+apiVersion: 1
+
+providers:
+  - name: PLANIT
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

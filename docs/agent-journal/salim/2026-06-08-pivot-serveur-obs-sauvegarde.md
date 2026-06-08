@@ -79,3 +79,25 @@ Précision en cours de session (Q&R) : **on garde** la beta Cloudflare Tunnel (s
 - ADR-0009 (Phases 1-2 acceptées), ADR-0013 (note de révision posture). tech-debt : `TD-OBS-REQID`,
   `TD-OBS-UPTIME`, `TD-OBS-HEALTH` retirés (livrés) ; `TD-OBS-SENTRY/SINK/METRIC/LOGS` reformulés
   (increment 3) ; `TD-V04-BETA-EXTERNE` mis à jour (PaaS abandonnés, quick-tunnel privilégié).
+
+## 9. Increment 3 — métriques + Sentry dormant (même session, décisions Q&R)
+
+Décisions Salim : **pousser sans merger** (PR #81 re-titrée), **enchaîner les métriques**, **Sentry
+scaffoldé dormant** (DSN plus tard).
+
+- **Métriques RED** (`prom-client`, dép ajoutée + `pnpm install`) : `MetricsService` (registre dédié +
+  histogramme latence + compteur par méthode/route/status) + `MetricsInterceptor` global (route =
+  motif Express, cardinalité bornée, auto-exclusion de `/metrics`) + `MetricsController` `@Public()`
+  `GET /api/metrics`. Compose : **Prometheus** (scrape `backend:3001/api/metrics`) + **Grafana**
+  (datasource + dashboard golden-signals **provisionnés**, JSON versionné) dans le profil
+  `observability`, bindés 127.0.0.1. **Caddy refuse `/api/metrics` au public** (404).
+- **Sentry dormant** : `@sentry/node` (init bootstrap gaté `SENTRY_DSN` + report des 5xx depuis
+  `AllExceptionsFilter`, corrélé `requestId`) + `@sentry/nextjs` (`instrumentation*.ts` gatés +
+  `captureException` dans `error.tsx`/`global-error.tsx`). **Sans `withSentryConfig`** (source-maps) →
+  zéro risque de casser le build ; source-maps documentées comme geste restant (token Sentry requis).
+- **CHECK** : backend `tsc` + `eslint` verts (fix `exactOptionalPropertyTypes` sur le contexte Sentry) ;
+  web `tsc` + `next lint` verts ; YAML compose (12 services / 8 volumes) + JSON dashboard + Prometheus
+  validés. Tests unit `metrics.service` (3 cas) écrits — exécutés en CI.
+- **Reste** (geste de Salim) : créer le projet Sentry → poser `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN`,
+  ajouter l'hôte Sentry au `connect-src` CSP, activer `withSentryConfig` + `SENTRY_AUTH_TOKEN` (CI).
+- Soft-locks `docker-compose.prod.yml` + `Caddyfile.prod` **libérés**.

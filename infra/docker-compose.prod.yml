@@ -241,6 +241,50 @@ services:
           memory: 256m
     logging: *default-logging
 
+  # Prometheus scrape les métriques RED du backend (backend:3001/api/metrics) sur
+  # le réseau compose — pas d'exposition (interrogé par Grafana en interne).
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: ['observability']
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+    logging: *default-logging
+
+  # Grafana — dashboards golden-signals, datasource + dashboard PROVISIONNÉS
+  # (config-as-code, versionnée). Bindé 127.0.0.1 (accès SSH local-forward).
+  grafana:
+    image: grafana/grafana-oss:latest
+    profiles: ['observability']
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD requis (profil observability)}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - '127.0.0.1:3012:3000'
+    depends_on:
+      prometheus:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    logging: *default-logging
+
 volumes:
   postgres_data:
   redis_data:
@@ -248,3 +292,5 @@ volumes:
   caddy_data:
   caddy_config:
   uptime_kuma_data:
+  prometheus_data:
+  grafana_data:

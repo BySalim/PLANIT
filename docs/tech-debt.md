@@ -15,16 +15,16 @@
 > Dozzle, Uptime Kuma), dépendances `prom-client`/`@sentry/*` validées. Les lignes
 > ci-dessous se **clôturent au fil de la livraison** (profil compose `observability`).
 
-| ID            | Description                                                                                                                 | Impact                                                                | Priorité |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | -------- |
-| TD-OBS-SENTRY | Error tracking non branché (Sentry ou GlitchTip) — **increment 3** (déps `@sentry/*` + DSN)                                 | Erreurs prod front+back non agrégées/alertées ; debug à l'aveugle     | Haute    |
-| TD-OBS-SINK   | Error boundaries front sans report distant (Phase 0 = repli UI seul) — lié à TD-OBS-SENTRY                                  | Les erreurs de rendu ne remontent nulle part tant que Sentry absent   | Moyenne  |
-| TD-OBS-METRIC | Métriques RED / golden signals + dashboards — **increment 3** (`prom-client` + Prometheus + Grafana)                        | Aucune visibilité perf backend en prod (latence, taux d'erreur)       | Moyenne  |
-| TD-OBS-LOGS   | Pas d'**agrégateur/rétention** de logs (Dozzle ✅ donne la lecture web ; recherche/rétention longue durée = SaaS plus tard) | Rétention limitée à la vie du conteneur ; pas de recherche historique | Faible   |
+| ID            | Description                                                                                                                                                                                                               | Impact                                                                              | Priorité |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------- |
+| TD-OBS-SENTRY | Sentry **câblé dormant** (back + web, no-op sans DSN). Reste : créer le projet + poser les DSN, ajouter l'hôte Sentry au `connect-src` CSP, et l'upload **source-maps** en CI (`withSentryConfig` + `SENTRY_AUTH_TOKEN`). | Tant qu'aucun DSN n'est posé, les erreurs ne sont pas agrégées/alertées à distance. | Moyenne  |
+| TD-OBS-LOGS   | Pas d'**agrégateur/rétention** de logs (Dozzle ✅ donne la lecture web ; recherche/rétention longue durée = SaaS plus tard)                                                                                               | Rétention limitée à la vie du conteneur ; pas de recherche historique               | Faible   |
 
 > **Livré le 2026-06-08** (retiré de la liste) : `TD-OBS-REQID` (requestId + `X-Request-Id`),
-> `TD-OBS-UPTIME` / `TD-OBS-HEALTH` (Uptime Kuma sur `/api/health/ready` + alerte backup, profil
-> compose `observability`). Cf. [observabilite.md §5](observabilite.md) et le journal du 2026-06-08.
+> `TD-OBS-UPTIME` / `TD-OBS-HEALTH` (Uptime Kuma sur `/api/health/ready` + alerte backup),
+> `TD-OBS-METRIC` (`/api/metrics` prom-client + Prometheus + Grafana golden-signals), `TD-OBS-SINK`
+> (error boundaries front câblées sur `captureException`, dormant). Profil compose `observability`.
+> Cf. [observabilite.md §5](observabilite.md) et le journal du 2026-06-08.
 
 ---
 

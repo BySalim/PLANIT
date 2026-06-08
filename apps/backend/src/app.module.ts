@@ -9,6 +9,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { ClassesModule } from './classes/classes.module';
 import { LoggerModule } from './common/logger.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { SallesModule } from './salles/salles.module';
 import { PrismaModule } from './common/prisma.module';
 import { EnseignantsModule } from './enseignants/enseignants.module';
@@ -33,6 +34,7 @@ const DEFAULT_LIMIT = isTest ? 10_000 : 100;
 @Module({
   imports: [
     LoggerModule,
+    MetricsModule,
     PrismaModule,
     ThrottlerModule.forRoot([
       // Quota global : 100 requêtes par IP / minute.

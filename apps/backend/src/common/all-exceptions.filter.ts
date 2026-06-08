@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client';
 import type { Logger } from 'pino';
 import { ZodError } from 'zod';
 import { PINO_LOGGER } from './logger.module';
+import { getRequestId } from './request-context';
+import { captureBackendException } from './sentry';
 
 /**
  * Sous-ensemble minimum des objets Express dont on a besoin ici.
@@ -70,6 +72,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (normalized.statusCode >= 500) {
       this.logger.error(logPayload, 'Unhandled exception');
+      // Report distant des 5xx (Sentry, dormant si DSN absent) — corrélé au requestId.
+      captureBackendException(exception, {
+        requestId: getRequestId(),
+        path: normalized.path,
+        method: request.method,
+        statusCode: normalized.statusCode,
+      });
     } else {
       this.logger.warn(logPayload, 'Handled exception');
     }

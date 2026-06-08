@@ -9,9 +9,14 @@ import { corsOrigin } from './common/cors';
 import { validateEnv } from './common/env.validation';
 import { PINO_LOGGER } from './common/logger.module';
 import { requestIdMiddleware } from './common/request-id.middleware';
+import { initSentry } from './common/sentry';
 import { ZodValidationPipe } from './common/zod-validation.pipe';
 
 async function bootstrap(): Promise<void> {
+  // Error tracking Sentry — dormant si SENTRY_DSN absent (init le plus tôt
+  // possible pour capturer aussi les erreurs de démarrage). ADR-0009 Phase 1.
+  initSentry();
+
   // Fail-fast : refuse de démarrer si une variable d'env requise manque (LOT 1.5).
   validateEnv();
 

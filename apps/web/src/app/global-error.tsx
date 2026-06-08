@@ -9,8 +9,10 @@
  * Les valeurs littérales sont justifiées par ce cas limite — exception assumée à
  * la règle « pas de hex en dur ». Repli neutre, sobre, lisible.
  *
- * Report distant = Phase 1 (ADR-0009, tech-debt TD-OBS-SINK).
+ * Report distant Sentry (ADR-0009 Phase 1) — **dormant** sans `NEXT_PUBLIC_SENTRY_DSN`.
  */
+import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
@@ -19,6 +21,10 @@ interface GlobalErrorProps {
 
 // eslint-disable-next-line no-restricted-syntax -- global-error.tsx exige un export par défaut (convention App Router)
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <html lang="fr">
       <body
