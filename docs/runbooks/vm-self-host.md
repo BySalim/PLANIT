@@ -172,6 +172,10 @@ Planifier (cron deploy, 02h) :
 
 Procédure de reprise complète : [incident-dr.md](incident-dr.md).
 
+**Copie off-box (recommandé)** : définir `PLANIT_BACKUP_OFFBOX_DIR` (mount NFS TrueNAS) pour que
+`backup.sh` recopie chaque dump **hors de la VM** + snapshots ZFS — protège du cas « VM détruite ».
+Mise en place : [truenas-backup.md](truenas-backup.md).
+
 ## 9. Rollback manuel
 
 ```bash
@@ -184,4 +188,4 @@ docker compose --env-file /opt/planit/.env.prod -f docker-compose.prod.yml up -d
 
 - **WebSocket realtime** : `NEXT_PUBLIC_WS_URL` est _build-time_ ; l'image GHCR générique le laisse vide → le temps réel (`session:published`) peut nécessiter un build web dédié VM (tracé `TD-V04-WS-BUILDARG`).
 - Pas d'accès Internet/externe (choix Local/LAN). Pour des testeurs distants : session ultérieure (Cloudflare Tunnel ou Railway payant).
-- Backups locaux uniquement (pas de TrueNAS) — copie off-box manuelle conseillée (dossier partagé VirtualBox).
+- _(Backups : résolu — 2 niveaux local + off-box NFS TrueNAS, cf. §8 et [truenas-backup.md](truenas-backup.md).)_

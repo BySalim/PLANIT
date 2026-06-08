@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # V04 LOT 5.4 — Backup Postgres planifié de la stack prod (ADR-0013 §7).
-# TrueNAS absent chez le TL → dump local dans /opt/planit/backups (+ option :
-# dossier partagé VirtualBox vers l'hôte = copie off-box du pauvre). Rotation.
+# Deux niveaux : (1) dump local gzip dans /opt/planit/backups (avec rotation),
+# puis (2) copie **off-box** optionnelle vers PLANIT_BACKUP_OFFBOX_DIR —
+# typiquement un partage NFS TrueNAS monté sur la VM (V4-D12). C'est l'off-box
+# qui protège du cas « VM détruite ». Cf. docs/runbooks/truenas-backup.md.
 # Restauration : voir restore.sh + docs/runbooks/incident-dr.md.
 set -euo pipefail
 
@@ -25,4 +27,27 @@ docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
 # Rotation : ne garder que les ${KEEP} plus récents.
 ls -1t "${BACKUP_DIR}"/planit-*.sql.gz 2>/dev/null | tail -n "+$((KEEP + 1))" | xargs -r rm -f
 
-echo "[backup] OK ($(du -h "${out}" | cut -f1)). Dumps conservés : $(ls -1 "${BACKUP_DIR}"/planit-*.sql.gz | wc -l)"
+echo "[backup] local OK ($(du -h "${out}" | cut -f1)). Dumps locaux : $(ls -1 "${BACKUP_DIR}"/planit-*.sql.gz | wc -l)"
+
+# ── Copie off-box (optionnelle) ─────────────────────────────────────────────
+# Si PLANIT_BACKUP_OFFBOX_DIR est défini (mount NFS TrueNAS), on y recopie le
+# dump puis on y applique la même rotation. Un échec ici est **fatal** (exit 1) :
+# le dump local est déjà en sécurité, mais l'off-box est la seule protection
+# « VM détruite » → on veut être alerté si le mount est tombé.
+OFFBOX_DIR="${PLANIT_BACKUP_OFFBOX_DIR:-}"
+if [ -n "${OFFBOX_DIR}" ]; then
+  if [ ! -d "${OFFBOX_DIR}" ] || [ ! -w "${OFFBOX_DIR}" ]; then
+    echo "[backup] ERREUR off-box : '${OFFBOX_DIR}' absent, non-monté ou non inscriptible." >&2
+    echo "[backup]   (le dump local '${out}' est OK — vérifier le mount NFS TrueNAS)" >&2
+    exit 1
+  fi
+  echo "[backup] copie off-box → ${OFFBOX_DIR}/"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a "${out}" "${OFFBOX_DIR}/"
+  else
+    cp -p "${out}" "${OFFBOX_DIR}/"
+  fi
+  # Rotation off-box (même politique ${KEEP} que le local).
+  ls -1t "${OFFBOX_DIR}"/planit-*.sql.gz 2>/dev/null | tail -n "+$((KEEP + 1))" | xargs -r rm -f
+  echo "[backup] off-box OK. Dumps off-box : $(ls -1 "${OFFBOX_DIR}"/planit-*.sql.gz 2>/dev/null | wc -l)"
+fi
