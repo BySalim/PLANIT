@@ -10,6 +10,19 @@ vague: 04
 # ADR-0013 — Strategie de deploiement V04
 
 > **Statut** : Accepte · **Date** : 2026-06-06 · **Vague** : 04 (LOT 0.2) · **Auteur** : Salim (Tech Lead)
+>
+> **Revision 2026-06-08** — voir la note ci-dessous : les hebergeurs PaaS loues sont abandonnes ; la **VM self-host devient le serveur de reference rejouable** ; la beta reste la VM exposee via Cloudflare Tunnel ([ADR-0015](0015-beta-cloudflare-tunnel-vm.md)).
+
+## Mise a jour 2026-06-08 — posture serveur : VM de reference, abandon des PaaS loues
+
+Apres les difficultes repetees avec les **hebergeurs PaaS loues** (Railway expire ; Neon+Koyeb+Vercel jamais deploye, Koyeb passe payant), le Tech Lead arrete la **roulette des free tiers**. Decision :
+
+- **La VM self-host (cible 3 d'origine) devient la cible serveur unique et de reference** : on la traite comme un **vrai serveur**, **rejouable a l'identique** sur un futur VPS en ligne (meme `docker-compose.prod.yml`, meme provisioning Ansible, memes scripts de backup). « Au moment voulu on bascule sur un serveur en ligne » = re-jouer Ansible sur la cible distante, sans rien reconcevoir.
+- **Les choix de prod cloud (VPS Hetzner, etc.) sont mis en PAUSE** jusqu'a ce que la VM soit complete et stable. Aucun host loue n'est provisionne entre-temps.
+- **La beta publique reste la VM exposee via Cloudflare Tunnel** ([ADR-0015](0015-beta-cloudflare-tunnel-vm.md)) — gratuite, sans port entrant. **Sans domaine pour l'instant** : on privilegie le **quick-tunnel** (`*.trycloudflare.com`, URL ephemere) protege par `basic_auth` Caddy ; le named tunnel + domaine reste disponible quand une URL stable sera voulue.
+- **Consequence concrete sur cet ADR** : §1 (table « 3 cibles ») et §5 (« CD beta Railway ») **caducs pour la partie Railway** — deja remplaces par ADR-0015 (tunnel). La cible « beta = host loue » disparait. Les §2 (images communes), §3 (compose prod), §4 (Caddy), §6 (CD VM pull-based), §7 (backups TrueNAS) **restent en vigueur** et sont meme renforces : **observabilite** (P1-2, [ADR-0009](0009-observabilite-strategie.md)) et **sauvegarde durcie** (chiffrement + GFS + restore teste + alerte) sont desormais livres sur la VM, pour qu'elle soit reellement « prod-like » et rejouable.
+
+> Le reste de l'ADR ci-dessous est conserve **tel quel** comme trace historique du raisonnement V04 ; lire a la lumiere de cette mise a jour.
 
 ## Contexte
 

@@ -31,6 +31,9 @@
           - ufw
           - fail2ban
           - unattended-upgrades
+          - age            # chiffrement des sauvegardes au repos (backup.sh)
+          - nfs-common     # mount off-box TrueNAS (truenas-backup.md)
+          - rsync          # copie off-box incrémentale (backup.sh)
         state: present
         update_cache: true
 
@@ -154,6 +157,18 @@
         enabled: true
         state: started
         daemon_reload: true
+
+    # ── Sauvegarde planifiée (cron 02h) ─────────────────────────
+    # V4-D11c : backups planifiés. Le chiffrement (age), l'off-box (NFS) et
+    # l'alerte (push) sont pilotés par les variables PLANIT_BACKUP_* de cd.env
+    # (cf. docs/runbooks/truenas-backup.md). Le script est idempotent côté cron.
+    - name: Schedule nightly Postgres backup (02:00)
+      ansible.builtin.cron:
+        name: planit-backup
+        user: "{{ deploy_user }}"
+        minute: '0'
+        hour: '2'
+        job: "{{ app_dir }}/src/infra/prod/scripts/backup.sh >> {{ app_dir }}/backup.log 2>&1"
 
   handlers:
     - name: Restart sshd

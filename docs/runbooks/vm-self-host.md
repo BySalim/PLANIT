@@ -157,23 +157,29 @@ tail -f /opt/planit/cd.log
 
 ## 8. Backups + restauration
 
-Backup manuel : `sudo -u deploy /opt/planit/src/infra/prod/scripts/backup.sh` → `/opt/planit/backups/`.
-Planifier (cron deploy, 02h) :
-
-```cron
-0 2 * * * /opt/planit/src/infra/prod/scripts/backup.sh >> /opt/planit/backup.log 2>&1
-```
-
-**Restauration testée** (à faire au moins une fois) :
+Le **cron 02h est posé par Ansible** (`site.yml`, tâche `planit-backup`, idempotent) — pas de cron à
+écrire à la main. Backup manuel à la demande :
 
 ```bash
-/opt/planit/src/infra/prod/scripts/restore.sh /opt/planit/backups/planit-<DATE>.sql.gz
+sudo -u deploy /opt/planit/src/infra/prod/scripts/backup.sh   # → /opt/planit/backups/
 ```
 
-Procédure de reprise complète : [incident-dr.md](incident-dr.md).
+`backup.sh` fait (cf. [truenas-backup.md §6](truenas-backup.md) pour la config `cd.env`) :
+**dump → chiffrement `age` → sidecar `.sha256` → rotation GFS (quotidien/hebdo/mensuel) → copie off-box →
+heartbeat/alerte push**. Configurer les variables `PLANIT_BACKUP_*` dans `/opt/planit/cd.env`.
+
+**Restauration** (vérifie l'intégrité puis déchiffre) :
+
+```bash
+PLANIT_BACKUP_AGE_IDENTITY=/chemin/planit-backup.key \
+  /opt/planit/src/infra/prod/scripts/restore.sh /opt/planit/backups/planit-<DATE>.sql.gz.age
+```
+
+> **Drill de restauration** à exécuter au moins une fois (puis trimestriel) et à **tracer** :
+> [truenas-backup.md §8.1](truenas-backup.md). Procédure de reprise complète : [incident-dr.md](incident-dr.md).
 
 **Copie off-box (recommandé)** : définir `PLANIT_BACKUP_OFFBOX_DIR` (mount NFS TrueNAS) pour que
-`backup.sh` recopie chaque dump **hors de la VM** + snapshots ZFS — protège du cas « VM détruite ».
+`backup.sh` recopie chaque dump chiffré **hors de la VM** + snapshots ZFS — protège du cas « VM détruite ».
 Mise en place : [truenas-backup.md](truenas-backup.md).
 
 ## 9. Rollback manuel
