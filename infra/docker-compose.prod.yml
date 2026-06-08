@@ -1,7 +1,8 @@
 # PLANIT — stack prod-like (V04 LOT 1.4, ADR-0013 §3).
 # Démarrer :
 #   docker compose --env-file infra/prod/env/.env.prod -f infra/docker-compose.prod.yml up -d --build
-# Une seule chaîne d'images sert la VM self-host ET Railway (mêmes Dockerfiles).
+# Cible serveur de référence = VM self-host (ADR-0013 rév. 2026-06-08 : PaaS loués abandonnés).
+# Profils opt-in : `tunnel` (beta Cloudflare) · `observability` (Dozzle + Uptime Kuma).
 name: planit-prod
 
 # Ancres réutilisables — rotation des logs (V4-D11) appliquée à tous les services.
@@ -183,9 +184,113 @@ services:
       - caddy_config:/config
     logging: *default-logging
 
+  # Cloudflare Tunnel (beta publique, ADR-0015) — OPT-IN via le profil `tunnel` :
+  #   docker compose --env-file ... --profile tunnel up -d cloudflared
+  # Expose la stack (Caddy) sur Internet SANS ouvrir de port entrant : cloudflared
+  # n'ouvre que des connexions SORTANTES vers Cloudflare. Le routage public
+  # (hostname → https://caddy:443, No-TLS-Verify, Host=PLANIT_DOMAIN) et le rideau
+  # Cloudflare Access se configurent côté dashboard CF. Cf. docs/runbooks/beta-tunnel.md.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ['tunnel']
+    restart: unless-stopped
+    command: ['tunnel', '--no-autoupdate', 'run']
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN requis (profil tunnel)}
+    depends_on:
+      caddy:
+        condition: service_started
+    logging: *default-logging
+
+  # ── Observabilité (ADR-0009 Phase 2) — profil opt-in `observability` ─────────
+  #   docker compose --env-file ... --profile observability up -d
+  # Bindés sur 127.0.0.1 UNIQUEMENT (aucune exposition LAN/Internet) : on accède
+  # aux UIs par SSH local-forward, sans ouvrir de port ufw :
+  #   ssh -L 8081:localhost:8081 -L 3011:localhost:3011 deploy@<vm>
+  # Dozzle = lecture web des logs conteneurs (docker.sock en lecture seule).
+  dozzle:
+    image: amir20/dozzle:latest
+    profiles: ['observability']
+    restart: unless-stopped
+    environment:
+      DOZZLE_NO_ANALYTICS: 'true'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - '127.0.0.1:8081:8080'
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+    logging: *default-logging
+
+  # Uptime Kuma = uptime + alerting. Surveille `/api/health/ready` (via le réseau
+  # compose, ex. http://caddy/api/health/ready) et reçoit l'alerte d'échec de
+  # backup (push monitor → PLANIT_BACKUP_PUSH_URL=http://127.0.0.1:3011/api/push/<token>).
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    profiles: ['observability']
+    restart: unless-stopped
+    volumes:
+      - uptime_kuma_data:/app/data
+    ports:
+      - '127.0.0.1:3011:3001'
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    logging: *default-logging
+
+  # Prometheus scrape les métriques RED du backend (backend:3001/api/metrics) sur
+  # le réseau compose — pas d'exposition (interrogé par Grafana en interne).
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: ['observability']
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+    logging: *default-logging
+
+  # Grafana — dashboards golden-signals, datasource + dashboard PROVISIONNÉS
+  # (config-as-code, versionnée). Bindé 127.0.0.1 (accès SSH local-forward).
+  grafana:
+    image: grafana/grafana-oss:latest
+    profiles: ['observability']
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD requis (profil observability)}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - '127.0.0.1:3012:3000'
+    depends_on:
+      prometheus:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    logging: *default-logging
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
   caddy_data:
   caddy_config:
+  uptime_kuma_data:
+  prometheus_data:
+  grafana_data:

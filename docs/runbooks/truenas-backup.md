@@ -17,12 +17,15 @@
 
 Deux niveaux de sauvegarde (cf. [`backup.sh`](../../infra/prod/scripts/backup.sh)) :
 
-1. **Local** : `pg_dump | gzip` → `/opt/planit/backups` (rotation `PLANIT_BACKUP_KEEP`).
-2. **Off-box** : copie vers `PLANIT_BACKUP_OFFBOX_DIR` (= le mount NFS TrueNAS) + même rotation.
-   Un échec off-box est **fatal** (le script `exit 1`) → l'absence de mount remonte dans `backup.log`.
+1. **Local** : `pg_dump | gzip` → **chiffré `age`** → `/opt/planit/backups` (rotation **GFS**), + sidecar `.sha256`.
+2. **Off-box** : copie du dump chiffré + sidecar vers `PLANIT_BACKUP_OFFBOX_DIR` (= le mount NFS TrueNAS) + même rotation GFS.
+   Un échec off-box est **fatal** (le script `exit 1`) → l'absence de mount remonte dans `backup.log` **et** déclenche l'alerte push (§6).
 
 > Pourquoi off-box : un dump qui vit **uniquement** sur le disque de la VM PLANIT disparaît avec
 > elle (corruption disque, suppression de la VM). La copie NFS + les snapshots ZFS survivent.
+>
+> Pourquoi **chiffré** : l'off-box (et a fortiori un futur off-box **cloud**) est hors de ton contrôle
+> direct. Un dump `age` est inutile à qui n'a pas la **clé privée** — laquelle ne vit **jamais sur la VM**.
 
 ---
 
@@ -123,7 +126,7 @@ protection contre un `rm` accidentel propagé par la rotation du script).
 
 - **Dataset** : `tank/planit-backups`
 - **Schedule** : quotidien, ex. **03h00** (après le backup PLANIT de 02h).
-- **Snapshot Lifetime (rétention)** : ex. **2 semaines** (aligné sur `PLANIT_BACKUP_KEEP=14`).
+- **Snapshot Lifetime (rétention)** : ex. **6 mois** (couvre la granularité mensuelle GFS — voir §6).
 - Naming schema par défaut.
 
 > Les snapshots ZFS sont quasi-gratuits (copy-on-write) : seuls les blocs modifiés coûtent. Une
@@ -131,25 +134,52 @@ protection contre un `rm` accidentel propagé par la rotation du script).
 
 ---
 
-## 6. Brancher `backup.sh` sur l'off-box
+## 6. Configurer `backup.sh` (chiffrement, GFS, off-box, alerte)
 
-Définir `PLANIT_BACKUP_OFFBOX_DIR` pour que `backup.sh` recopie vers le mount. Le plus simple :
-l'ajouter à **`/opt/planit/cd.env`** (déjà sourcé par le script) :
+Tout se pilote par des variables dans **`/opt/planit/cd.env`** (déjà sourcé par le script). Bloc complet :
 
 ```ini
+# Off-box : le mount NFS TrueNAS (§4). Un échec ici est fatal → alerte.
 PLANIT_BACKUP_OFFBOX_DIR=/mnt/truenas/planit-backups
+
+# Chiffrement au repos (clé PUBLIQUE age — sans danger ici ; la privée reste hors box).
+PLANIT_BACKUP_AGE_RECIPIENT=age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Rétention GFS (défauts si absents : 7 / 4 / 6).
+PLANIT_BACKUP_KEEP_DAILY=7
+PLANIT_BACKUP_KEEP_WEEKLY=4
+PLANIT_BACKUP_KEEP_MONTHLY=6
+
+# Alerte/heartbeat — Uptime Kuma « push monitor » (status=up/down auto). Optionnel.
+PLANIT_BACKUP_PUSH_URL=https://<uptime-kuma>/api/push/<token>
 ```
 
-(ou l'exporter dans la ligne cron). Test :
+### 6.1 Générer la clé `age` (une seule fois)
+
+> ⚠️ La **clé privée ne doit JAMAIS rester sur la VM** (sinon une VM compromise déchiffre toutes les
+> sauvegardes). On la génère ailleurs, on ne dépose que la **clé publique** dans `cd.env`.
 
 ```bash
-sudo -u deploy PLANIT_BACKUP_OFFBOX_DIR=/mnt/truenas/planit-backups \
-  /opt/planit/src/infra/prod/scripts/backup.sh
-# Attendu : "[backup] local OK …" puis "[backup] off-box OK. Dumps off-box : N"
+# Sur ton POSTE (pas la VM) :
+age-keygen -o planit-backup.key
+# → "Public key: age1xxxx…"  ⇒ c'est PLANIT_BACKUP_AGE_RECIPIENT (cd.env de la VM)
+# → planit-backup.key contient la clé PRIVÉE : range-la dans ton gestionnaire de
+#   mots de passe / coffre hors-ligne. NE PAS la committer, NE PAS la mettre sur la VM.
 ```
 
-Le cron 02h existant (cf. [vm-self-host.md §8](vm-self-host.md)) bascule alors automatiquement en
-2 niveaux dès que la variable est présente dans `cd.env`.
+Au moment d'une **restauration**, tu fourniras cette clé privée à `restore.sh` via
+`PLANIT_BACKUP_AGE_IDENTITY=/chemin/planit-backup.key` (cf. §7).
+
+### 6.2 Test manuel
+
+```bash
+sudo -u deploy /opt/planit/src/infra/prod/scripts/backup.sh
+# Attendu : "[backup] chiffré (age) …" → "[backup] local OK … Empreinte: …"
+#           → "[backup] rotation GFS locale OK …" → "[backup] off-box OK. Dumps off-box : N"
+```
+
+Le cron 02h (posé par Ansible, cf. [vm-self-host.md §8](vm-self-host.md)) applique alors les 2 niveaux
+chiffrés à chaque nuit dès que les variables sont présentes dans `cd.env`.
 
 ---
 
@@ -157,10 +187,13 @@ Le cron 02h existant (cf. [vm-self-host.md §8](vm-self-host.md)) bascule alors 
 
 1. Recréer la VM PLANIT (Ansible + secrets, cf. [incident-dr.md](incident-dr.md) « Reprise complète »).
 2. Remonter le NFS TrueNAS (§4) — les dumps sont là, **survivants** à la destruction de l'ancienne VM.
-3. Restaurer le dernier dump depuis le mount :
+3. Restaurer le dernier dump depuis le mount (fournir la **clé privée age**, gardée hors box, §6.1) :
 
    ```bash
-   /opt/planit/src/infra/prod/scripts/restore.sh /mnt/truenas/planit-backups/planit-<DATE>.sql.gz
+   PLANIT_BACKUP_AGE_IDENTITY=/chemin/planit-backup.key \
+     /opt/planit/src/infra/prod/scripts/restore.sh \
+     /mnt/truenas/planit-backups/planit-<DATE>.sql.gz.age
+   # restore.sh vérifie le .sha256 puis déchiffre (age) avant de réinjecter.
    curl -k --resolve planit.local:443:127.0.0.1 https://planit.local/api/health/ready
    ```
 
@@ -172,12 +205,38 @@ Le cron 02h existant (cf. [vm-self-host.md §8](vm-self-host.md)) bascule alors 
 
 ## 8. Vérification (Done off-box)
 
+- [ ] `backup.sh` produit un dump **chiffré** `planit-<DATE>.sql.gz.age` + sidecar `.sha256` (`[backup] chiffré (age) …`).
 - [ ] `backup.sh` écrit bien dans `/mnt/truenas/planit-backups` (`[backup] off-box OK`).
+- [ ] La **rotation GFS** conserve quotidien/hebdo/mensuel (vérifier après plusieurs jours).
 - [ ] Un **snapshot ZFS** du dataset apparaît côté TrueNAS après le run planifié.
-- [ ] **Restore depuis l'off-box** : drop d'une table → `restore.sh` depuis le mount → données revenues,
-      `…/api/health/ready` OK.
+- [ ] **Drill de restauration tracé** (§8.1) : restore depuis l'off-box → `…/api/health/ready` OK.
+- [ ] **Alerte** : un échec simulé (mount démonté) déclenche `status=down` côté Uptime Kuma.
 - [ ] TrueNAS éteinte → la VM PLANIT boote quand même (`nofail`) et `backup.sh` loggue l'erreur off-box
       sans perdre le dump local.
+
+### 8.1 Drill de restauration (à exécuter au moins une fois, puis trimestriel)
+
+Un backup non testé n'est pas un backup. Procédure reproductible (non destructive si jouée sur une VM jetable ; sinon prévenir l'équipe) :
+
+```bash
+# 1. Repérer le dernier dump off-box
+ls -1t /mnt/truenas/planit-backups/planit-*.sql.gz.age | head -1
+
+# 2. (optionnel) marqueur de preuve : créer puis « perdre » une donnée témoin
+#    -> ici on se contente de restaurer et de vérifier le compte de lignes d'une table.
+
+# 3. Restaurer en mode non-interactif (drill) avec la clé privée hors-box
+PLANIT_RESTORE_ASSUME_YES=1 \
+PLANIT_BACKUP_AGE_IDENTITY=/chemin/planit-backup.key \
+  /opt/planit/src/infra/prod/scripts/restore.sh \
+  /mnt/truenas/planit-backups/planit-<DATE>.sql.gz.age
+
+# 4. Vérifier la santé applicative
+curl -k --resolve planit.local:443:127.0.0.1 https://planit.local/api/health/ready
+```
+
+> **Tracer le résultat** (date, dump utilisé, durée, RTO observé, OK/KO) dans
+> [`incident-dr.md`](incident-dr.md) (section reprise) — c'est la preuve que le RPO/RTO tient.
 
 ---
 

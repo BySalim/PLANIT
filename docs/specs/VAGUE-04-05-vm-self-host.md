@@ -44,8 +44,9 @@ pas de déploiement continu, pas de backups/restore prouvés, pas de runbook inc
 
 ## 3. Non-objectifs (déférés)
 
-- **Beta externe** (5.1, 5.3, 5.11, 5.12) → **réintégrée** via **Neon + Koyeb + Vercel** (ADR-0015,
-  remplace Railway/essai expiré). Code/workflow/runbook livrés ; config dashboards = Salim.
+- **Beta externe** (5.1, 5.3, 5.11) → **réintégrée** via **Cloudflare Tunnel sur la VM self-host**
+  (ADR-0015 ; ex-Neon+Koyeb+Vercel abandonné, Koyeb passé payant). Runbook + service `cloudflared`
+  (profil `tunnel`) livrés ; setup tunnel + Cloudflare Access = Salim.
 - **TrueNAS off-box** (5.4 ZFS) → **réintégré en scope** (V4-D12) : TrueNAS est gratuit → monté en
   **2ᵉ VM VirtualBox** (NFS). Cf. §2 + `docs/runbooks/truenas-backup.md`. _(Initialement déféré faute
   de matériel — décision revue.)_

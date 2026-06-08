@@ -5,11 +5,12 @@
  * données non gérée dans l'arbre sous `app/`. Évite l'écran blanc : affiche un
  * repli on-brand avec une action « Réessayer » (reset) et un retour accueil.
  *
- * Observabilité V02 / Phase 0 (cf. ADR-0009) : pas encore de report distant.
- * Le branchement Sentry / endpoint backend est la Phase 1 (tech-debt TD-OBS-SINK).
+ * Observabilité (ADR-0009 Phase 1) : report distant Sentry — **dormant** tant que
+ * `NEXT_PUBLIC_SENTRY_DSN` est absent (`captureException` est alors un no-op).
  */
 import { useEffect } from 'react';
 import Link from 'next/link';
+import * as Sentry from '@sentry/nextjs';
 
 interface ErrorBoundaryProps {
   error: Error & { digest?: string };
@@ -19,9 +20,9 @@ interface ErrorBoundaryProps {
 // eslint-disable-next-line no-restricted-syntax -- error.tsx exige un export par défaut (convention App Router)
 export default function Error({ error, reset }: ErrorBoundaryProps) {
   useEffect(() => {
-    // Phase 1 (ADR-0009) : reporter `error` (+ `error.digest`) vers Sentry ou un
-    // endpoint backend. En Phase 0, on ne loggue pas en console (lint no-console) —
-    // l'overlay Next.js affiche déjà la stack en développement.
+    // Report distant (ADR-0009 Phase 1). No-op sans DSN ; l'overlay Next.js
+    // affiche déjà la stack en dev (pas de console.* — lint no-console).
+    Sentry.captureException(error);
   }, [error]);
 
   return (

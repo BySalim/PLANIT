@@ -9,6 +9,14 @@
 	encode zstd gzip
 	tls {$CADDY_TLS:internal}
 
+	# Métriques Prometheus : JAMAIS exposées au public (tunnel). Prometheus scrape
+	# `backend:3001/api/metrics` directement sur le réseau compose, sans passer ici.
+	# 404 plutôt que 403 pour ne pas révéler l'existence du endpoint.
+	@metrics path /api/metrics
+	handle @metrics {
+		respond 404
+	}
+
 	# API REST + docs Swagger + WebSocket → backend NestJS.
 	@backend path /api/* /docs /docs/*
 	handle @backend {
