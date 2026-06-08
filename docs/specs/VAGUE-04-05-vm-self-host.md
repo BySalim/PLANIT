@@ -37,14 +37,18 @@ pas de déploiement continu, pas de backups/restore prouvés, pas de runbook inc
 
 ### Backups / DR (5.4/5.10)
 
-- **TrueNAS absent** chez le TL → backups Postgres `pg_dump` planifiés (cron/systemd) vers un **dossier local**
-  `/opt/planit/backups` (+ option dossier partagé VirtualBox vers l'hôte comme copie off-box du pauvre).
-  **Restauration testée** documentée. Runbook **incident + DR** (RTO/RPO, restore, postmortem).
+- Backups Postgres `pg_dump` planifiés (cron/systemd) à **2 niveaux** : dump local `/opt/planit/backups`
+  (rotation) **+ copie off-box NFS TrueNAS** (V4-D12) — TrueNAS SCALE en **2ᵉ VM VirtualBox**, dataset
+  ZFS + partage NFS + **snapshots ZFS** avec rétention (cf. `docs/runbooks/truenas-backup.md`).
+  **Restauration testée** documentée (local **et** off-box). Runbook **incident + DR** (RTO/RPO, restore, postmortem).
 
 ## 3. Non-objectifs (déférés)
 
-- **Railway / beta externe** (5.1, 5.2, 5.3, 5.11, 5.12) → reportés (essai expiré). Écart ADR-0013 §7 tracé.
-- **TrueNAS** (5.4 off-box ZFS) → N/A (matériel absent) ; backups locaux à la place.
+- **Beta externe** (5.1, 5.3, 5.11, 5.12) → **réintégrée** via **Neon + Koyeb + Vercel** (ADR-0015,
+  remplace Railway/essai expiré). Code/workflow/runbook livrés ; config dashboards = Salim.
+- **TrueNAS off-box** (5.4 ZFS) → **réintégré en scope** (V4-D12) : TrueNAS est gratuit → monté en
+  **2ᵉ VM VirtualBox** (NFS). Cf. §2 + `docs/runbooks/truenas-backup.md`. _(Initialement déféré faute
+  de matériel — décision revue.)_
 - **Branch protection bloquante** (5.9) → action **admin GitHub = TL** (recommandation fournie, pas appliquée par l'agent).
 - Exposition Internet / domaine réel / Let's Encrypt → non retenu (choix Local/LAN).
 

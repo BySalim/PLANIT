@@ -62,6 +62,15 @@ IMAGE_TAG=develop
 PLANIT_DOMAIN=planit.local
 ```
 
+> ⚠️ **Propriété des fichiers** : ces deux fichiers sont créés par `root` (sudo) alors que l'agent CD
+> tourne en **`User=deploy`** (`planit-cd.service`). S'ils restent `root:root`, le CD ne peut pas les
+> lire → déploiement continu KO. Donne-les à `deploy` (en gardant `600`) **après** les avoir édités :
+>
+> ```bash
+> sudo chown deploy:deploy /opt/planit/.env.prod /opt/planit/cd.env
+> sudo chmod 600 /opt/planit/.env.prod /opt/planit/cd.env
+> ```
+
 > 🔀 La VM suit **`develop`** pendant le développement de la Vague 04. La bascule sur **`main`** (release `develop → main` puis `IMAGE_TAG=develop` → `main` dans **`.env.prod` ET `cd.env`**, V4-D9 : `main` → VM) se fera **à la clôture de la vague (LOT 7)**.
 
 ## 3bis. Authentification GHCR (images privées)
@@ -95,12 +104,22 @@ docker compose --env-file /opt/planit/.env.prod -f docker-compose.prod.yml ps
 Caddy génère sa propre autorité racine. Exporte-la et installe-la sur le **PC hôte** :
 
 ```bash
-# sur la VM
-docker compose -f docker-compose.prod.yml cp \
+# sur la VM — `--env-file` requis, sinon `docker compose cp` échoue sur les variables
+# non résolues du compose (ex. « MINIO_ROOT_USER is missing a value »)
+docker compose --env-file /opt/planit/.env.prod -f docker-compose.prod.yml cp \
   caddy:/data/caddy/pki/authorities/local/root.crt /opt/planit/planit-root.crt
 ```
 
-Récupère `planit-root.crt` sur l'hôte (dossier partagé VirtualBox ou `scp`) puis :
+> 📂 Le fichier exporté appartient à `root:root`. Pour le récupérer par `scp` (qui se connecte en
+> `deploy`), copie-le d'abord dans le home de `deploy` et donne-lui la propriété :
+>
+> ```bash
+> sudo cp /opt/planit/planit-root.crt /home/deploy/ \
+>   && sudo chown deploy:deploy /home/deploy/planit-root.crt
+> ```
+
+Récupère `planit-root.crt` sur l'hôte (dossier partagé VirtualBox, ou
+`scp deploy@<IP_VM>:/home/deploy/planit-root.crt .`) puis :
 
 - **Windows** : `certutil -addstore -f ROOT planit-root.crt` (PowerShell admin) — ou `certmgr.msc` → _Autorités de certification racines de confiance → Importer_.
 - **Firefox** (magasin propre) : _Paramètres → Certificats → Autorités → Importer_.
@@ -115,6 +134,14 @@ Sur le **PC hôte**, ajoute l'IP de la VM (étape 1) au fichier hosts :
   ```
 
 Teste : ouvre **https://planit.local** → l'app PLANIT (login), **cadenas valide** (cert de confiance). Vérif API : `https://planit.local/api/health` → `{"status":"ok"}`.
+
+> 🪟 **Vérif en ligne de commande Windows** : `curl.exe` passe par **Schannel**, qui tente une
+> vérification de révocation (CRL/OCSP) que la CA interne Caddy n'expose pas → l'appel échoue même
+> avec le certificat installé. Ajoute `--ssl-no-revoke` :
+>
+> ```powershell
+> curl.exe --ssl-no-revoke https://planit.local/api/health
+> ```
 
 ## 7. Déploiement continu (déjà armé par Ansible)
 
@@ -145,6 +172,10 @@ Planifier (cron deploy, 02h) :
 
 Procédure de reprise complète : [incident-dr.md](incident-dr.md).
 
+**Copie off-box (recommandé)** : définir `PLANIT_BACKUP_OFFBOX_DIR` (mount NFS TrueNAS) pour que
+`backup.sh` recopie chaque dump **hors de la VM** + snapshots ZFS — protège du cas « VM détruite ».
+Mise en place : [truenas-backup.md](truenas-backup.md).
+
 ## 9. Rollback manuel
 
 ```bash
@@ -156,5 +187,6 @@ docker compose --env-file /opt/planit/.env.prod -f docker-compose.prod.yml up -d
 ## 10. Limites connues (Local/LAN)
 
 - **WebSocket realtime** : `NEXT_PUBLIC_WS_URL` est _build-time_ ; l'image GHCR générique le laisse vide → le temps réel (`session:published`) peut nécessiter un build web dédié VM (tracé `TD-V04-WS-BUILDARG`).
-- Pas d'accès Internet/externe (choix Local/LAN). Pour des testeurs distants : session ultérieure (Cloudflare Tunnel ou Railway payant).
-- Backups locaux uniquement (pas de TrueNAS) — copie off-box manuelle conseillée (dossier partagé VirtualBox).
+- Pas d'accès Internet/externe (choix Local/LAN). Pour des testeurs **distants** : la **beta cloud**
+  (Neon + Koyeb + Vercel, [beta-cloud.md](beta-cloud.md)) — sans exposer la VM.
+- _(Backups : résolu — 2 niveaux local + off-box NFS TrueNAS, cf. §8 et [truenas-backup.md](truenas-backup.md).)_
