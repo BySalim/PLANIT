@@ -59,14 +59,14 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3001/api/health/ready
 **Usage prévu** :
 
 - **Liveness** → sonde de redémarrage d'un orchestrateur. Ne **pas** y mettre de check BD (sinon un incident BD passager redémarre le conteneur en boucle).
-- **Readiness** → moniteur uptime (UptimeRobot) et/ou retrait du pool par un load-balancer quand la BD est injoignable. Câblage infra = `TD-OBS-HEALTH` (Phase 2).
+- **Readiness** → surveillé par **Uptime Kuma** (profil `observability`, §5) qui ping `/api/health/ready` et alerte ; un load-balancer peut aussi retirer l'instance du pool quand la BD est injoignable.
 
 ## 4. Erreurs frontend
 
 - `app/error.tsx` capture les erreurs de rendu/données sous `app/` ; `app/global-error.tsx` est le dernier rempart (erreur dans le root layout, rend ses propres `<html>/<body>`).
 - L'utilisateur voit un **repli sobre** avec « Réessayer » (et « Retour à l'accueil » pour le segment), au lieu d'un écran blanc.
 - **En dev** : l'overlay Next.js affiche la stack normalement.
-- **En prod** : l'erreur n'est **pas encore reportée à distance** (Phase 1 — `TD-OBS-SINK`). Pour l'instant, la seule trace d'une erreur frontend est ce que l'utilisateur signale.
+- **En prod** : les deux boundaries appellent `Sentry.captureException` — **report distant actif dès qu'un DSN est posé** (`NEXT_PUBLIC_SENTRY_DSN`), no-op sinon. Voir §6.
 
 ## 5. Stack d'observabilité self-host (profil `observability`)
 
