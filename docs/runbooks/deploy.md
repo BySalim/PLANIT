@@ -1,7 +1,7 @@
 # Runbook — Déploiement PLANIT (V04 LOT 5.6)
 
-> Remplace le placeholder Hetzner. PLANIT vise **3 cibles** de déploiement (ADR-0013).
-> Chaque cible a sa procédure détaillée ; ce fichier est l'aiguillage.
+> Remplace le placeholder Hetzner. PLANIT vise **3 cibles** de déploiement (ADR-0013 ;
+> beta affinée par ADR-0015). Chaque cible a sa procédure détaillée ; ce fichier est l'aiguillage.
 
 ## Chaîne d'images (commune)
 
@@ -31,12 +31,19 @@ Procédure complète : **[vm-self-host.md](vm-self-host.md)**. Résumé :
 
 Reprise sur incident / DR : [incident-dr.md](incident-dr.md).
 
-## Cible 3 — Hébergeur beta externe (Railway) — ⏸️ différé
+## Cible 3 — Beta cloud (Neon + Koyeb + Vercel) — ✅ active
 
-Prévu par ADR-0013 §7 mais **différé V04** : l'essai Railway a expiré (plan payant requis). Le chemin
-beta externe (deploy-beta.yml, GHCR→Railway, basic-auth, release-please) est tracé pour une reprise
-ultérieure (Railway Hobby payant, ou alternative gratuite type Cloudflare Tunnel sur la VM). Écart acté
-en tech-debt `TD-V04-BETA-EXTERNE`.
+Remplace Railway (essai expiré) — **ADR-0015**. Beta publique **gratuite** : **Neon** (Postgres) +
+**Koyeb** (backend NestJS depuis l'image GHCR) + **Vercel** (web Next.js). Pas de Redis (inerte), pas
+de MinIO (exports client-side). Accès derrière **basic-auth**, comptes seed à mot de passe fort.
+
+Procédure complète : **[beta-cloud.md](beta-cloud.md)**. Résumé :
+
+1. **Neon** : projet Postgres → `DATABASE_URL` (`sslmode=require`).
+2. **Koyeb** : service Docker depuis `ghcr.io/bysalim/planit-api` (image privée → creds registre), env
+   `DATABASE_URL`/`JWT_*`/`FRONTEND_URL`/`NODE_ENV=production`, health `/api/health`.
+3. **Vercel** : root `apps/web`, `BACKEND_ORIGIN` (rewrite `/api` → Koyeb), `NEXT_PUBLIC_WS_URL`, `BETA_BASIC_AUTH`.
+4. **CI** `deploy-beta.yml` (branche `beta`, Environment `beta`) : migrate Neon → redeploy Koyeb → smoke.
 
 ## Rollback
 

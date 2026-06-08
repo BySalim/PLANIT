@@ -20,12 +20,26 @@ const isDev = process.env.NODE_ENV !== 'production';
 const scriptSrc = isDev
   ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
   : "script-src 'self' 'unsafe-inline'";
-// En dev, le front parle au backend direct sur :3001 (HTTP + WS). En prod, Caddy
-// sert front + API + WebSocket sur la **même origine** → `'self'` suffit. Un WS
-// sur un hôte distinct devra être ajouté ici (cf. TD CSP prod, ADR-0013).
+// En dev, le front parle au backend direct sur :3001 (HTTP + WS). En prod **VM**,
+// Caddy sert front + API + WebSocket sur la **même origine** → `'self'` suffit.
+// En prod **beta** (front Vercel + backend Koyeb), le WS vise une origine
+// **distincte** : on l'ajoute à `connect-src` depuis `NEXT_PUBLIC_WS_URL`.
+//
+// socket.io fait un handshake HTTP(S) puis upgrade en WS(S) → on autorise les
+// **deux** schemes de l'origine WS (build-time, valeur inlinée).
+function prodWsConnectSrc(): string {
+  const raw = process.env.NEXT_PUBLIC_WS_URL;
+  if (!raw) return '';
+  try {
+    const origin = new URL(raw).origin; // ex. https://planit-api.koyeb.app
+    return ` ${origin} ${origin.replace(/^http/, 'ws')}`; // + wss:// (ou ws://)
+  } catch {
+    return ''; // valeur non-URL → CSP reste stricte
+  }
+}
 const connectSrc = isDev
   ? "connect-src 'self' http://localhost:3001 ws://localhost:3001 wss://localhost:3001"
-  : "connect-src 'self'";
+  : `connect-src 'self'${prodWsConnectSrc()}`;
 const CSP_DIRECTIVES = [
   "default-src 'self'",
   scriptSrc,

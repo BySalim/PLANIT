@@ -30,7 +30,11 @@ const ARGON2_OPTS = {
   parallelism: 1,
 } as const;
 
-const SEED_PASSWORD = 'Test1234!';
+// Mot de passe des comptes seed. Par défaut `Test1234!` (dev/CI/e2e — les tests
+// l'attendent en dur). En **beta** (V4-D16), on injecte un mot de passe **fort**
+// via `SEED_PASSWORD` (jamais commité, distribué en privé aux beta-testeurs) pour
+// que la base publique ne soit pas accessible avec le mot de passe par défaut.
+const SEED_PASSWORD = process.env['SEED_PASSWORD'] ?? 'Test1234!';
 
 /**
  * Idempotently seed the vague-02 dataset (upsert-based — safe to run repeatedly).

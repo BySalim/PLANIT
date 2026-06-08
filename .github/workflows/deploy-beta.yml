@@ -1,0 +1,94 @@
+name: Deploy beta
+
+# Déploiement de l'environnement **beta cloud** (ADR-0015 : Neon + Koyeb + Vercel,
+# déviation de Railway/ADR-0013 §7). Front Vercel et migrations Neon sont gérés
+# hors de ce workflow (Vercel build-on-push ; migrations ci-dessous). Ce workflow
+# couvre la partie **données + backend** :
+#   1. `prisma migrate deploy` vers Neon (Postgres managé) ;
+#   2. **redeploy Koyeb** (le service tire son image GHCR) ;
+#   3. **smoke** sur le `/api/health` du backend.
+#
+# ⚠️ **Dormant tant que la branche `beta` n'existe pas** (comme release-please
+# l'est tant que `main` n'est pas touché). Aucune exécution sur `develop`/`main`.
+#
+# Secrets attendus dans l'**Environment GitHub `beta`** (scoping + approbation,
+# 5.11) — voir docs/runbooks/beta-cloud.md :
+#   - NEON_DATABASE_URL  : URL Neon (sslmode=require)
+#   - KOYEB_TOKEN        : token API Koyeb
+#   - KOYEB_SERVICE_ID   : id du service backend à redéployer
+#   - BETA_SMOKE_URL     : base URL backend Koyeb (ex. https://planit-api.koyeb.app)
+
+on:
+  push:
+    branches: [beta]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un seul déploiement beta à la fois (un push qui en double un autre annule le
+# précédent — évite deux migrate/redeploy concurrents sur la même base).
+concurrency:
+  group: deploy-beta
+  cancel-in-progress: true
+
+jobs:
+  migrate:
+    name: Migrate Neon
+    runs-on: ubuntu-latest
+    environment: beta # secrets scopés + gate d'approbation éventuel
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `migrate deploy` applique les migrations versionnées (pas de `generate`
+      # requis). On exécute depuis la source de la branche beta — équivalent à
+      # l'image one-shot `planit-migrate` de la VM, mais Node est déjà là en CI.
+      - name: Prisma migrate deploy (Neon)
+        working-directory: apps/backend
+        run: pnpm prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+
+  deploy:
+    name: Redeploy Koyeb + smoke
+    runs-on: ubuntu-latest
+    needs: migrate
+    environment: beta
+    steps:
+      # Déclenche un redéploiement du service Koyeb (il re-tire son image GHCR).
+      - name: Trigger Koyeb redeploy
+        run: |
+          curl -fsSL -X POST \
+            "https://app.koyeb.com/v1/services/${{ secrets.KOYEB_SERVICE_ID }}/redeploy" \
+            -H "Authorization: Bearer ${{ secrets.KOYEB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+
+      # Smoke : on attend que le backend redéployé réponde 200 sur /api/health.
+      # Cible = URL Koyeb directe (pas le front Vercel, qui est derrière le
+      # basic-auth beta). Koyeb prend ~1-3 min à basculer → on poll.
+      - name: Smoke /api/health
+        run: |
+          URL="${{ secrets.BETA_SMOKE_URL }}/api/health"
+          echo "Smoke: ${URL}"
+          for i in $(seq 1 30); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "${URL}" || echo 000)"
+            if [ "${code}" = "200" ]; then
+              echo "✅ beta healthy (HTTP 200) après ${i} tentative(s)."
+              exit 0
+            fi
+            echo "… tentative ${i}/30 : HTTP ${code} — nouvelle tentative dans 10s"
+            sleep 10
+          done
+          echo "❌ beta non healthy après 5 min." >&2
+          exit 1
