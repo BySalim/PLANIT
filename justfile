@@ -45,7 +45,7 @@ logs service="backend":
     docker compose -f infra/docker-compose.prod.yml logs -f {{service}}
 
 deploy-beta:
-    Write-Output "Beta externe (Railway) differe en V04 (essai expire). Voir docs/runbooks/deploy.md + TD-V04-BETA-EXTERNE."
+    Write-Output "Beta = Cloudflare Tunnel sur la VM (ADR-0015). Voir docs/runbooks/beta-tunnel.md."
 
 # Les recettes suivantes s'executent SUR LA VM (Linux). Depuis le host Windows,
 # elles pointent vers la procedure ; sur la VM, lancer les scripts directement.

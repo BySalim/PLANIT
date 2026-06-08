@@ -187,6 +187,6 @@ docker compose --env-file /opt/planit/.env.prod -f docker-compose.prod.yml up -d
 ## 10. Limites connues (Local/LAN)
 
 - **WebSocket realtime** : `NEXT_PUBLIC_WS_URL` est _build-time_ ; l'image GHCR générique le laisse vide → le temps réel (`session:published`) peut nécessiter un build web dédié VM (tracé `TD-V04-WS-BUILDARG`).
-- Pas d'accès Internet/externe (choix Local/LAN). Pour des testeurs **distants** : la **beta cloud**
-  (Neon + Koyeb + Vercel, [beta-cloud.md](beta-cloud.md)) — sans exposer la VM.
+- Pas d'accès Internet/externe par défaut (choix Local/LAN). Pour des testeurs **distants** sans ouvrir
+  de port : **Cloudflare Tunnel** sur cette même VM ([beta-tunnel.md](beta-tunnel.md), ADR-0015).
 - _(Backups : résolu — 2 niveaux local + off-box NFS TrueNAS, cf. §8 et [truenas-backup.md](truenas-backup.md).)_

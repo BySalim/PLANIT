@@ -31,19 +31,20 @@ Procédure complète : **[vm-self-host.md](vm-self-host.md)**. Résumé :
 
 Reprise sur incident / DR : [incident-dr.md](incident-dr.md).
 
-## Cible 3 — Beta cloud (Neon + Koyeb + Vercel) — ✅ active
+## Cible 3 — Beta publique (Cloudflare Tunnel sur la VM) — ✅ active
 
-Remplace Railway (essai expiré) — **ADR-0015**. Beta publique **gratuite** : **Neon** (Postgres) +
-**Koyeb** (backend NestJS depuis l'image GHCR) + **Vercel** (web Next.js). Pas de Redis (inerte), pas
-de MinIO (exports client-side). Accès derrière **basic-auth**, comptes seed à mot de passe fort.
+Remplace Railway puis Neon+Koyeb+Vercel (free tiers devenus payants) — **ADR-0015**. La beta **réutilise
+la VM self-host** (cible 2) exposée sur Internet via **Cloudflare Tunnel** (`cloudflared`), **sans ouvrir
+de port** (connexion sortante seule). Rien à louer : Postgres/web/backend viennent de la VM. Rideau
+d'accès = **Cloudflare Access** (gratuit, ≤ 50 users).
 
-Procédure complète : **[beta-cloud.md](beta-cloud.md)**. Résumé :
+Procédure complète : **[beta-tunnel.md](beta-tunnel.md)**. Résumé :
 
-1. **Neon** : projet Postgres → `DATABASE_URL` (`sslmode=require`).
-2. **Koyeb** : service Docker depuis `ghcr.io/bysalim/planit-api` (image privée → creds registre), env
-   `DATABASE_URL`/`JWT_*`/`FRONTEND_URL`/`NODE_ENV=production`, health `/api/health`.
-3. **Vercel** : root `apps/web`, `BACKEND_ORIGIN` (rewrite `/api` → Koyeb), `NEXT_PUBLIC_WS_URL`, `BETA_BASIC_AUTH`.
-4. **CI** `deploy-beta.yml` (branche `beta`, Environment `beta`) : migrate Neon → redeploy Koyeb → smoke.
+1. **VM self-host** opérationnelle (cible 2) + un **domaine géré par Cloudflare** (URL stable).
+2. **Tunnel** (dashboard CF) → token → `CLOUDFLARE_TUNNEL_TOKEN` dans `.env.prod`.
+3. `docker compose … --profile tunnel up -d cloudflared` (service **opt-in**).
+4. **Public hostname** `beta.<domaine>` → `https://caddy:443` (No-TLS-Verify, Host = `PLANIT_DOMAIN`).
+5. **Cloudflare Access** : policy email = beta-testeurs. Seed comptes (`SEED_PASSWORD` fort).
 
 ## Rollback
 

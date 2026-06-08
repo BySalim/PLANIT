@@ -183,6 +183,24 @@ services:
       - caddy_config:/config
     logging: *default-logging
 
+  # Cloudflare Tunnel (beta publique, ADR-0015) — OPT-IN via le profil `tunnel` :
+  #   docker compose --env-file ... --profile tunnel up -d cloudflared
+  # Expose la stack (Caddy) sur Internet SANS ouvrir de port entrant : cloudflared
+  # n'ouvre que des connexions SORTANTES vers Cloudflare. Le routage public
+  # (hostname → https://caddy:443, No-TLS-Verify, Host=PLANIT_DOMAIN) et le rideau
+  # Cloudflare Access se configurent côté dashboard CF. Cf. docs/runbooks/beta-tunnel.md.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ['tunnel']
+    restart: unless-stopped
+    command: ['tunnel', '--no-autoupdate', 'run']
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN requis (profil tunnel)}
+    depends_on:
+      caddy:
+        condition: service_started
+    logging: *default-logging
+
 volumes:
   postgres_data:
   redis_data:
