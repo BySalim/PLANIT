@@ -207,6 +207,24 @@ docker compose --env-file /opt/planit/.env.prod -f docker-compose.prod.yml \
 > flottant (toujours visible quand connecté) ou le menu profil. La révocation
 > ciblée par utilisateur côté admin reste un vœu (VOEU-001/002 — dashboard temps réel).
 
+## 9quater. Hygiène disque (VM à petit disque ~16 Go)
+
+Incident 2026-06-09 : `/` saturé à 98 % → Grafana KO. Causes structurelles bornées
+**dans la config** (re-`ansible-playbook` + recréer les conteneurs pour appliquer) :
+
+- **Images Docker** (principal facteur) : le CD tire de nouvelles images `:staging`
+  à chaque déploiement et garde les précédentes (rollback). → **cron hebdo**
+  `docker image prune -af --filter until=168h` (Ansible) : purge l'inutilisé de
+  plus de 7 j, **préserve** les images récentes (dont le rollback du dernier deploy).
+- **Journal systemd** : plafonné à `SystemMaxUse=200M` (`/etc/systemd/journald.conf.d/planit.conf`, Ansible).
+- **Prometheus** : `--storage.tsdb.retention.size=512MB` (plafond dur, en plus des 15 j).
+- **Logs conteneurs** : déjà bornés (`json-file` 10 Mo × 5 par service, ancre compose).
+- **Grafana** : limite mémoire portée à **512m** (256m saturait → panels en erreur).
+
+> Purge manuelle ponctuelle si besoin : `docker image prune -af --filter until=24h`,
+> `journalctl --vacuum-size=100M`, `apt clean`. **Ne pas** faire `docker image prune -a`
+> nu (sans `until`) juste après un deploy : ça supprimerait l'image de rollback.
+
 ## 10. Limites connues (Local/LAN)
 
 - **WebSocket realtime** : `NEXT_PUBLIC_WS_URL` est _build-time_. Depuis 2026-06-09,

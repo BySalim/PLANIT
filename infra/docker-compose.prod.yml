@@ -269,6 +269,10 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=15d'
+      # Plafond DUR de taille (VM à petit disque) : Prometheus purge les plus
+      # vieux blocs dès que le TSDB dépasse cette taille, même avant 15j. Évite
+      # que `prometheus_data` ne grossisse sans borne sur `/` (incident 2026-06-09).
+      - '--storage.tsdb.retention.size=512MB'
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -304,7 +308,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          # 256m saturait (~91 % utilisé) → panels « Error loading: timeseries »
+          # au chargement du dashboard (incident 2026-06-09). 512m donne la marge.
+          memory: 512m
     logging: *default-logging
 
 volumes:
