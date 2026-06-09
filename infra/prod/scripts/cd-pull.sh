@@ -15,7 +15,7 @@ APP_DIR="${PLANIT_APP_DIR:-/opt/planit}"
 COMPOSE_DIR="${PLANIT_COMPOSE_DIR:-${APP_DIR}/src/infra}"
 COMPOSE_FILE="${COMPOSE_DIR}/docker-compose.prod.yml"
 ENV_FILE="${PLANIT_ENV_FILE:-${APP_DIR}/.env.prod}"
-IMAGE_TAG="${IMAGE_TAG:-main}"          # tag mouvant suivi par la VM
+IMAGE_TAG="${IMAGE_TAG:-staging}"       # tag mouvant suivi par la VM (= serveur de test → staging)
 DOMAIN="${PLANIT_DOMAIN:-planit.local}"
 LOG_FILE="${PLANIT_CD_LOG:-${APP_DIR}/cd.log}"
 API_IMG="ghcr.io/bysalim/planit-api:${IMAGE_TAG}"

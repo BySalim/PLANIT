@@ -1,0 +1,32 @@
+name: Protect Staging
+
+# Stratégie de branches : feat/* → develop → staging → main, + hotfix/* → main.
+# `staging` (serveur de test = VM self-host) ne reçoit que des PR depuis `develop`
+# (intégration validée) ou une branche `hotfix/*` (correctif à tester avant main).
+on:
+  pull_request:
+    branches:
+      - staging
+
+jobs:
+  check-source:
+    # Contexte de status check requis par la branch protection de `staging`.
+    name: require-source-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure PR comes from develop or a hotfix branch
+        # head_ref = donnée non fiable (github context) → passée par env, jamais
+        # interpolée directement dans le shell (anti script-injection, Semgrep).
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            develop|hotfix/*)
+              echo "✅ PR source '$HEAD_REF' autorisée vers staging."
+              ;;
+            *)
+              echo "❌ Les PR vers staging doivent venir de 'develop' ou 'hotfix/*', pas de '$HEAD_REF'."
+              echo "Stratégie : feat/* → develop → staging → main (+ hotfix/* → main)"
+              exit 1
+              ;;
+          esac

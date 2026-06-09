@@ -50,21 +50,26 @@ Stack : Next.js 15 + React 19 (web) · Expo (mobile) · NestJS (backend) · Post
 1. Exécuter `git branch --show-current`
 2. Identifier le membre selon le tableau
 3. Annoncer : « Branche active : `feat/<X>` — session pour **Prénom**. »
-4. **Refuser tout commit sur `main`, `develop`, ou sur la branche d'un autre membre.**
+4. **Refuser tout commit sur `main`, `develop`, `staging`, ou sur la branche d'un autre membre.**
 
-Si la branche n'est pas une `feat/<prénom>` connue → refuser d'écrire et demander confirmation.
+Si la branche n'est pas une `feat/<prénom>` connue (ou une `hotfix/*` explicitement demandée par le TL) → refuser d'écrire et demander confirmation.
 
 ---
 
 ## Stratégie de branches
 
 ```
-main ← develop ← feat/*
+main ← staging ← develop ← feat/*
+                              ↖ hotfix/* → main (urgence prod)
 ```
 
-- `main` : production stable, jamais touché directement — reçoit uniquement des merges depuis `develop`
-- `develop` : intégration — toutes les PRs de features ciblent `develop`
+- `main` : production stable, jamais touché directement — reçoit uniquement des merges depuis `staging` (ou `hotfix/*`)
+- `staging` : **branche de test** — déployée sur la **VM self-host** (serveur de test, tag image `:staging`). Reçoit les PR depuis `develop` (ou `hotfix/*`)
+- `develop` : intégration — toutes les PR de features ciblent `develop`
 - `feat/<prénom>` : branche de travail de chaque membre — PR → `develop`
+- `hotfix/*` : correctif urgent prod — PR → `main`, puis **re-merge dans `develop` + `staging`** pour ne pas régresser au prochain cycle. Création ponctuelle validée par le TL.
+
+> Flux nominal : `feat/* → develop → staging → main`. La VM suit `staging` : toute promotion `develop → staging` est testée sur la VM avant la release `staging → main`. Guards CI : `protect-staging.yml` (source `develop`/`hotfix`) et `protect-main.yml` (source `staging`/`hotfix`).
 
 ---
 
