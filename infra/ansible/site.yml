@@ -170,8 +170,50 @@
         hour: '2'
         job: "{{ app_dir }}/src/infra/prod/scripts/backup.sh >> {{ app_dir }}/backup.log 2>&1"
 
+    # ── Hygiène disque (VM à petit disque ~16 Go) ───────────────
+    # Incident 2026-06-09 : `/` à 98 % → Grafana KO. Deux causes structurelles
+    # de croissance non bornée, qu'on plafonne ici (le reste = limites compose).
+
+    # 1. Images Docker : le CD tire de nouvelles images :staging à chaque
+    #    déploiement et conserve les précédentes (rollback) → accumulation.
+    #    Purge hebdo de ce qui est INUTILISÉ depuis > 7 jours : `until=168h`
+    #    préserve les images récentes (dont la cible de rollback du dernier
+    #    deploy), ne supprime que le vieux. `deploy` est dans le groupe docker.
+    - name: Schedule weekly Docker image prune (dim. 03:30)
+      ansible.builtin.cron:
+        name: planit-docker-prune
+        user: "{{ deploy_user }}"
+        weekday: '0'
+        minute: '30'
+        hour: '3'
+        job: "docker image prune -af --filter until=168h >> {{ app_dir }}/docker-prune.log 2>&1"
+
+    # 2. Journal systemd : sans borne, /var/log/journal croît sans limite
+    #    (vacuum manuel observé pendant l'incident). On le plafonne.
+    - name: Ensure journald drop-in directory exists
+      ansible.builtin.file:
+        path: /etc/systemd/journald.conf.d
+        state: directory
+        mode: '0755'
+
+    - name: Cap systemd journal size
+      ansible.builtin.copy:
+        dest: /etc/systemd/journald.conf.d/planit.conf
+        mode: '0644'
+        content: |
+          # PLANIT — borne le journal systemd (VM petit disque). Géré par Ansible.
+          [Journal]
+          SystemMaxUse=200M
+          SystemKeepFree=500M
+      notify: Restart journald
+
   handlers:
     - name: Restart sshd
       ansible.builtin.systemd:
         name: ssh
+        state: restarted
+
+    - name: Restart journald
+      ansible.builtin.systemd:
+        name: systemd-journald
         state: restarted

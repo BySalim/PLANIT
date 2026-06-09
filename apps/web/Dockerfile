@@ -18,6 +18,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Args build-time : seuls les NEXT_PUBLIC_* sont inlinés dans le bundle client.
 ARG NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
+# DSN Sentry navigateur — inliné au build (no-op si vide). Public par design.
+# Sert aussi à dériver l'origine d'ingestion dans la CSP (next.config.ts).
+ARG NEXT_PUBLIC_SENTRY_DSN
+ENV NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN}
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @planit/web...

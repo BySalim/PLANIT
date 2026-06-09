@@ -20,12 +20,27 @@ const isDev = process.env.NODE_ENV !== 'production';
 const scriptSrc = isDev
   ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
   : "script-src 'self' 'unsafe-inline'";
+// Origine d'ingestion Sentry dérivée du DSN (lu au BUILD via NEXT_PUBLIC_SENTRY_DSN,
+// build arg de l'image web). Le navigateur POST ses events sur cet hôte → il DOIT
+// figurer dans `connect-src`, sinon la CSP bloque l'envoi (cf. instrumentation-client.ts).
+// Vide si pas de DSN → CSP stricte inchangée (Lighthouse `csp-xss`). On dérive
+// l'origine exacte (pas de wildcard `*.sentry.io`).
+function sentryConnectSrc(): string {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+  if (dsn === undefined || dsn === '') return '';
+  try {
+    return ` ${new URL(dsn).origin}`;
+  } catch {
+    return '';
+  }
+}
+
 // En dev, le front parle au backend direct sur :3001 (HTTP + WS). En prod, Caddy
 // sert front + API + WebSocket sur la **même origine** → `'self'` suffit. Un WS
 // sur un hôte distinct devra être ajouté ici (cf. TD CSP prod, ADR-0013).
 const connectSrc = isDev
-  ? "connect-src 'self' http://localhost:3001 ws://localhost:3001 wss://localhost:3001"
-  : "connect-src 'self'";
+  ? `connect-src 'self' http://localhost:3001 ws://localhost:3001 wss://localhost:3001${sentryConnectSrc()}`
+  : `connect-src 'self'${sentryConnectSrc()}`;
 const CSP_DIRECTIVES = [
   "default-src 'self'",
   scriptSrc,

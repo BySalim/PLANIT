@@ -15,9 +15,9 @@ name: Security
 
 on:
   pull_request:
-    branches: [develop, main]
+    branches: [develop, staging, main]
   push:
-    branches: [develop, main]
+    branches: [develop, staging, main]
 
 permissions:
   contents: read
