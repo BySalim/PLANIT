@@ -17,15 +17,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ensure PR comes from staging or a hotfix branch
+        # head_ref = donnée non fiable (github context) → passée par env, jamais
+        # interpolée directement dans le shell (anti script-injection, Semgrep).
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          HEAD="${{ github.head_ref }}"
-
-          case "$HEAD" in
+          case "$HEAD_REF" in
             staging|hotfix/*)
-              echo "✅ PR source '$HEAD' autorisée vers main."
+              echo "✅ PR source '$HEAD_REF' autorisée vers main."
               ;;
             *)
-              echo "❌ Les PR vers main doivent venir de 'staging' ou 'hotfix/*', pas de '$HEAD'."
+              echo "❌ Les PR vers main doivent venir de 'staging' ou 'hotfix/*', pas de '$HEAD_REF'."
               echo "Stratégie : feat/* → develop → staging → main (+ hotfix/* → main)"
               exit 1
               ;;
