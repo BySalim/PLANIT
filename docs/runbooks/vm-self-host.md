@@ -190,9 +190,28 @@ docker tag <ID_PRECEDENT> ghcr.io/bysalim/planit-api:main
 docker compose --env-file /opt/planit/.env.prod -f docker-compose.prod.yml up -d
 ```
 
+## 9ter. Déconnecter toutes les sessions (admin / incident)
+
+Outil d'exploitation : révoque **tous** les refresh tokens actifs → plus aucun
+refresh ne réussit, les access JWT en cours expirent sous `JWT_ACCESS_TTL` (15 min)
+→ **re-login forcé pour tous**. Usage : après un reseed beta, un changement
+d'accès, ou une suspicion de compromission. Pas d'endpoint HTTP (action sensible).
+
+```bash
+docker compose --env-file /opt/planit/.env.prod -f docker-compose.prod.yml \
+  exec backend node dist/scripts/revoke-all-sessions.js
+# → "[admin] N session(s) révoquée(s). Re-login requis pour tous les utilisateurs."
+```
+
+> Pour déconnecter **un seul** utilisateur, il se déconnecte lui-même via le bouton
+> flottant (toujours visible quand connecté) ou le menu profil. La révocation
+> ciblée par utilisateur côté admin reste un vœu (VOEU-001/002 — dashboard temps réel).
+
 ## 10. Limites connues (Local/LAN)
 
-- **WebSocket realtime** : `NEXT_PUBLIC_WS_URL` est _build-time_ ; l'image GHCR générique le laisse vide → le temps réel (`session:published`) peut nécessiter un build web dédié VM (tracé `TD-V04-WS-BUILDARG`).
+- **WebSocket realtime** : `NEXT_PUBLIC_WS_URL` est _build-time_. Depuis 2026-06-09,
+  `build-images.yml` le passe en build arg (var repo `NEXT_PUBLIC_WS_URL`) → poser
+  la variable + rebuild l'image web active le temps réel (`session:published`). Tracé `TD-V04-WS-BUILDARG`.
 - Pas d'accès Internet/externe par défaut (choix Local/LAN). Pour des testeurs **distants** sans ouvrir
   de port : **Cloudflare Tunnel** sur cette même VM ([beta-tunnel.md](beta-tunnel.md), ADR-0015).
 - _(Backups : résolu — 2 niveaux local + off-box NFS TrueNAS, cf. §8 et [truenas-backup.md](truenas-backup.md).)_
