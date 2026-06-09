@@ -1,4 +1,4 @@
-# Runbook — Branch protection (`develop` + `main`) · V04 LOT 5.9
+# Runbook — Branch protection (`develop` + `staging` + `main`) · V04 LOT 5.9
 
 > **Action réservée à un admin du repo (Tech Lead).** L'agent Claude **ne peut pas**
 > activer/modifier la branch protection (pas d'accès aux _repo settings_). Ce document
@@ -9,12 +9,16 @@
 
 ## 0. Pourquoi
 
-`feat/* → develop → main`. On verrouille les deux branches d'intégration pour qu'aucun
-merge ne passe sans que la CI (qualité + sécurité) soit verte. Politique de review :
+`feat/* → develop → staging → main` (+ `hotfix/* → main`). On verrouille les trois branches
+d'intégration pour qu'aucun merge ne passe sans que la CI (qualité + sécurité) soit verte.
+La **VM self-host (serveur de test)** suit `staging`. Politique de review :
 
 - **`develop`** : merge possible par un admin (intégration continue de l'équipe), CI verte requise.
+- **`staging`** : branche de test (déployée sur la VM). CI verte requise, source restreinte à
+  `develop` ou `hotfix/*` (guard `require-source-staging`). Review au choix du TL.
 - **`main`** : review **code-owner** obligatoire (`@ShadowHaku54`), `enforce_admins` activé
-  (les admins ne bypassent pas), source du merge restreinte à `develop`.
+  (les admins ne bypassent pas), source du merge restreinte à `staging` ou `hotfix/*`
+  (guard `require-source-main`, **renommé** depuis `require-develop`).
 
 ---
 
@@ -25,19 +29,20 @@ merge ne passe sans que la CI (qualité + sécurité) soit verte. Politique de r
 > PR sur _« Expected — Waiting for status to be reported »_. Le job `quality` de `ci.yml` porte
 > d'ailleurs un commentaire d'avertissement à ce sujet.
 
-| Contexte (à coller dans GitHub)             | Workflow           | Job            | S'exécute sur | Nature du gate                                                          |
-| ------------------------------------------- | ------------------ | -------------- | ------------- | ----------------------------------------------------------------------- |
-| `Lint · Typecheck · Test`                   | `ci.yml`           | `quality`      | PR + push     | **Réel** (lint/typecheck/test + coverage gate)                          |
-| `Build`                                     | `ci.yml`           | `build`        | PR + push     | **Réel**                                                                |
-| `E2E Playwright (4 rôles)`                  | `ci.yml`           | `e2e`          | PR uniquement | **Réel**                                                                |
-| `Perf smoke (k6)`                           | `ci.yml`           | `perf-smoke`   | PR uniquement | **Présence** (step k6 en `continue-on-error`) — cf. §3                  |
-| `Lighthouse mobile (Étudiant + Enseignant)` | `ci.yml`           | `lighthouse`   | PR uniquement | **main = réel** · **develop = présence** sauf label `lighthouse-strict` |
-| `Secrets (Gitleaks)`                        | `security.yml`     | `secrets`      | PR + push     | **Réel** (aucun secret ne doit fuiter)                                  |
-| `SCA (deps + Trivy fs)`                     | `security.yml`     | `sca`          | PR + push     | **Présence** (`pnpm audit` en `continue-on-error`) — cf. §3             |
-| `SCA (OSV-Scanner)`                         | `security.yml`     | `osv`          | PR + push     | **Présence** (`fail-on-vuln: false`) — cf. §3                           |
-| `SAST (Semgrep)`                            | `security.yml`     | `sast`         | PR + push     | **Présence** (job en `continue-on-error`) — cf. §3                      |
-| `Image & IaC scan (Trivy)`                  | `security.yml`     | `image-scan`   | PR uniquement | **Présence** (job en `continue-on-error`) — cf. §3                      |
-| `require-develop`                           | `protect-main.yml` | `check-source` | PR → `main`   | **Réel** — **`main` uniquement** (source = `develop`)                   |
+| Contexte (à coller dans GitHub)             | Workflow              | Job            | S'exécute sur  | Nature du gate                                                          |
+| ------------------------------------------- | --------------------- | -------------- | -------------- | ----------------------------------------------------------------------- |
+| `Lint · Typecheck · Test`                   | `ci.yml`              | `quality`      | PR + push      | **Réel** (lint/typecheck/test + coverage gate)                          |
+| `Build`                                     | `ci.yml`              | `build`        | PR + push      | **Réel**                                                                |
+| `E2E Playwright (4 rôles)`                  | `ci.yml`              | `e2e`          | PR uniquement  | **Réel**                                                                |
+| `Perf smoke (k6)`                           | `ci.yml`              | `perf-smoke`   | PR uniquement  | **Présence** (step k6 en `continue-on-error`) — cf. §3                  |
+| `Lighthouse mobile (Étudiant + Enseignant)` | `ci.yml`              | `lighthouse`   | PR uniquement  | **main = réel** · **develop = présence** sauf label `lighthouse-strict` |
+| `Secrets (Gitleaks)`                        | `security.yml`        | `secrets`      | PR + push      | **Réel** (aucun secret ne doit fuiter)                                  |
+| `SCA (deps + Trivy fs)`                     | `security.yml`        | `sca`          | PR + push      | **Présence** (`pnpm audit` en `continue-on-error`) — cf. §3             |
+| `SCA (OSV-Scanner)`                         | `security.yml`        | `osv`          | PR + push      | **Présence** (`fail-on-vuln: false`) — cf. §3                           |
+| `SAST (Semgrep)`                            | `security.yml`        | `sast`         | PR + push      | **Présence** (job en `continue-on-error`) — cf. §3                      |
+| `Image & IaC scan (Trivy)`                  | `security.yml`        | `image-scan`   | PR uniquement  | **Présence** (job en `continue-on-error`) — cf. §3                      |
+| `require-source-main`                       | `protect-main.yml`    | `check-source` | PR → `main`    | **Réel** — **`main` uniquement** (source = `staging` ou `hotfix/*`)     |
+| `require-source-staging`                    | `protect-staging.yml` | `check-source` | PR → `staging` | **Réel** — **`staging` uniquement** (source = `develop` ou `hotfix/*`)  |
 
 > **« Présence »** = le check est toujours **vert** tant que le job _s'exécute jusqu'au bout_
 > (les findings n'échouent pas le job). L'exiger garantit que la CI a tourné, **pas** que le
@@ -71,15 +76,25 @@ Perf smoke (k6)
 > niveaux, cf. `docs/runbooks/ci-lighthouse.md`) plutôt que par un required check — l'ajouter en
 > dur retirerait l'opt-in. À toi de l'inclure si tu veux le rendre systématiquement bloquant.
 
+### `staging` (tous ceux de develop **+**)
+
+```
+require-source-staging
+```
+
+> `staging` = serveur de test (VM). On exige la **même barre qualité que `develop`** + le guard de
+> source (`develop` ou `hotfix/*`). Lighthouse reste piloté par le label, comme sur develop.
+
 ### `main` (tous ceux de develop **+**)
 
 ```
 Lighthouse mobile (Étudiant + Enseignant)
-require-develop
+require-source-main
 ```
 
 > Sur `main`, Lighthouse est **toujours bloquant** (le workflow désactive `continue-on-error`
-> quand `base_ref == main`) → l'exiger a un effet réel.
+> quand `base_ref == main`) → l'exiger a un effet réel. `require-source-main` (ex-`require-develop`)
+> restreint la source à `staging`/`hotfix/*`.
 
 ---
 
@@ -126,8 +141,10 @@ correspondant (c'est une édition de `ci.yml`/`security.yml`, séparée de la si
 ### Équivalent `gh` CLI (optionnel, scriptable)
 
 ```bash
-# Exemple pour develop — adapter la liste de contextes et répéter pour main (+ require-develop,
-# + Lighthouse, + required_pull_request_reviews code-owner, + enforce_admins=true).
+# Exemple pour develop — adapter la liste de contextes et répéter pour :
+#   • staging : mêmes contextes + `require-source-staging` ;
+#   • main    : mêmes contextes + `require-source-main` + Lighthouse
+#               + required_pull_request_reviews code-owner + enforce_admins=true.
 gh api -X PUT repos/BySalim/PLANIT/branches/develop/protection \
   -H "Accept: application/vnd.github+json" \
   -f 'required_status_checks[strict]=true' \
@@ -153,8 +170,10 @@ gh api -X PUT repos/BySalim/PLANIT/branches/develop/protection \
    les contextes de §2, tous résolus avant que le bouton _Merge_ ne s'active.
 2. Aucun statut bloqué sur _« Expected — Waiting for status to be reported »_ : si c'est le cas, le
    nom requis ne correspond à **aucun** job (faute de frappe / job renommé) → corriger le contexte.
-3. Sur une PR `develop → main`, vérifier que `require-develop` apparaît et que `main` refuse une PR
-   dont la source ≠ `develop`.
+3. Sur une PR `develop → staging`, vérifier que `require-source-staging` apparaît et que `staging`
+   refuse une PR dont la source ∉ {`develop`, `hotfix/*`}.
+4. Sur une PR `staging → main`, vérifier que `require-source-main` apparaît et que `main` refuse une
+   PR dont la source ∉ {`staging`, `hotfix/*`}.
 
 ---
 
@@ -162,8 +181,10 @@ gh api -X PUT repos/BySalim/PLANIT/branches/develop/protection \
 
 - Workflows : [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) ·
   [`security.yml`](../../.github/workflows/security.yml) ·
-  [`protect-main.yml`](../../.github/workflows/protect-main.yml)
+  [`protect-main.yml`](../../.github/workflows/protect-main.yml) ·
+  [`protect-staging.yml`](../../.github/workflows/protect-staging.yml)
 - Lighthouse (gating à deux niveaux) : [`ci-lighthouse.md`](ci-lighthouse.md)
 - Perf k6 : [`perf-k6.md`](perf-k6.md)
-- Stratégie de branches `feat/* → develop → main` : `CLAUDE.md` §« Stratégie de branches » ·
-  [ADR-0013](../architecture/adr/0013-strategie-deploiement-v04.md) (déploiement V04)
+- Stratégie de branches `feat/* → develop → staging → main` : `CLAUDE.md` §« Stratégie de branches » ·
+  [ADR-0013](../architecture/adr/0013-strategie-deploiement-v04.md) (déploiement V04) ·
+  [ADR-0016](../architecture/adr/0016-branche-staging-serveur-test.md) (staging = serveur de test)

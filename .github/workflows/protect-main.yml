@@ -1,5 +1,8 @@
 name: Protect Main
 
+# Stratégie de branches : feat/* → develop → staging → main, + hotfix/* → main.
+# `main` (prod) ne reçoit donc que des PR depuis `staging` (promotion testée sur
+# la VM) ou une branche `hotfix/*` (correctif urgent prod).
 on:
   pull_request:
     branches:
@@ -7,17 +10,23 @@ on:
 
 jobs:
   check-source:
-    name: require-develop
+    # ⚠️ Contexte de status check requis par la branch protection de `main`.
+    # Renommé depuis `require-develop` le 2026-06-09 (pivot staging) → mettre à
+    # jour la liste des required checks de `main` en conséquence.
+    name: require-source-main
     runs-on: ubuntu-latest
     steps:
-      - name: Ensure PR comes from develop
+      - name: Ensure PR comes from staging or a hotfix branch
         run: |
           HEAD="${{ github.head_ref }}"
 
-          if [ "$HEAD" != "develop" ]; then
-            echo "❌ PRs to main must come from 'develop', not '$HEAD'."
-            echo "Strategy: feat/* → develop → main"
-            exit 1
-          fi
-
-          echo "✅ PR source is 'develop' — OK"
+          case "$HEAD" in
+            staging|hotfix/*)
+              echo "✅ PR source '$HEAD' autorisée vers main."
+              ;;
+            *)
+              echo "❌ Les PR vers main doivent venir de 'staging' ou 'hotfix/*', pas de '$HEAD'."
+              echo "Stratégie : feat/* → develop → staging → main (+ hotfix/* → main)"
+              exit 1
+              ;;
+          esac
