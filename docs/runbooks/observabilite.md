@@ -85,12 +85,12 @@ ssh -L 8081:localhost:8081 -L 3011:localhost:3011 -L 3012:localhost:3012 deploy@
 # Dozzle http://localhost:8081 · Uptime Kuma http://localhost:3011 · Grafana http://localhost:3012
 ```
 
-| Outil           | Rôle                                                | Premier réglage                                                                 |
-| --------------- | --------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **Dozzle**      | Lecture web des logs de tous les conteneurs.        | Aucun — lit `docker.sock` (lecture seule).                                      |
-| **Uptime Kuma** | Ping `/api/health/ready` + alerte (e-mail/webhook). | Créer un monitor HTTP(s) sur `http://caddy/api/health/ready` (réseau compose).  |
-| **Prometheus**  | Scrape `/api/metrics` (RED) du backend.             | Aucun — config `infra/prometheus/prometheus.yml` (scrape `backend:3001`).       |
-| **Grafana**     | Dashboards golden-signals.                          | Login `admin` / `GRAFANA_ADMIN_PASSWORD` ; datasource + dashboard provisionnés. |
+| Outil           | Rôle                                                | Premier réglage                                                                                                                              |
+| --------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dozzle**      | Lecture web des logs de tous les conteneurs.        | Aucun — lit `docker.sock` (lecture seule).                                                                                                   |
+| **Uptime Kuma** | Ping `/api/health/ready` + alerte (e-mail/webhook). | Monitor HTTP(s) sur `http://backend:3001/api/health/ready` (backend EN DIRECT — pas `http://caddy/...` qui échoue au handshake TLS interne). |
+| **Prometheus**  | Scrape `/api/metrics` (RED) du backend.             | Aucun — config `infra/prometheus/prometheus.yml` (scrape `backend:3001`).                                                                    |
+| **Grafana**     | Dashboards golden-signals.                          | Login `admin` / `GRAFANA_ADMIN_PASSWORD` ; datasource + dashboard provisionnés.                                                              |
 
 > **Métriques** : le backend expose `GET /api/metrics` (prom-client, `@Public()`). Caddy **refuse**
 > ce chemin au public (tunnel) — Prometheus le scrape en interne. Dashboard livré :
@@ -103,17 +103,23 @@ ssh -L 8081:localhost:8081 -L 3011:localhost:3011 -L 3012:localhost:3012 deploy@
 > **`requestId`** : chaque réponse porte un en-tête `X-Request-Id` et chaque ligne de log le champ
 > `requestId`. Dans Dozzle, filtrer sur cette valeur regroupe toutes les traces d'une même requête.
 
-## 6. Activer Sentry (le SDK est déjà câblé, dormant) — il reste 3 gestes
+## 6. Activer Sentry (le SDK est déjà câblé, dormant) — les gestes restants
 
 Le code est en place et **no-op tant qu'aucun DSN n'est posé** : `@sentry/node` (init au bootstrap +
 report des 5xx depuis `AllExceptionsFilter`, corrélé au `requestId`) et `@sentry/nextjs` (init dormant
 `instrumentation*.ts` + `captureException` dans les error boundaries). Pour l'activer :
 
 1. **Créer le projet Sentry** (ou GlitchTip self-host, même SDK) → récupérer les **DSN** back + front.
-2. **Poser les DSN** : `SENTRY_DSN` et `NEXT_PUBLIC_SENTRY_DSN` dans `.env.prod` (jamais en dur).
-   ⚠️ **CSP** : ajouter l'hôte d'ingestion Sentry au `connect-src` de `apps/web/next.config.ts`
-   (sinon le navigateur bloque l'envoi). `NEXT_PUBLIC_SENTRY_DSN` est un **build arg** du web.
-3. **Source-maps en CI** (sinon stacks minifiées illisibles) : ajouter `withSentryConfig` à
+2. **Poser le DSN backend** (runtime, pur) : `SENTRY_DSN` dans `/opt/planit/.env.prod` → `docker compose up -d backend`.
+3. **Poser le DSN navigateur** (build-time !) : `NEXT_PUBLIC_SENTRY_DSN` est **inliné au build** du
+   bundle client. La VM tire l'image GHCR déjà construite → le poser dans `.env.prod` **n'active PAS**
+   le Sentry navigateur. Il faut le déclarer comme **variable repo GitHub** `NEXT_PUBLIC_SENTRY_DSN`
+   (Settings → Secrets and variables → Actions → Variables ; DSN public par design) puis **rebuild
+   l'image web** (`build-images.yml` la passe en build arg). Le Next **server-side** (SSR) lit
+   `SENTRY_DSN` au runtime → couvert par l'étape 2.
+   - **CSP** : aucune action — le `connect-src` **dérive automatiquement** l'hôte d'ingestion du DSN
+     au build ([next.config.ts](../../apps/web/next.config.ts) `sentryConnectSrc()`).
+4. **Source-maps en CI** (sinon stacks minifiées illisibles) : ajouter `withSentryConfig` à
    `next.config.ts` + le secret `SENTRY_AUTH_TOKEN` (et approuver le build script `@sentry/cli` :
    `pnpm approve-builds`). Étape **différée** car elle exige le projet Sentry + token.
 

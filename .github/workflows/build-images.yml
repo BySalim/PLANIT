@@ -34,14 +34,23 @@ jobs:
           - app: api
             dockerfile: apps/backend/Dockerfile
             target: runtime
+            build_args: ''
+          # Le web inline les NEXT_PUBLIC_* AU BUILD (bundle client). La VM tire
+          # l'image déjà construite → ces valeurs DOIVENT être injectées ici, pas
+          # au runtime sur la VM. Variables repo publiques (pas des secrets) :
+          # NEXT_PUBLIC_SENTRY_DSN (Sentry navigateur) + NEXT_PUBLIC_WS_URL (realtime).
           - app: web
             dockerfile: apps/web/Dockerfile
             target: runtime
+            build_args: |
+              NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+              NEXT_PUBLIC_WS_URL=${{ vars.NEXT_PUBLIC_WS_URL }}
           # Image one-shot des migrations (stage `build` = CLI Prisma) — tirée par
           # la VM pour `prisma migrate deploy` sans builder sur place (LOT 5.8).
           - app: migrate
             dockerfile: apps/backend/Dockerfile
             target: build
+            build_args: ''
     steps:
       - uses: actions/checkout@v4
 
@@ -71,6 +80,8 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.target }}
+          # Build args web (NEXT_PUBLIC_* inlinés) ; vide pour api/migrate.
+          build-args: ${{ matrix.build_args }}
           # VM = VirtualBox x86_64 → une seule plateforme (build rapide).
           platforms: linux/amd64
           push: true
