@@ -72,6 +72,14 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../../'),
   // Workspace packages shipped as TypeScript source must be transpiled by Next.
   transpilePackages: ['@planit/ui', '@planit/design-tokens', '@planit/contracts', '@planit/utils'],
+  // Warning webpack « Critical dependency » émis par require-in-the-middle
+  // (OpenTelemetry, embarqué par @sentry/nextjs côté serveur). Connu et bénin :
+  // l'instrumentation patche require() dynamiquement, webpack ne peut pas le
+  // tracer statiquement. On le masque pour garder un boot dev lisible.
+  webpack: (config: { ignoreWarnings?: unknown[] }) => {
+    config.ignoreWarnings = [...(config.ignoreWarnings ?? []), { module: /require-in-the-middle/ }];
+    return config;
+  },
   // Redirections des anciennes URLs à nom d'acteur (`/rp`, `/enseignant`,
   // `/etudiant`…) vers les URLs role-agnostiques (V03-01). 308 permanent : pas
   // de 404 sur les bookmarks / liens existants après le refactor. Exécutées

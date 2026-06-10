@@ -148,7 +148,7 @@ export function SessionsTodayList({
                         style={{ color: palette.text, opacity: 0.75 }}
                       >
                         <MapPinIcon size={11} color="currentColor" />
-                        <span className="truncate">{session.salle.name}</span>
+                        <span className="truncate">{session.salle?.name ?? '—'}</span>
                       </div>
                     </>
                   ) : (
@@ -164,7 +164,7 @@ export function SessionsTodayList({
                       <span className="text-text-faint">·</span>
                       <span className="inline-flex items-center gap-1">
                         <MapPinIcon size={11} color="currentColor" />
-                        <span className="truncate">{session.salle.name}</span>
+                        <span className="truncate">{session.salle?.name ?? '—'}</span>
                       </span>
                     </div>
                   )}

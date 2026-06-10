@@ -227,9 +227,10 @@ Incident 2026-06-09 : `/` saturé à 98 % → Grafana KO. Causes structurelles b
 
 ## 10. Limites connues (Local/LAN)
 
-- **WebSocket realtime** : `NEXT_PUBLIC_WS_URL` est _build-time_. Depuis 2026-06-09,
-  `build-images.yml` le passe en build arg (var repo `NEXT_PUBLIC_WS_URL`) → poser
-  la variable + rebuild l'image web active le temps réel (`session:published`). Tracé `TD-V04-WS-BUILDARG`.
+- **WebSocket realtime** : _résolu 2026-06-10_ — le client WS est **same-origin par défaut**
+  (`io()` → `wss://<domaine>/socket.io`, routé vers le backend par Caddy). Aucune variable à poser :
+  l'image GHCR unique marche sur tout domaine. `NEXT_PUBLIC_WS_URL` reste un override optionnel
+  (WS sur un hôte distinct). Cf. `TD-V04-WS-BUILDARG` (clos).
 - Pas d'accès Internet/externe par défaut (choix Local/LAN). Pour des testeurs **distants** sans ouvrir
   de port : **Cloudflare Tunnel** sur cette même VM ([beta-tunnel.md](beta-tunnel.md), ADR-0015).
 - _(Backups : résolu — 2 niveaux local + off-box NFS TrueNAS, cf. §8 et [truenas-backup.md](truenas-backup.md).)_
