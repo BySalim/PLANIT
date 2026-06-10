@@ -7,6 +7,7 @@ import {
   loginSchema,
   roleSchema,
   salleSchema,
+  sessionSchema,
   suiviModuleQuerySchema,
   ueSchema,
 } from '../index';
@@ -64,6 +65,34 @@ describe('entities — hex color', () => {
       modules: [{ id: 'm1', code: 'M1', libelle: 'Mod', color: '#fff', ueId: '1' }],
     });
     expect(full.modules).toHaveLength(1);
+  });
+});
+
+describe('planning — sessionSchema salle nullable', () => {
+  const baseSession = {
+    id: 's-1',
+    type: 'CM',
+    status: 'PROVISOIRE',
+    startAt: '2026-06-09T08:00:00.000Z',
+    endAt: '2026-06-09T10:00:00.000Z',
+    isPublished: true,
+    lastModifiedAt: '2026-06-09T08:00:00.000Z',
+    lastPublishedAt: null,
+    classe: { id: 'c-1', code: 'GL3', name: 'GL3 A' },
+    module: { id: 'm-1', code: 'ALGO', name: 'Algorithmique' },
+    teacher: { id: 't-1', fullName: 'M. Ba' },
+  };
+
+  it('accepte salle = null (séance V2 sans salle — fix 500 V1, 2026-06-10)', () => {
+    expect(sessionSchema.safeParse({ ...baseSession, salle: null }).success).toBe(true);
+  });
+
+  it('accepte toujours une salle renseignée', () => {
+    const parsed = sessionSchema.safeParse({
+      ...baseSession,
+      salle: { id: 'sa-1', name: 'Amphi A' },
+    });
+    expect(parsed.success).toBe(true);
   });
 });
 

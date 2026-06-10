@@ -42,7 +42,11 @@ export const sessionSchema = z.object({
   lastPublishedAt: z.string().datetime().nullable(),
   classe: classeRefSchema,
   module: moduleRefSchema,
-  salle: salleRefSchema,
+  // Nullable depuis 2026-06-10 : la BD autorise salleId NULL depuis V02 LOT 2
+  // (séance V2/EVENEMENT sans salle) — le DTO de lecture reflète la réalité.
+  // L'ancien contrat non-null faisait jeter le mapper V1 → 500 sur toute la
+  // semaine dès qu'une séance V2 sans salle existait (vues étudiant/enseignant).
+  salle: salleRefSchema.nullable(),
   teacher: teacherRefSchema,
 });
 
