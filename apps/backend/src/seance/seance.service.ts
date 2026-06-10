@@ -150,7 +150,14 @@ export class SeanceService {
     const weekEnd = new Date(weekStart);
     weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
 
-    const where: Prisma.SeanceWhereInput = { startAt: { gte: weekStart, lt: weekEnd } };
+    // `teacherId: { not: null }` : le contrat SessionDto exige un teacher.
+    // Garde défensive — sans elle, UNE row legacy sans teacher fait jeter le
+    // mapper et 500 toute la semaine (cf. incident salle nulle 2026-06-10 ;
+    // salle est désormais nullable dans le contrat, teacher non).
+    const where: Prisma.SeanceWhereInput = {
+      startAt: { gte: weekStart, lt: weekEnd },
+      teacherId: { not: null },
+    };
     if (query.classeId) where.classeId = query.classeId;
     if (query.teacherId) where.teacherId = query.teacherId;
     if (query.studentId) {

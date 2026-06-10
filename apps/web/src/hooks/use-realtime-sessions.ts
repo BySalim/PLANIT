@@ -89,7 +89,20 @@ export function useRealtimeSessions(
     // au handshake (cf. `ws.gateway.ts`). On envoie donc les cookies via
     // `withCredentials: true`. Le `userId` reste utile uniquement comme clé
     // de dépendance React pour réinitialiser le socket quand l'acteur change.
-    const socket: Socket = io(WS_URL, { withCredentials: true });
+    // WS_URL === '' → same-origin (prod : Caddy route /socket.io → backend).
+    const socket: Socket =
+      WS_URL === '' ? io({ withCredentials: true }) : io(WS_URL, { withCredentials: true });
+
+    // Échec de connexion visible en DEV uniquement (gated : en CI Lighthouse,
+    // un log console déclencherait l'audit `errors-in-console`). Sans ce
+    // handler, un realtime cassé est indétectable (cf. bug namespace /api,
+    // silencieux pendant 10 jours).
+    if (process.env.NODE_ENV === 'development') {
+      socket.on('connect_error', (err: Error) => {
+        // eslint-disable-next-line no-console
+        console.warn('[realtime] connexion WS échouée :', err.message);
+      });
+    }
 
     socket.on('session:published', (payload?: SessionPublishedPayload) => {
       const sessions = payload?.sessions;

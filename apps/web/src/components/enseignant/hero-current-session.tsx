@@ -79,7 +79,8 @@ export function HeroCurrentSession({
         {next !== null ? (
           <p className="mt-2 text-sm text-text-sec">
             Prochaine séance : <span className="font-semibold text-text">{next.module.name}</span> à{' '}
-            {format(new Date(next.startAt), 'HH:mm', { locale: fr })} en {next.salle.name}.
+            {format(new Date(next.startAt), 'HH:mm', { locale: fr })} en{' '}
+            {next.salle?.name ?? 'salle à confirmer'}.
           </p>
         ) : (
           <p className="mt-2 text-sm text-text-sec">
@@ -144,7 +145,7 @@ export function HeroCurrentSession({
           ) : null}
           <span className="inline-flex items-center gap-1.5">
             <MapPinIcon size={13} color="currentColor" />
-            <span>{current.salle.name}</span>
+            <span>{current.salle?.name ?? '—'}</span>
           </span>
         </div>
 

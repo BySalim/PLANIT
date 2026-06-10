@@ -95,6 +95,21 @@ describe('toSessionDto', () => {
     expect(dto).not.toHaveProperty('teacherId');
   });
 
+  it('salle = null mappée en null (séance V2 sans salle — incident 500 2026-06-10)', () => {
+    const dto = toSessionDto(buildSeance({ salleId: null, salle: null }));
+
+    expect(dto.salle).toBeNull();
+    // Le reste du DTO reste intact : la séance est représentable sans salle.
+    expect(dto.id).toBe('seance-1');
+    expect(dto.teacher).toEqual({ id: 'teacher-1', fullName: 'M. Oumar Ndiaye' });
+  });
+
+  it('jette si teacher est null (contrat SessionDto le requiert — buildWeekWhere filtre en amont)', () => {
+    expect(() => toSessionDto(buildSeance({ teacherId: null, teacher: null }))).toThrow(
+      /sans teacher/,
+    );
+  });
+
   it("préserve l'ordre quand on map plusieurs seances", () => {
     const seances = [
       buildSeance({ id: 's-1' }),

@@ -120,7 +120,7 @@ function SessionBlock({ session, top, height, status, variant, onTap }: SessionB
             style={{ color: palette.text, opacity: 0.72 }}
           >
             <MapPinIcon size={12} color="currentColor" />
-            {session.salle.name}
+            {session.salle?.name ?? '—'}
           </span>
         ) : null}
       </div>

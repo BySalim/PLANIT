@@ -132,7 +132,7 @@ export function SessionDetailView({ session }: SessionDetailViewProps) {
       <Section title="Lieu">
         <InfoItem
           label="Salle"
-          value={session.salle.name}
+          value={session.salle?.name ?? '—'}
           icon={<MapPinIcon size={15} color="currentColor" />}
         />
       </Section>
