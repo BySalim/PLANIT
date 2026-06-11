@@ -1,8 +1,9 @@
 # Runbook — Incident & Disaster Recovery · V04 LOT 5.10
 
-> Reprise sur incident de la cible **VM self-host**. Backups à **2 niveaux**
-> (`backup.sh`) : dump local + **off-box NFS TrueNAS** (snapshots ZFS), cf.
-> [truenas-backup.md](truenas-backup.md). Voir aussi [vm-self-host.md](vm-self-host.md).
+> Reprise sur incident des cibles serveur **VM staging** et **prod réelle** (Hetzner, ADR-0017).
+> Backups (`backup.sh`) : dump local + **off-box NFS TrueNAS** (snapshots ZFS) + **off-site cloud
+> B2/R2** en prod (LOT 8.9), cf. [truenas-backup.md](truenas-backup.md). Voir aussi
+> [vm-self-host.md](vm-self-host.md) et [go-live-prod.md](go-live-prod.md).
 
 ## Objectifs de reprise
 
@@ -41,6 +42,12 @@ curl -k --resolve planit.local:443:127.0.0.1 https://planit.local/api/health/rea
 > ⚠️ Le RPO dépend de la copie **off-box** des dumps. Avec TrueNAS (NFS + snapshots ZFS), elle est
 > automatique à chaque `backup.sh` ; vérifier périodiquement que `backup.log` ne montre pas d'erreur
 > off-box (mount tombé).
+
+> **Prod réelle (box Hetzner détruite)** : même logique, mais (a) reprovision d'une **nouvelle box
+> Hetzner** (Ansible, hôte `planit_prod`) ; (b) `.env.prod` avec `PLANIT_DOMAIN=planit.sn` +
+> `CADDY_TLS=admin@planit.sn` → Caddy ré-émet le certificat Let's Encrypt automatiquement une fois le
+> DNS re-pointé sur la nouvelle IP (Netim) ; (c) le dump se restaure depuis l'**off-site cloud**
+> (`rclone copy <remote> .`) si le TrueNAS on-prem est injoignable. RTO un peu plus long (création de la box puis propagation DNS). Cf. [go-live-prod.md §11](go-live-prod.md).
 
 ## Modèle de postmortem (sans blâme)
 
