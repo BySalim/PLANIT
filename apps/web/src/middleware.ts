@@ -25,11 +25,21 @@ import { safeReturnUrl } from '@/lib/return-url';
 const ACCESS_COOKIE = 'access';
 const LOGIN_PATH = '/login';
 
+// Routes PUBLIQUES (accessibles sans cookie d'accès) : login + pages légales
+// (mentions légales / politique de confidentialité, obligatoires au go-live —
+// V04 LOT 8.8). Le reste est gaté par défaut (deny-by-default).
+const PUBLIC_PATHS = new Set<string>([
+  LOGIN_PATH,
+  '/mentions-legales',
+  '/politique-confidentialite',
+]);
+
 export function middleware(request: NextRequest): NextResponse {
   const { nextUrl, cookies } = request;
   const { pathname, search } = nextUrl;
   const hasAccess = cookies.get(ACCESS_COOKIE) !== undefined;
   const isLoginRoute = pathname === LOGIN_PATH;
+  const isPublicRoute = PUBLIC_PATHS.has(pathname);
 
   // Déjà authentifié sur /login → on renvoie vers la destination voulue
   // (returnUrl) ou la racine, qui résout le role-home côté client.
@@ -38,8 +48,8 @@ export function middleware(request: NextRequest): NextResponse {
     return NextResponse.redirect(new URL(target, nextUrl));
   }
 
-  // Route protégée sans cookie → /login en mémorisant la cible.
-  if (!isLoginRoute && !hasAccess) {
+  // Route protégée (non publique) sans cookie → /login en mémorisant la cible.
+  if (!isPublicRoute && !hasAccess) {
     const loginUrl = new URL(LOGIN_PATH, nextUrl);
     loginUrl.searchParams.set('returnUrl', `${pathname}${search}`);
     return NextResponse.redirect(loginUrl);
