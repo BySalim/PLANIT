@@ -1,7 +1,7 @@
 # Runbook — Déploiement PLANIT (V04 LOT 5.6)
 
-> Remplace le placeholder Hetzner. PLANIT vise **3 cibles** de déploiement (ADR-0013 ;
-> beta affinée par ADR-0015). Chaque cible a sa procédure détaillée ; ce fichier est l'aiguillage.
+> PLANIT vise **4 cibles** de déploiement (ADR-0013 ; beta affinée par ADR-0015 ;
+> **prod réelle par ADR-0017**). Chaque cible a sa procédure détaillée ; ce fichier est l'aiguillage.
 
 ## Chaîne d'images (commune)
 
@@ -45,6 +45,20 @@ Procédure complète : **[beta-tunnel.md](beta-tunnel.md)**. Résumé :
 3. `docker compose … --profile tunnel up -d cloudflared` (service **opt-in**).
 4. **Public hostname** `beta.<domaine>` → `https://caddy:443` (No-TLS-Verify, Host = `PLANIT_DOMAIN`).
 5. **Cloudflare Access** : policy email = beta-testeurs. Seed comptes (`SEED_PASSWORD` fort).
+
+## Cible 4 — Production réelle (Hetzner · planit.sn) — go-live pilote
+
+Vraie prod pour le **pilote ISM** (**ADR-0017**, V04 LOT 8). **2ᵉ instance de la machinerie VM** sur une
+box **Hetzner Cloud** (x86 80 Go, eu-central) suivant **`:main`**, exposée en **Caddy direct + Let's
+Encrypt** sur **`planit.sn`** (pas de tunnel). La VM on-prem reste le staging (`:staging`).
+
+Procédure complète : **[go-live-prod.md](go-live-prod.md)**. Résumé :
+
+1. Provision box (Ansible, hôte `planit_prod`) + DNS Netim (`planit.sn` → IP).
+2. `.env.prod` : `PLANIT_DOMAIN=planit.sn`, `CADDY_TLS=admin@planit.sn`, `IMAGE_TAG=main`, secrets.
+3. `cd.env` : `IMAGE_TAG=main` → CD pull-based poll `:main` → migrate → smoke `https://planit.sn` → rollback.
+4. **Bootstrap** 4 comptes cœur (`bootstrap-prod.js`) + onboarding données (référentiel + inscriptions manuels, UI V03).
+5. Backups 2 cibles off-site (TrueNAS + cloud B2/R2) + observabilité (Sentry + Uptime Kuma).
 
 ## Rollback
 

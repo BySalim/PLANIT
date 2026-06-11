@@ -13,6 +13,8 @@
     "db:seed": "ts-node prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "sessions:revoke-all": "node dist/scripts/revoke-all-sessions.js",
+    "bootstrap:prod": "node dist/scripts/bootstrap-prod.js",
+    "reset:password": "node dist/scripts/reset-password.js",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests"
   },

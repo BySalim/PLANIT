@@ -57,3 +57,15 @@ backup:
 
 restore:
     Write-Output "Sur la VM: /opt/planit/src/infra/prod/scripts/restore.sh <dump.sql.gz>"
+
+# Production reelle (box Hetzner, planit.sn) — CD pull-based sur :main (ADR-0017, LOT 8).
+deploy-prod:
+    Write-Output "Prod = box Hetzner (planit.sn), CD pull-based :main. Voir docs/runbooks/go-live-prod.md."
+
+# Bootstrap one-off des 4 comptes coeur sur une prod VIDE (RP/AC/enseignant/etudiant).
+bootstrap-prod:
+    Write-Output "Sur la box: docker compose --env-file /opt/planit/.env.prod -f infra/docker-compose.prod.yml run --rm --env-file /opt/planit/bootstrap.env backend node dist/scripts/bootstrap-prod.js"
+
+# Reset du mot de passe d'UN compte (faute d'email transactionnel, TD-003).
+reset-password:
+    Write-Output "Sur la box: docker compose --env-file /opt/planit/.env.prod -f infra/docker-compose.prod.yml run --rm -e RESET_EMAIL=... -e RESET_PASSWORD=... backend node dist/scripts/reset-password.js"
