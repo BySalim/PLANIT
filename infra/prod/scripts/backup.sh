@@ -7,6 +7,8 @@
 #   3. SHA-256 sidecar (intégrité vérifiable au restore),
 #   4. rotation GFS (quotidien/hebdo/mensuel) au lieu d'un KEEP plat,
 #   5. copie OFF-BOX (mount NFS TrueNAS) + même GFS — protège du cas « VM détruite »,
+#   5bis. copie OFF-SITE CLOUD (objet S3-compatible B2/R2 via rclone) — protège du
+#         cas « site on-prem (box + TrueNAS) indisponible » (V04 LOT 8.9 / ADR-0017),
 #   6. ALERTE (Uptime Kuma push / webhook) si le backup échoue, heartbeat si OK.
 # Restauration : voir restore.sh + docs/runbooks/incident-dr.md + truenas-backup.md.
 set -euo pipefail
@@ -125,6 +127,29 @@ if [ -n "${OFFBOX_DIR}" ]; then
   fi
   prune_gfs "${OFFBOX_DIR}"
   echo "[backup] off-box OK. Dumps off-box : $(ls -1 "${OFFBOX_DIR}"/planit-*.sql.gz "${OFFBOX_DIR}"/planit-*.sql.gz.age 2>/dev/null | wc -l)"
+fi
+
+# ── 5bis. Copie off-site CLOUD (objet S3-compatible via rclone — recommandé prod) ─
+# V04 LOT 8.9 / ADR-0017 : 2ᵉ cible off-site en plus du TrueNAS. CLOUD_REMOTE = un
+# remote rclone (ex. `r2:planit-backups/prod` ou `b2:planit-backups/prod`, configuré
+# via `rclone config` sur la box). Échec = FATAL (trap ERR → alerte) car c'est la
+# protection « site on-prem KO ». Rétention : privilégier une lifecycle rule du
+# bucket (B2/R2) ; un purge d'âge simple s'applique aussi si CLOUD_KEEP_DAYS est posé.
+CLOUD_REMOTE="${PLANIT_BACKUP_CLOUD_REMOTE:-}"
+CLOUD_KEEP_DAYS="${PLANIT_BACKUP_CLOUD_KEEP_DAYS:-}"
+if [ -n "${CLOUD_REMOTE}" ]; then
+  if ! command -v rclone >/dev/null 2>&1; then
+    echo "[backup] ERREUR cloud : PLANIT_BACKUP_CLOUD_REMOTE défini mais 'rclone' absent (apt-get install -y rclone)." >&2
+    exit 1
+  fi
+  echo "[backup] copie off-site cloud → ${CLOUD_REMOTE}/"
+  rclone copyto "${out}" "${CLOUD_REMOTE}/$(basename "${out}")"
+  rclone copyto "${out}.sha256" "${CLOUD_REMOTE}/$(basename "${out}").sha256"
+  if [ -n "${CLOUD_KEEP_DAYS}" ]; then
+    # Purge best-effort des objets plus vieux que N jours (non fatal : l'upload est fait).
+    rclone delete --min-age "${CLOUD_KEEP_DAYS}d" --include 'planit-*' "${CLOUD_REMOTE}" || true
+  fi
+  echo "[backup] cloud OK (${CLOUD_REMOTE})."
 fi
 
 # ── 6. Heartbeat de succès ───────────────────────────────────────────────────
