@@ -125,13 +125,15 @@ describe('SeanceService.findWeek', () => {
     expect(args.orderBy).toEqual({ startAt: 'asc' });
   });
 
-  it('baseline sans filtre acteur : where ne contient que la fenêtre temporelle', async () => {
+  it('baseline sans filtre acteur : fenêtre temporelle + garde teacher non null', async () => {
     await service.findWeek(baseQuery());
 
     const where = (prisma.seance.findMany.mock.calls[0][0] as { where: Prisma.SeanceWhereInput })
       .where;
     expect(where.classeId).toBeUndefined();
-    expect(where.teacherId).toBeUndefined();
+    // Garde défensive : le contrat SessionDto exige un teacher ; une row legacy
+    // sans teacher ferait jeter le mapper → 500 sur toute la semaine.
+    expect(where.teacherId).toEqual({ not: null });
     // Fenêtre [weekStart ; weekStart + 7j[
     const range = where.startAt as { gte: Date; lt: Date };
     expect(range.gte.toISOString()).toBe('2026-05-25T00:00:00.000Z');
@@ -153,7 +155,8 @@ describe('SeanceService.findWeek', () => {
     const where = (prisma.seance.findMany.mock.calls[0][0] as { where: Prisma.SeanceWhereInput })
       .where;
     expect(where.classeId).toBe('classe-42');
-    expect(where.teacherId).toBeUndefined();
+    // La garde teacher non null reste appliquée en plus du filtre classe.
+    expect(where.teacherId).toEqual({ not: null });
   });
 
   it('résout studentId → classeId via prisma.user.findUnique', async () => {

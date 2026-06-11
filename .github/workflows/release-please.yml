@@ -1,0 +1,40 @@
+name: Release Please
+
+# release-please maintient une **PR de release** sur `main` : il agrège les
+# Conventional Commits depuis le dernier tag (`v0.3.0`), met à jour `CHANGELOG.md`
+# + bump `package.json`, et — au merge de cette PR — crée le **tag `vX.Y.Z`** et la
+# GitHub Release. Source de vérité de version : `.release-please-manifest.json`.
+#
+# ⚠️ N'agit qu'à partir du **LOT 7** (1re bascule `develop → main` de la V04).
+# Tant qu'aucun push n'arrive sur `main`, ce workflow ne s'exécute pas — c'est
+# voulu (`main` n'est touché qu'à la clôture de vague).
+#
+# Action **SHA-pinnée** (convention V4-D6 : tags mobiles interdits depuis la
+# compromission de l'action Trivy). Le commentaire `# vX.Y.Z` laisse Dependabot
+# proposer les bumps.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # créer le tag + la release + commit sur la branche de release
+  pull-requests: write # ouvrir / mettre à jour la release PR
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          # GITHUB_TOKEN par défaut. ⚠️ Limite connue : une PR ouverte avec
+          # GITHUB_TOKEN ne déclenche **pas** les workflows `pull_request` (anti-
+          # boucle GitHub) → la CI ne tournerait pas sur la release PR, qui resterait
+          # bloquée par la branch protection de `main`. Définir un PAT
+          # `RELEASE_PLEASE_TOKEN` (scope `contents`+`pull-requests`) lève la limite ;
+          # sinon, fallback sur GITHUB_TOKEN (la release PR devra alors être
+          # re-déclenchée / mergée par un admin). Cf. LOT 7.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}

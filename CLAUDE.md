@@ -50,21 +50,26 @@ Stack : Next.js 15 + React 19 (web) · Expo (mobile) · NestJS (backend) · Post
 1. Exécuter `git branch --show-current`
 2. Identifier le membre selon le tableau
 3. Annoncer : « Branche active : `feat/<X>` — session pour **Prénom**. »
-4. **Refuser tout commit sur `main`, `develop`, ou sur la branche d'un autre membre.**
+4. **Refuser tout commit sur `main`, `develop`, `staging`, ou sur la branche d'un autre membre.**
 
-Si la branche n'est pas une `feat/<prénom>` connue → refuser d'écrire et demander confirmation.
+Si la branche n'est pas une `feat/<prénom>` connue (ou une `hotfix/*` explicitement demandée par le TL) → refuser d'écrire et demander confirmation.
 
 ---
 
 ## Stratégie de branches
 
 ```
-main ← develop ← feat/*
+main ← staging ← develop ← feat/*
+                              ↖ hotfix/* → main (urgence prod)
 ```
 
-- `main` : production stable, jamais touché directement — reçoit uniquement des merges depuis `develop`
-- `develop` : intégration — toutes les PRs de features ciblent `develop`
+- `main` : production stable, jamais touché directement — reçoit uniquement des merges depuis `staging` (ou `hotfix/*`)
+- `staging` : **branche de test** — déployée sur la **VM self-host** (serveur de test, tag image `:staging`). Reçoit les PR depuis `develop` (ou `hotfix/*`)
+- `develop` : intégration — toutes les PR de features ciblent `develop`
 - `feat/<prénom>` : branche de travail de chaque membre — PR → `develop`
+- `hotfix/*` : correctif urgent prod — PR → `main`, puis **re-merge dans `develop` + `staging`** pour ne pas régresser au prochain cycle. Création ponctuelle validée par le TL.
+
+> Flux nominal : `feat/* → develop → staging → main`. La VM suit `staging` : toute promotion `develop → staging` est testée sur la VM avant la release `staging → main`. Guards CI : `protect-staging.yml` (source `develop`/`hotfix`) et `protect-main.yml` (source `staging`/`hotfix`).
 
 ---
 
@@ -259,6 +264,18 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 
 - **Skeletons de chargement par page** ([apps/web/src/components/rp/\*/\*-skeleton.tsx](apps/web/src/components/rp/)) : chaque liste/fiche lourde (classes, formations, étudiants, suivi) a son skeleton dédié monté pendant le `isLoading` TanStack Query. À répliquer pour toute nouvelle page liste/fiche.
 - **Routing role-aware sans segment d'acteur (V3-D14)** : une URL unique `/suivi-modules` rend la variante RP/AC · Enseignant · Étudiant selon le rôle (`useRole()`), pas de `/rp/...` vs `/etudiant/...` dupliqués. Les hooks `useRole()` / `useAcScope()` ([apps/web/src/hooks/](apps/web/src/hooks/)) pilotent l'affichage. Pattern à suivre pour toute future vue multi-acteurs.
+
+---
+
+## Patterns émergés Vague 04 — LOT 8 (déploiement réel, production)
+
+> Capitalisation du go-live prod (**ADR-0017**, 2026-06-11). Acquis : tout nouveau code/ops prod suit ces conventions.
+
+- **Prod = 2ᵉ instance de la machinerie VM** (pas de stack prod séparée) : la production (box **Hetzner**, `planit.sn`) réutilise tels quels `infra/docker-compose.prod.yml`, `infra/ansible/site.yml`, `infra/prod/scripts/cd-pull.sh` + `planit-cd.timer`. La seule différence prod ↔ staging vit dans **`/opt/planit/cd.env`** (`IMAGE_TAG=main` vs `staging`) et **`/opt/planit/.env.prod`** (`PLANIT_DOMAIN`, `CADDY_TLS`) — **jamais dans le code/playbook**. La **VM on-prem = staging (`:staging`)**, la **box cloud = prod (`:main`)**. Tout nouvel essentiel prod se branche **par variable**, pas par fork.
+- **Scripts d'exploitation one-off dans `apps/backend/src/scripts/`** (compilés en `dist/scripts/`, exécutés dans l'**image runtime** via `docker compose run --rm backend node dist/scripts/<x>.js`) — pattern `revoke-all-sessions`, étendu par `bootstrap-prod` (4 comptes cœur RP/AC/enseignant/étudiant, **idempotent** upsert par email, mdp forts lus de l'env, hashing argon2id ADR-0007) et `reset-password` (faute d'email, TD-003). Toute action admin/ops sensible = un **script CLI** ici (pas d'endpoint HTTP), env-driven + fail-fast. Scripts npm `bootstrap:prod` / `reset:password`.
+- **Page publique = groupe `(legal)` hors `(planit)` + allowlist middleware** : une route accessible sans auth se place **hors** du groupe applicatif (qui porte `<RequireAuth>`) et s'ajoute à `PUBLIC_PATHS` dans [middleware.ts](apps/web/src/middleware.ts) (deny-by-default). Les pages légales sont des **server components statiques** (`metadata` + tokens design, zéro JS client). À répliquer pour toute future page publique.
+- **Backups prod à 3 niveaux** ([backup.sh](infra/prod/scripts/backup.sh)) : local (rotation GFS) → off-box NFS **TrueNAS** → **off-site cloud S3-compatible (rclone B2/R2)**, dump chiffré **age**. Les 2 cibles off-site sont **fatales** (alerte Uptime Kuma) car couvrent des pannes distinctes (VM détruite / site on-prem KO). Variables dans `cd.env` (`PLANIT_BACKUP_*`).
+- **Onboarding prod = manuel via l'UI V03** : référentiel **et** étudiants saisis à la main (étudiants par le flux d'inscription **email-first** existant). **Pas d'import de masse** (décision TL — évite une dépendance de parsing). Pas d'écran admin (différé, `TD-V04-ADMIN-PROVISIONING`). Reset mot de passe au pilote = CLI (emails différés, TD-003).
 
 ---
 

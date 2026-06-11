@@ -26,6 +26,21 @@ export default defineConfig({
     fileParallelism: false,
     hookTimeout: 30000,
     testTimeout: 30000,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'html', 'json-summary', 'lcov'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.ts'],
+      exclude: [
+        // Bootstrap entrypoint — not booted by createTestApp (tests wire the
+        // app directly), so it never executes under the suite.
+        'src/main.ts',
+        // Type-only / DI-wiring barrels with no runtime branches to gate.
+        'src/**/*.module.ts',
+        'src/**/*.d.ts',
+      ],
+      thresholds: { lines: 60, branches: 45, functions: 55, statements: 60 },
+    },
   },
   plugins: [
     swc.vite({

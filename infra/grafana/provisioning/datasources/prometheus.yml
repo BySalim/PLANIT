@@ -1,0 +1,11 @@
+# Datasource Prometheus provisionnée (config-as-code) — ADR-0009 Phase 2.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: planit-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

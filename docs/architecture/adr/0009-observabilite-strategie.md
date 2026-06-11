@@ -1,8 +1,24 @@
 # ADR-0009 — Stratégie d'observabilité (logs, erreurs, santé, métriques)
 
-> **Statut** : Accepté pour la **Phase 0** · Phases 1-3 **Proposées** · **Date** : 2026-05-30 · **Vague** : 02 · **Auteur** : Salim (Tech Lead)
+> **Statut** : **Phase 0 + Phases 1-2 Acceptées** (1-2 activées le 2026-06-08, V04+) · Phase 3 **Proposée** · **Date initiale** : 2026-05-30 · **Vague** : 02 (cadre) / 04+ (activation 1-2) · **Auteur** : Salim (Tech Lead)
 
 ---
+
+## Mise à jour 2026-06-08 — activation des Phases 1 & 2 (V04+)
+
+> Contexte du déclencheur : pivot de stratégie serveur (cf. note de révision [ADR-0013](0013-strategie-deploiement-v04.md)). Les **hébergeurs PaaS loués** (Railway/Koyeb/Neon/Vercel) sont **abandonnés** ; la **VM self-host** devient le **serveur de référence rejouable**, et la beta publique reste la **VM exposée via Cloudflare Tunnel** (quick-tunnel, sans domaine — [ADR-0015](0015-beta-cloudflare-tunnel-vm.md)). Traiter la VM en « vrai serveur » impose enfin de **brancher** le signal — ce qu'ADR-0009 prévoyait (Phases 1-2) et que V4-D14(a)(d) avait acté puis différé.
+
+Les Phases 1 & 2 passent de **Proposées** à **Acceptées**. Outillage retenu — critère **« mis en place une seule fois, sans config lourde, config-as-code »** :
+
+| Brique (phase)         | Choix retenu                                   | Forme                                                                                                                                                           |
+| ---------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Corrélation (P1)       | **`requestId` in-house** (`AsyncLocalStorage`) | 0 dépendance, 0 compte. Injecté dans chaque log pino + header `X-Request-Id`.                                                                                   |
+| Error tracking (P1)    | **Sentry SaaS (free tier)**                    | Le plus « zéro-config ». `@sentry/node` + `@sentry/nextjs`, DSN par env, source-maps en CI. **GlitchTip self-host** = swap data-ownership (même SDK) si besoin. |
+| Métriques RED (P2)     | **`prom-client` + Prometheus + Grafana**       | Endpoint `/metrics`, dashboard golden-signals **provisionné** (JSON versionné).                                                                                 |
+| Logs / inspection (P2) | **Dozzle**                                     | Lecture web des logs conteneurs (l'app reste stdout-JSON 12-factor). Agrégateur lourd (Loki) **non** retenu (RAM).                                              |
+| Uptime + alerting (P2) | **Uptime Kuma** (self-host)                    | Ping `/api/health/ready`, alerte (e-mail/webhook). Reçoit aussi l'**alerte d'échec de backup** (push monitor).                                                  |
+
+**Packaging** : les conteneurs d'observabilité (Prometheus, Grafana, Dozzle, Uptime Kuma) vivent dans `docker-compose.prod.yml` derrière un **profil opt-in `observability`** (même patron que le profil `tunnel`), pour ne pas charger un petit hôte par défaut : `docker compose --profile observability up -d`. Les deux dépendances npm (`prom-client`, `@sentry/*`) sont **validées** par cette décision (sensibles au sens du `CLAUDE.md`). Self-hosting léger privilégié sur la box ; **Sentry** est le seul service externe (SaaS, free tier).
 
 ## Contexte
 
@@ -54,13 +70,13 @@ Adopter une stratégie d'observabilité **par phases**. **Implémenter uniquemen
 
 _Rationale_ : valeur immédiate (échec gracieux + une probe exploitable par un LB / moniteur), sans dépendance ni compte, sans charger la CX22.
 
-### Phase 1 — suivante · error tracking + corrélation + expédition des logs
+### Phase 1 — ✅ Acceptée (activée 2026-06-08) · error tracking + corrélation + expédition des logs
 
 - **Error tracking** : **Sentry** (SaaS, free tier) recommandé pour l'effort minimal, **ou GlitchTip** (OSS compatible Sentry, self-host léger) si la propriété des données prime. Brancher `@sentry/node` (back) + `@sentry/nextjs` (front), DSN par env, upload des **source maps** en CI. Source du signal = `AllExceptionsFilter` (back) + un reporter appelé depuis les error boundaries (front).
 - **`requestId` / correlation id** : middleware (ou `AsyncLocalStorage`) propagé dans **chaque ligne de log** + renvoyé en en-tête `X-Request-Id`.
 - **Expédition des logs** : l'app reste **stdout-JSON** (12-factor) ; un collecteur (**Grafana Alloy** / **Vector**) expédie vers un store. Vu la CX22, **privilégier un SaaS free tier** (Better Stack / Axiom / Grafana Cloud) plutôt qu'un Loki self-hosted sur la même box.
 
-### Phase 2 — métriques + uptime + alerting
+### Phase 2 — ✅ Acceptée (activée 2026-06-08) · métriques + uptime + alerting
 
 - **Métriques HTTP** (méthode **RED** : Rate / Errors / Duration) via un intercepteur + endpoint `/metrics` (`prom-client`) scrapé par **Prometheus** (agent Grafana Cloud ou petit self-host), dashboards **golden signals** dans **Grafana**.
 - **RUM frontend** : `useReportWebVitals` (natif Next) → endpoint backend ou Sentry. (Lighthouse CI couvre déjà la perf « labo ».)
@@ -76,7 +92,7 @@ _Rationale_ : valeur immédiate (échec gracieux + une probe exploitable par un 
 - **In-house d'abord** : tout ce qui exige une dépendance npm ou un compte externe attend un **go explicite** (décision sensible `CLAUDE.md`).
 - **OpenTelemetry** comme standard d'instrumentation cible → pas de lock-in vendeur.
 - **SaaS free tiers > self-hosting lourd** sur la CX22 (RAM).
-- **Sentry vs GlitchTip** : choix final reporté au lancement de la Phase 1.
+- **Sentry vs GlitchTip** : tranché le 2026-06-08 → **Sentry SaaS free tier** (zéro-config, set-up-once). GlitchTip reste le swap self-host (SDK identique) si la propriété des données devient prioritaire.
 
 ## Conséquences
 

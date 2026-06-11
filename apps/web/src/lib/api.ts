@@ -3,11 +3,22 @@
 // (prod). Cookies d'auth first-party, pas de CORS, dev == prod.
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '/api';
 
-// Le WebSocket (socket.io) ne passe pas par le proxy HTTP : il vise le backend
-// en absolu. Le cookie d'auth first-party (posé via le proxy) reste envoyé en
-// same-site à `:3001` lors du handshake. En prod, surcharger via
-// NEXT_PUBLIC_WS_URL selon le routage Caddy.
-export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:3001/api';
+// WebSocket (socket.io) :
+// - DEV : le proxy Next ne relaie pas l'upgrade WS → URL absolue vers le
+//   backend, SANS path (le path d'une URL socket.io = le NAMESPACE, pas un
+//   préfixe HTTP ; l'ancien fallback `…:3001/api` demandait le namespace
+//   `/api` inexistant → « Invalid namespace » silencieux, realtime mort).
+// - PROD : `''` = same-origin — io() vise window.location, path par défaut
+//   `/socket.io` routé vers le backend par Caddy. Aucune URL à inliner au
+//   build → l'image GHCR unique marche sur tout domaine (TD-V04-WS-BUILDARG).
+// - NEXT_PUBLIC_WS_URL reste un override explicite (WS sur un autre hôte).
+const rawWsUrl = process.env.NEXT_PUBLIC_WS_URL;
+export const WS_URL =
+  rawWsUrl !== undefined && rawWsUrl !== ''
+    ? rawWsUrl
+    : process.env.NODE_ENV === 'development'
+      ? 'http://localhost:3001'
+      : '';
 
 export interface ResponseParser<T> {
   safeParse(raw: unknown): { success: true; data: T } | { success: false; error: unknown };

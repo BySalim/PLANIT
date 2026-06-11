@@ -1,19 +1,19 @@
 # Runbook — Setup local PLANIT, FAQ
 
-> Version étendue de la FAQ du README. Tous les problèmes rencontrés par
-> l'équipe pendant la Vague 01, avec solution validée.
+> Version étendue de la FAQ du README : setup local pas-à-pas + solutions
+> validées aux problèmes rencontrés par l'équipe (Vagues 01 → 04).
 
 ---
 
 ## 1. Pré-requis logiciels
 
-| Outil          | Version min | Vérifier                 |
-| -------------- | ----------- | ------------------------ |
-| Node.js        | 22.x        | `node -v`                |
-| pnpm           | 10.x        | `pnpm -v`                |
-| Docker         | 24.x        | `docker -v`              |
-| Docker Compose | v2 (plugin) | `docker compose version` |
-| Git            | 2.40+       | `git --version`          |
+| Outil          | Version min   | Vérifier                 |
+| -------------- | ------------- | ------------------------ |
+| Node.js        | 22.x (CI: 24) | `node -v`                |
+| pnpm           | 10.x          | `pnpm -v`                |
+| Docker         | 24.x          | `docker -v`              |
+| Docker Compose | v2 (plugin)   | `docker compose version` |
+| Git            | 2.40+         | `git --version`          |
 
 **Windows** : Docker Desktop avec backend WSL2, ou Docker dans une distro
 WSL native. Voir section dédiée plus bas.
@@ -24,19 +24,41 @@ WSL native. Voir section dédiée plus bas.
 
 ```bash
 git clone <repo-url> PLANIT && cd PLANIT
-pnpm install
+pnpm install                           # `postinstall` build @planit/contracts + utils
 cp .env.example .env
 docker compose -f infra/docker-compose.dev.yml up -d
-pnpm db:reset                          # migration + seed
+pnpm db:migrate                        # applique les migrations Prisma
+pnpm db:seed                           # comptes des 4 rôles + données démo
 pnpm dev                               # web + backend en parallèle
 ```
+
+> 💡 **`db:migrate` + `db:seed`** au premier run (base vierge), pas `db:reset` :
+> `db:reset` **drop** la base avant de rejouer migrations + seed — pratique pour
+> repartir de zéro (cf. §4) mais destructeur. Sur une base neuve, `migrate` suffit.
 
 Si tout passe, l'app est sur :
 
 - Frontend : http://localhost:3000
-- Backend : http://localhost:3001
+- Backend : http://localhost:3001 (préfixe `/api`, ex. `/api/health`)
 - Swagger : http://localhost:3001/docs
 - MinIO console : http://localhost:9001 (`planit_minio` / `planit_minio_dev`)
+
+### Comptes de connexion (après `db:seed`)
+
+Tous au mot de passe **`Test1234!`** (argon2id). Source de vérité :
+[`apps/backend/prisma/seed-data.ts`](../../apps/backend/prisma/seed-data.ts).
+
+| Rôle (UI)  | Email                        |
+| ---------- | ---------------------------- |
+| RP         | `aminata.diallo@planit.test` |
+| AC         | `awa.toure@planit.test`      |
+| Enseignant | `oumar.ndiaye@planit.test`   |
+| Étudiant   | `ibrahima.sow@planit.test`   |
+
+> Après login, le front redirige chaque rôle vers sa home (`ROLE_HOME`). En dev,
+> le **DevToolsFloater** (bouton ⚙️ flottant, `NODE_ENV=development` uniquement)
+> affiche la session courante et un bouton _Déconnexion_ — pratique pour
+> enchaîner les connexions sous différents rôles.
 
 ---
 
@@ -234,10 +256,13 @@ dans `infra/docker-compose.dev.yml` (Postgres/Redis/MinIO).
 
 1. Le backend a planté au boot — vérifier les logs (terminal qui affiche
    `[Nest]`).
-2. Le frontend pointe sur la mauvaise URL — vérifier `apps/web/src/lib/api.ts`
-   et la variable `NEXT_PUBLIC_API_URL` dans `apps/web/.env.local`.
-3. CORS bloqué — `FRONTEND_URL` dans `.env` doit matcher l'origine réelle
-   du frontend (`http://localhost:3000` par défaut).
+2. Le proxy same-origin ne joint pas le backend — depuis l'auth V02, le front
+   appelle `/api` en **relatif** (`apps/web/src/lib/api.ts`, `API_BASE='/api'`)
+   et `next.config.ts` réécrit `/api/:path*` vers `BACKEND_ORIGIN` (défaut
+   `http://localhost:3001`). Pas de `NEXT_PUBLIC_API_URL` : le relatif garde les
+   cookies d'auth _first-party_. Vérifier que le backend tourne bien sur `:3001`.
+3. CORS bloqué — `FRONTEND_URL` dans `.env` (backend) doit matcher l'origine
+   réelle du frontend (`http://localhost:3000` par défaut).
 
 ### 3.10 WebSocket ne reçoit pas les events
 
@@ -265,7 +290,7 @@ Quand on veut repartir de zéro :
 
 ```bash
 # 1. Stopper tout
-pnpm exec turbo run dev --kill              # ou Ctrl+C sur tous les terminaux
+# Ctrl+C sur le terminal `pnpm dev` (arrête web + backend lancés en parallèle)
 docker compose -f infra/docker-compose.dev.yml down -v   # -v efface les volumes !
 
 # 2. Nettoyer Node

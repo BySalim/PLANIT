@@ -6,13 +6,33 @@ import type { Logger } from 'pino';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { corsOrigin } from './common/cors';
+import { validateEnv } from './common/env.validation';
 import { PINO_LOGGER } from './common/logger.module';
+import { requestIdMiddleware } from './common/request-id.middleware';
+import { initSentry } from './common/sentry';
 import { ZodValidationPipe } from './common/zod-validation.pipe';
 
 async function bootstrap(): Promise<void> {
+  // Error tracking Sentry — dormant si SENTRY_DSN absent (init le plus tôt
+  // possible pour capturer aussi les erreurs de démarrage). ADR-0009 Phase 1.
+  initSentry();
+
+  // Fail-fast : refuse de démarrer si une variable d'env requise manque (LOT 1.5).
+  validateEnv();
+
   const app = await NestFactory.create(AppModule);
 
+  // Arrêt gracieux (LOT 1.7, V4-D11) : Nest écoute SIGTERM/SIGINT et déclenche
+  // les hooks `onModuleDestroy` (ex. PrismaService.$disconnect) → drain propre
+  // des connexions avant l'arrêt du conteneur (pas de requête coupée brutalement).
+  app.enableShutdownHooks();
+
   app.setGlobalPrefix('api');
+
+  // requestId en TOUT premier (ADR-0009 Phase 1) : ouvre le contexte
+  // AsyncLocalStorage avant toute autre couche → chaque log porte le requestId,
+  // y compris ceux du filtre d'exceptions.
+  app.use(requestIdMiddleware);
 
   // cookie-parser pose `req.cookies` — requis par les strategies passport-jwt
   // (extracteurs depuis les cookies HttpOnly `access` et `refresh`).
@@ -45,4 +65,10 @@ async function bootstrap(): Promise<void> {
   logger.info({ port }, `[PLANIT] Swagger docs: http://localhost:${port}/docs`);
 }
 
-void bootstrap();
+bootstrap().catch((err: unknown) => {
+  // Avant `NestFactory.create`, le logger pino n'existe pas encore : on écrit
+  // sur stderr (autorisé par `no-console`) puis on sort en code ≠ 0 (fail-fast).
+  const message = err instanceof Error ? err.message : String(err);
+  process.stderr.write(`\n[PLANIT] Échec du démarrage du backend :\n${message}\n\n`);
+  process.exit(1);
+});

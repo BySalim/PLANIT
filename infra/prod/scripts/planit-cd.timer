@@ -1,0 +1,13 @@
+# V04 LOT 5.8 — Cadence du poll GHCR (toutes les 5 min). La VM ne fait que des
+# connexions SORTANTES (pas de port entrant ouvert pour le CD).
+[Unit]
+Description=PLANIT — timer du déploiement continu pull-based
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

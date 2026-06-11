@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 
 // CSP pragmatique pour PLANIT.
@@ -19,13 +20,34 @@ const isDev = process.env.NODE_ENV !== 'production';
 const scriptSrc = isDev
   ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
   : "script-src 'self' 'unsafe-inline'";
+// Origine d'ingestion Sentry dérivée du DSN (lu au BUILD via NEXT_PUBLIC_SENTRY_DSN,
+// build arg de l'image web). Le navigateur POST ses events sur cet hôte → il DOIT
+// figurer dans `connect-src`, sinon la CSP bloque l'envoi (cf. instrumentation-client.ts).
+// Vide si pas de DSN → CSP stricte inchangée (Lighthouse `csp-xss`). On dérive
+// l'origine exacte (pas de wildcard `*.sentry.io`).
+function sentryConnectSrc(): string {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+  if (dsn === undefined || dsn === '') return '';
+  try {
+    return ` ${new URL(dsn).origin}`;
+  } catch {
+    return '';
+  }
+}
+
+// En dev, le front parle au backend direct sur :3001 (HTTP + WS). En prod, Caddy
+// sert front + API + WebSocket sur la **même origine** → `'self'` suffit. Un WS
+// sur un hôte distinct devra être ajouté ici (cf. TD CSP prod, ADR-0013).
+const connectSrc = isDev
+  ? `connect-src 'self' http://localhost:3001 ws://localhost:3001 wss://localhost:3001${sentryConnectSrc()}`
+  : `connect-src 'self'${sentryConnectSrc()}`;
 const CSP_DIRECTIVES = [
   "default-src 'self'",
   scriptSrc,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   "img-src 'self' data: blob:",
-  "connect-src 'self' http://localhost:3001 ws://localhost:3001 wss://localhost:3001",
+  connectSrc,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -41,8 +63,23 @@ const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN ?? 'http://localhost:3001';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Build conteneurisé (V04 LOT 1.2) : `standalone` émet un serveur Node autonome
+  // (`.next/standalone/.../server.js`) avec un node_modules minimal tracé — pas
+  // besoin d'embarquer tout le workspace dans l'image runtime.
+  output: 'standalone',
+  // En monorepo, le tracing des fichiers doit partir de la **racine** du repo
+  // (sinon les packages workspace `@planit/*` ne sont pas inclus dans standalone).
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   // Workspace packages shipped as TypeScript source must be transpiled by Next.
   transpilePackages: ['@planit/ui', '@planit/design-tokens', '@planit/contracts', '@planit/utils'],
+  // Warning webpack « Critical dependency » émis par require-in-the-middle
+  // (OpenTelemetry, embarqué par @sentry/nextjs côté serveur). Connu et bénin :
+  // l'instrumentation patche require() dynamiquement, webpack ne peut pas le
+  // tracer statiquement. On le masque pour garder un boot dev lisible.
+  webpack: (config: { ignoreWarnings?: unknown[] }) => {
+    config.ignoreWarnings = [...(config.ignoreWarnings ?? []), { module: /require-in-the-middle/ }];
+    return config;
+  },
   // Redirections des anciennes URLs à nom d'acteur (`/rp`, `/enseignant`,
   // `/etudiant`…) vers les URLs role-agnostiques (V03-01). 308 permanent : pas
   // de 404 sur les bookmarks / liens existants après le refactor. Exécutées

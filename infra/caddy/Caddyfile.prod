@@ -1,0 +1,42 @@
+# Caddyfile.prod — reverse proxy unique de la stack (V04 LOT 1.4, ADR-0013 §4).
+# Sert front + API + WebSocket sur la MÊME origine (cookies first-party).
+#
+# TLS piloté par $CADDY_TLS (défaut `internal`) :
+#   - `internal`           → CA interne Caddy (localhost / VM on-prem sans domaine ; curl -k).
+#   - `admin@exemple.com`  → cert Let's Encrypt automatique pour un domaine public réel.
+
+{$PLANIT_DOMAIN:localhost} {
+	encode zstd gzip
+	tls {$CADDY_TLS:internal}
+
+	# Métriques Prometheus : JAMAIS exposées au public (tunnel). Prometheus scrape
+	# `backend:3001/api/metrics` directement sur le réseau compose, sans passer ici.
+	# 404 plutôt que 403 pour ne pas révéler l'existence du endpoint.
+	@metrics path /api/metrics
+	handle @metrics {
+		respond 404
+	}
+
+	# API REST + docs Swagger + WebSocket → backend NestJS.
+	# /socket.io/* = handshake + transports Socket.IO (polling et upgrade WS).
+	# Sans cette route, le realtime tombe sur Next → 404 (incident beta 2026-06-10).
+	@backend path /api/* /docs /docs/* /socket.io /socket.io/*
+	handle @backend {
+		# Durcissement headers des réponses API (V04 LOT 4.5) : les réponses JSON
+		# du backend n'ont pas les headers que Next pose sur le HTML. On les ajoute
+		# ici (0 dépendance npm ; helmet écarté). Le web garde ses headers via
+		# next.config.ts — pas de doublon (scope limité à @backend).
+		header {
+			X-Content-Type-Options nosniff
+			X-Frame-Options DENY
+			Referrer-Policy no-referrer
+			-Server
+		}
+		reverse_proxy backend:3001
+	}
+
+	# Tout le reste → web Next.js (serveur standalone).
+	handle {
+		reverse_proxy web:3000
+	}
+}

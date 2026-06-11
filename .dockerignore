@@ -1,0 +1,30 @@
+# Contexte de build Docker — exclure tout ce qui est régénéré ou sensible.
+**/node_modules
+**/.next
+**/dist
+**/build
+**/.turbo
+**/coverage
+**/test-results
+**/playwright-report
+**/.vitest
+
+.git
+.github
+.husky
+.vscode
+
+**/*.log
+**/.DS_Store
+
+# Secrets / env locaux — JAMAIS dans une image.
+**/.env
+**/.env.*
+!infra/prod/env/.env.prod.example
+
+# Fichiers agents / outillage local.
+AGENTS.md
+.codex
+.agents
+.claude
+.playwright-mcp

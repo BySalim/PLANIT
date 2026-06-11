@@ -105,7 +105,7 @@ export function PlanningUpdateModal({ open, sessions, onClose }: PlanningUpdateM
                     <p className="mt-0.5 text-xs text-text-sec">
                       {format(start, 'EEE d MMM', { locale: fr })} ·{' '}
                       {format(start, 'HH:mm', { locale: fr })} –{' '}
-                      {format(end, 'HH:mm', { locale: fr })} · {session.salle.name}
+                      {format(end, 'HH:mm', { locale: fr })} · {session.salle?.name ?? '—'}
                     </p>
                   </div>
                 </li>

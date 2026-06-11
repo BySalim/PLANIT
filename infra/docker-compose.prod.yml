@@ -1,0 +1,324 @@
+# PLANIT — stack prod-like (V04 LOT 1.4, ADR-0013 §3).
+# Démarrer :
+#   docker compose --env-file infra/prod/env/.env.prod -f infra/docker-compose.prod.yml up -d --build
+# Cible serveur de référence = VM self-host (ADR-0013 rév. 2026-06-08 : PaaS loués abandonnés).
+# Profils opt-in : `tunnel` (beta Cloudflare) · `observability` (Dozzle + Uptime Kuma).
+name: planit-prod
+
+# Ancres réutilisables — rotation des logs (V4-D11) appliquée à tous les services.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER requis (.env.prod)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis (.env.prod)}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB requis (.env.prod)}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 20 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    logging: *default-logging
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER requis (.env.prod)}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD requis (.env.prod)}
+    command: server /data --console-address ':9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging: *default-logging
+
+  # One-shot : applique les migrations (migrate deploy) puis se termine.
+  # Image = stage `build` (contient le CLI Prisma). AUCUN seed (V4-D11 / LOT 1.8).
+  migrate:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+      target: build
+    # Image GHCR (publiée par build-images.yml) → la VM pull-based l'applique
+    # sans builder sur place. En local, `--build` régénère depuis le stage build.
+    image: ghcr.io/bysalim/planit-migrate:${IMAGE_TAG:-local}
+    command: ['pnpm', '--filter', '@planit/backend', 'exec', 'prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL requis (.env.prod)}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+    logging: *default-logging
+
+  backend:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+      target: runtime
+    image: ghcr.io/bysalim/planit-api:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL requis (.env.prod)}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET requis (.env.prod)}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET requis (.env.prod)}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-900}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-604800}
+      FRONTEND_URL: ${FRONTEND_URL:-https://localhost}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Error tracking Sentry (ADR-0009 Phase 1) — DORMANT tant que SENTRY_DSN
+      # est vide (no-op côté backend). Pur runtime → poser le DSN dans .env.prod
+      # suffit (aucun rebuild). SENTRY_RELEASE corrèle l'erreur à l'image déployée.
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_RELEASE: ${IMAGE_TAG:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '1.0'
+    logging: *default-logging
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      target: runtime
+      args:
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-}
+        # NEXT_PUBLIC_* = inliné au BUILD du bundle client. Sur la VM (pull GHCR),
+        # c'est build-images.yml qui passe ce build arg ; ici pour le build local.
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+    image: ghcr.io/bysalim/planit-web:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      # Sentry Next server-side (instrumentation.ts) = runtime → lu ici. Le DSN
+      # navigateur (client) est inliné au build (cf. build.args ci-dessus).
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '1.0'
+    logging: *default-logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+      backend:
+        condition: service_started
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      PLANIT_DOMAIN: ${PLANIT_DOMAIN:-localhost}
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:-admin@planit.local}
+    volumes:
+      - ./caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *default-logging
+
+  # Cloudflare Tunnel (beta publique, ADR-0015) — OPT-IN via le profil `tunnel` :
+  #   docker compose --env-file ... --profile tunnel up -d cloudflared
+  # Expose la stack (Caddy) sur Internet SANS ouvrir de port entrant : cloudflared
+  # n'ouvre que des connexions SORTANTES vers Cloudflare. Le routage public
+  # (hostname → https://caddy:443, No-TLS-Verify, Host=PLANIT_DOMAIN) et le rideau
+  # Cloudflare Access se configurent côté dashboard CF. Cf. docs/runbooks/beta-tunnel.md.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ['tunnel']
+    restart: unless-stopped
+    command: ['tunnel', '--no-autoupdate', 'run']
+    environment:
+      # Défaut vide (`:-`) volontaire : Compose interpole TOUT le fichier au parse,
+      # même les services de profils inactifs. Un `:?` (requis-dur) ici faisait
+      # échouer `docker compose ps/up/config` de la stack DE BASE quand le token
+      # n'est pas posé (cf. log vm-self-host). Le token est requis seulement quand
+      # on active `--profile tunnel` (sinon cloudflared démarre mais ne connecte pas).
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      caddy:
+        condition: service_started
+    logging: *default-logging
+
+  # ── Observabilité (ADR-0009 Phase 2) — profil opt-in `observability` ─────────
+  #   docker compose --env-file ... --profile observability up -d
+  # Bindés sur 127.0.0.1 UNIQUEMENT (aucune exposition LAN/Internet) : on accède
+  # aux UIs par SSH local-forward, sans ouvrir de port ufw :
+  #   ssh -L 8081:localhost:8081 -L 3011:localhost:3011 deploy@<vm>
+  # Dozzle = lecture web des logs conteneurs (docker.sock en lecture seule).
+  dozzle:
+    image: amir20/dozzle:latest
+    profiles: ['observability']
+    restart: unless-stopped
+    environment:
+      DOZZLE_NO_ANALYTICS: 'true'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - '127.0.0.1:8081:8080'
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+    logging: *default-logging
+
+  # Uptime Kuma = uptime + alerting. Surveille `/api/health/ready` via le réseau
+  # compose en visant le backend EN DIRECT (http://backend:3001/api/health/ready) :
+  # passer par `http://caddy/...` échoue (Caddy fait du TLS interne → handshake KO
+  # depuis un sonde HTTP). Reçoit aussi l'alerte d'échec de
+  # backup (push monitor → PLANIT_BACKUP_PUSH_URL=http://127.0.0.1:3011/api/push/<token>).
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    profiles: ['observability']
+    restart: unless-stopped
+    volumes:
+      - uptime_kuma_data:/app/data
+    ports:
+      - '127.0.0.1:3011:3001'
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    logging: *default-logging
+
+  # Prometheus scrape les métriques RED du backend (backend:3001/api/metrics) sur
+  # le réseau compose — pas d'exposition (interrogé par Grafana en interne).
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: ['observability']
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+      # Plafond DUR de taille (VM à petit disque) : Prometheus purge les plus
+      # vieux blocs dès que le TSDB dépasse cette taille, même avant 15j. Évite
+      # que `prometheus_data` ne grossisse sans borne sur `/` (incident 2026-06-09).
+      - '--storage.tsdb.retention.size=512MB'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+    logging: *default-logging
+
+  # Grafana — dashboards golden-signals, datasource + dashboard PROVISIONNÉS
+  # (config-as-code, versionnée). Bindé 127.0.0.1 (accès SSH local-forward).
+  grafana:
+    image: grafana/grafana-oss:latest
+    profiles: ['observability']
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      # Défaut vide (`:-`) volontaire — même raison que cloudflared : ne pas faire
+      # échouer la stack de base. À POSER impérativement quand on active
+      # `--profile observability` (sinon Grafana retombe sur un mot de passe faible).
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - '127.0.0.1:3012:3000'
+    depends_on:
+      prometheus:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          # 256m saturait (~91 % utilisé) → panels « Error loading: timeseries »
+          # au chargement du dashboard (incident 2026-06-09). 512m donne la marge.
+          memory: 512m
+    logging: *default-logging
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  caddy_data:
+  caddy_config:
+  uptime_kuma_data:
+  prometheus_data:
+  grafana_data:

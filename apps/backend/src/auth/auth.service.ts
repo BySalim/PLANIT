@@ -205,6 +205,22 @@ export class AuthService {
     this.logger.info({ jti }, '[auth] logout');
   }
 
+  /**
+   * Révoque **toutes** les sessions actives (refresh tokens non révoqués). Outil
+   * d'exploitation/incident (VOEU-002) : reseed beta, changement d'accès, ou
+   * suspicion de compromission. Les access JWT en cours (stateless) expirent sous
+   * `JWT_ACCESS_TTL` ; plus aucun refresh ne réussira → re-login forcé pour tous.
+   * Exposé via la CLI `src/scripts/revoke-all-sessions.ts` (pas d'endpoint HTTP).
+   */
+  async revokeAllSessions(): Promise<{ revoked: number }> {
+    const { count } = await this.prisma.refreshToken.updateMany({
+      where: { revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    this.logger.warn({ revoked: count }, '[auth] ALL sessions revoked (admin CLI)');
+    return { revoked: count };
+  }
+
   /** `GET /auth/me` : projection user → DTO public. */
   async me(userId: string): Promise<AuthMeDto> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });

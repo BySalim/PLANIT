@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import pino from 'pino';
 import type { Logger } from 'pino';
+import { getRequestId } from './request-context';
 
 /**
  * Token DI pour récupérer l'instance pino partagée.
@@ -49,6 +50,12 @@ function createLogger(): Logger {
     level,
     redact: { paths: REDACT_PATHS, censor: '[REDACTED]' },
     base: { service: 'planit-backend' },
+    // Injecte le requestId courant (AsyncLocalStorage) dans chaque ligne de log
+    // pour corréler toutes les traces d'une même requête (ADR-0009 Phase 1).
+    mixin() {
+      const requestId = getRequestId();
+      return requestId !== undefined ? { requestId } : {};
+    },
   };
 
   if (isProd || isTest) {

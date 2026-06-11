@@ -237,7 +237,7 @@ function PlanningSessionBlock({ session, top, height, now, variant, onTap }: Blo
           >
             <MapPinIcon size={10} color={palette.text} />
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {session.salle.name}
+              {session.salle?.name ?? '—'}
             </span>
           </span>
         ) : null}
