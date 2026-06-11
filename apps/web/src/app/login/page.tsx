@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { loginSchema, type LoginDto } from '@planit/contracts';
 import { useAuth, ROLE_HOME } from '@/contexts/auth-context';
@@ -131,6 +132,15 @@ function LoginPageInner() {
           </button>
         </form>
       </div>
+
+      <nav className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-text-muted">
+        <Link href="/mentions-legales" className="hover:text-text hover:underline">
+          Mentions légales
+        </Link>
+        <Link href="/politique-confidentialite" className="hover:text-text hover:underline">
+          Politique de confidentialité
+        </Link>
+      </nav>
     </div>
   );
 }
