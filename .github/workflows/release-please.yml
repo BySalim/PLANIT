@@ -16,6 +16,8 @@ name: Release Please
 on:
   push:
     branches: [main]
+  # Déclenchement manuel (re-run de la release sans nouveau push sur main).
+  workflow_dispatch: {}
 
 permissions:
   contents: write # créer le tag + la release + commit sur la branche de release
@@ -30,6 +32,10 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          # La branche par défaut GitHub du repo est `develop` → sans ce pin,
+          # release-please cible develop (manifeste périmé 0.1.0, branche de release
+          # sur le mauvais flux). On force `main` : la PR de release + le tag y vivent.
+          target-branch: main
           # GITHUB_TOKEN par défaut. ⚠️ Limite connue : une PR ouverte avec
           # GITHUB_TOKEN ne déclenche **pas** les workflows `pull_request` (anti-
           # boucle GitHub) → la CI ne tournerait pas sur la release PR, qui resterait
