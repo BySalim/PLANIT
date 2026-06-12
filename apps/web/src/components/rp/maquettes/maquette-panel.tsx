@@ -12,14 +12,13 @@ import { useFlash } from '@planit/ui';
 import {
   useAddMaquetteModuleMutation,
   useDeleteMaquetteModuleMutation,
-  useRenewMaquetteMutation,
   useUpdateMaquetteModuleMutation,
-  useUpdateMaquetteMutation,
 } from '@/lib/mutations-v3';
 import { useMaquetteVersionDetailQuery, useMaquetteVersionsQuery } from '@/lib/queries-v3';
 import { exportNodeToImage, exportNodeToPdf } from '@/lib/export';
 import { AnneesWidget } from './annees-widget';
 import { MaquetteInfosModal } from './maquette-infos-modal';
+import { ModulePickerModal } from './module-picker-modal';
 import { SemestresView } from './semestres-view';
 
 // ── Bouton export maquette (LOT 7 X.3) ───────────────────────────────
@@ -127,7 +126,9 @@ export function MaquettePanelEmpty() {
         </svg>
       </div>
       <p className="text-[14px] font-semibold text-text-sec">Sélectionnez une maquette à gauche</p>
-      <p className="text-[12.5px] text-text-muted">ou créez-en une nouvelle.</p>
+      <p className="text-[12.5px] text-text-muted">
+        pour la composer. Les maquettes naissent de la création d’une formation.
+      </p>
     </div>
   );
 }
@@ -178,9 +179,6 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
   const versionsQuery = useMaquetteVersionsQuery(maquette.id);
   const versions = useMemo(() => versionsQuery.data ?? [], [versionsQuery.data]);
 
-  // Année courante
-  const currentAnnee = useMemo(() => annees.find((a) => a.etat === 'EN_COURS') ?? null, [annees]);
-
   // Années utilisées (via versions)
   const usedAnnees = useMemo(() => {
     const ids = new Set(versions.map((v) => v.anneeAcademiqueId));
@@ -195,12 +193,6 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
   const versionDetailQuery = useMaquetteVersionDetailQuery(effectiveVersionId);
   const versionDetail = versionDetailQuery.data ?? null;
 
-  // La maquette a-t-elle une version pour l'année courante ?
-  const hasCurrentVersion = useMemo(
-    () => currentAnnee !== null && versions.some((v) => v.anneeAcademiqueId === currentAnnee.id),
-    [versions, currentAnnee],
-  );
-
   // ── Mode composer
   const [isComposing, setIsComposing] = useState(false);
   const [edits, setEdits] = useState<Record<string, Partial<MaquetteModuleDto>>>({});
@@ -210,11 +202,16 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
   const [showInfosModal, setShowInfosModal] = useState(false);
 
   // ── Mutations
-  const updateMaquette = useUpdateMaquetteMutation();
-  const renewMaquette = useRenewMaquetteMutation();
   const addModule = useAddMaquetteModuleMutation();
   const updateModule = useUpdateMaquetteModuleMutation();
   const deleteModule = useDeleteMaquetteModuleMutation();
+
+  // Sélecteur de module (composer) : semestre cible mémorisé tant qu'il est ouvert.
+  const [pickerSemestre, setPickerSemestre] = useState<1 | 2 | null>(null);
+  const presentModuleIds = useMemo(
+    () => new Set((versionDetail?.modules ?? []).map((m) => m.moduleId)),
+    [versionDetail],
+  );
 
   // ── Handlers composer
   function startCompose() {
@@ -261,12 +258,31 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
     [deleteModule],
   );
 
-  const handleAddModule = useCallback(
-    (_semestre: 1 | 2) => {
-      // TODO LOT 3 — ouvrir un sélecteur de module (modal)
-      flash.push('error', 'Sélecteur de module : à implémenter');
+  const handleAddModule = useCallback((semestre: 1 | 2) => {
+    setPickerSemestre(semestre);
+  }, []);
+
+  const handlePickModule = useCallback(
+    async (moduleId: string) => {
+      if (effectiveVersionId === null || pickerSemestre === null) return;
+      try {
+        await addModule.mutateAsync({
+          versionId: effectiveVersionId,
+          body: {
+            moduleId,
+            semestre: pickerSemestre,
+            heuresCM: 0,
+            heuresTD: 0,
+            heuresTP: 0,
+            heuresTPE: 0,
+          },
+        });
+        setPickerSemestre(null);
+      } catch {
+        // flash géré par la mutation
+      }
     },
-    [flash],
+    [addModule, effectiveVersionId, pickerSemestre],
   );
 
   // ── Stats globales
@@ -438,27 +454,6 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
                   </svg>
                   Composer la maquette
                 </button>
-                {!hasCurrentVersion && currentAnnee !== null && (
-                  <button
-                    type="button"
-                    disabled={renewMaquette.isPending}
-                    onClick={() => void renewMaquette.mutateAsync({ maquetteId: maquette.id })}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#92400E] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#7C2D12] disabled:opacity-60"
-                  >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <rect x="8" y="2" width="8" height="4" rx="1" />
-                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                    </svg>
-                    Renouveler
-                  </button>
-                )}
               </>
             )}
           </div>
@@ -498,56 +493,18 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
                 ? (versions.find((v) => v.id === effectiveVersionId)?.anneeAcademiqueId ?? null)
                 : null
             }
-            currentAnnee={currentAnnee}
-            hasCurrentVersion={hasCurrentVersion}
             onSelect={(anneeId) => {
               const v = versions.find((ver) => ver.anneeAcademiqueId === anneeId);
               if (v) setSelectedVersionId(v.id);
             }}
-            onRenew={() => void renewMaquette.mutateAsync({ maquetteId: maquette.id })}
           />
         </section>
-
-        {/* ── Bandeau renouvellement ── */}
-        {!hasCurrentVersion && currentAnnee !== null && (
-          <div className="mb-5 flex items-center gap-4 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-5 py-4">
-            <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#FEF3C7] text-[#92400E]">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13.5px] font-bold text-[#78350F]">
-                Pas de version pour {currentAnnee.libelle}
-              </p>
-              <p className="text-[12px] text-[#92400E]/90">
-                {"Cette maquette n'a pas été renouvelée pour l'année en cours."}
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={renewMaquette.isPending}
-              onClick={() => void renewMaquette.mutateAsync({ maquetteId: maquette.id })}
-              className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-[#92400E] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#7C2D12] disabled:opacity-60"
-            >
-              Renouveler pour {currentAnnee.libelle}
-            </button>
-          </div>
-        )}
 
         {/* ── Semestres (ref LOT 7 X.3 : capturé pour export) ── */}
         <div ref={semestresRef}>
           <SemestresView
             version={versionDetail}
+            niveau={maquette.niveau}
             isLoading={versionDetailQuery.isLoading}
             isEditing={isComposing}
             edits={edits}
@@ -604,19 +561,22 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
         )}
       </div>
 
-      {/* ── Modal infos ── */}
+      {/* ── Modal infos (lecture seule) ── */}
       <MaquetteInfosModal
         open={showInfosModal}
         maquette={maquette}
         versions={versions}
         annees={annees}
-        isSaving={updateMaquette.isPending}
         onClose={() => setShowInfosModal(false)}
-        onSave={(nom) => {
-          void updateMaquette.mutateAsync({ id: maquette.id, body: { nom } }).then(() => {
-            setShowInfosModal(false);
-          });
-        }}
+      />
+
+      {/* ── Sélecteur de module (composer) ── */}
+      <ModulePickerModal
+        isOpen={pickerSemestre !== null}
+        presentModuleIds={presentModuleIds}
+        isAdding={addModule.isPending}
+        onClose={() => setPickerSemestre(null)}
+        onSelect={(moduleId) => void handlePickModule(moduleId)}
       />
     </div>
   );

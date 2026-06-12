@@ -41,7 +41,7 @@ describe('Maquettes — lecture & RBAC (A.2/A.7)', () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(4);
     const l3 = (res.body as { nom: string; versionCount?: number; niveau: string }[]).find(
-      (m) => m.nom === 'Maquette GLRS L3',
+      (m) => m.nom === 'Maquette L3 GLRS',
     );
     expect(l3?.niveau).toBe('L3');
     expect(l3?.versionCount).toBe(2);
@@ -103,67 +103,10 @@ describe('Maquette versions & modules (A.3)', () => {
   });
 });
 
-describe('Maquette CRUD (A.2)', () => {
-  it('crée une maquette (versionCount 0)', async () => {
-    const session = await rp();
-    const res = await api()
-      .post('/api/maquettes')
-      .set('Cookie', session.cookieHeader)
-      .send({ nom: 'Maquette GLRS M2', filiereId: 'seed-filiere-glrs', niveau: 'M2' });
-    expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ nom: 'Maquette GLRS M2', niveau: 'M2', versionCount: 0 });
-  });
-
-  it('refuse un doublon (même filière + niveau + nom) → 409', async () => {
-    const session = await rp();
-    const res = await api()
-      .post('/api/maquettes')
-      .set('Cookie', session.cookieHeader)
-      .send({ nom: 'Maquette GLRS L3', filiereId: 'seed-filiere-glrs', niveau: 'L3' });
-    expect(res.status).toBe(409);
-  });
-
-  it('renomme une maquette (PUT)', async () => {
-    const session = await rp();
-    const res = await api()
-      .put('/api/maquettes/seed-maq-glrs-l1')
-      .set('Cookie', session.cookieHeader)
-      .send({ nom: 'Maquette GLRS L1 (révisée)' });
-    expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ nom: 'Maquette GLRS L1 (révisée)', niveau: 'L1' });
-  });
-});
-
-describe('Renouveler (A.3)', () => {
-  it("clone la dernière version vers l'année courante sans toucher l'ancienne", async () => {
-    const session = await rp();
-    // GLRS L1 n'a qu'une version 2024 → renew crée la 2025.
-    const res = await api()
-      .post('/api/maquettes/seed-maq-glrs-l1/renew')
-      .set('Cookie', session.cookieHeader);
-    expect(res.status).toBe(201);
-    const body = res.body as { id: string; annee?: { libelle: string }; modules: unknown[] };
-    expect(body.annee?.libelle).toBe('2025-2026');
-    expect(body.modules).toHaveLength(3); // modules clonés
-
-    // L'ancienne version 2024 est intacte (immutabilité inter-versions).
-    const old = await prisma.maquetteModule.count({
-      where: { maquetteVersionId: 'seed-maqv-glrs-l1-2024' },
-    });
-    expect(old).toBe(3);
-    // La nouvelle version est bien distincte.
-    expect(body.id).not.toBe('seed-maqv-glrs-l1-2024');
-  });
-
-  it('renouveler 2× la même année → 409', async () => {
-    const session = await rp();
-    // GLRS L3 a déjà une version 2025 (= année courante).
-    const res = await api()
-      .post('/api/maquettes/seed-maq-glrs-l3/renew')
-      .set('Cookie', session.cookieHeader);
-    expect(res.status).toBe(409);
-  });
-});
+// ADR-0018 : plus de POST/PUT/renew publics sur /maquettes — création et
+// renouvellement sont pilotés par la création de formation (cf. formations.spec :
+// « clone la maquette de l'année précédente »). Cette page reste lecture +
+// composition. Les endpoints retirés renvoient 404 (non testés ici).
 
 describe('Composer (A.4)', () => {
   it('ajoute un module + VHE/VHT dérivés corrects', async () => {

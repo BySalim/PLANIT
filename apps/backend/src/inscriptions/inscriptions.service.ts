@@ -47,7 +47,7 @@ export class InscriptionsService {
 
     const classe = await this.prisma.classe.findUnique({
       where: { id: classeId },
-      include: { formation: true },
+      include: { formation: { include: { filiere: true } } },
     });
     if (!classe) throw new NotFoundException(`Classe ${classeId} introuvable`);
     if (!classe.formation) {
@@ -57,6 +57,7 @@ export class InscriptionsService {
     }
 
     const anneeAcademiqueId = classe.formation.anneeAcademiqueId;
+    // ADR-0018 : catégorie dérivée de la **filière** de la formation.
     const isDoubleDiplome = isDoubleDiplomeInscription(classe.formation);
 
     // Résolution de l'étudiant selon le mode.

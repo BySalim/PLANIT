@@ -438,7 +438,9 @@ model Maquette {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([filiereId, niveau, nom])
+  // ADR-0018 : une seule maquette par (filière, niveau). Le `nom` est dérivé
+  // (« Maquette {niveau} {sigle} ») — il n'entre plus dans la clé d'unicité.
+  @@unique([filiereId, niveau])
   @@index([filiereId])
   @@map("maquettes")
 }
@@ -497,13 +499,17 @@ model Formation {
   anneeAcademique   AnneeAcademique @relation(fields: [anneeAcademiqueId], references: [id])
   maquetteVersionId String
   maquetteVersion   MaquetteVersion @relation(fields: [maquetteVersionId], references: [id])
-  isDoubleDiplome   Boolean         @default(false)
+
+  // ADR-0018 : `isDoubleDiplome` n'est PLUS porté par la formation — c'est une
+  // propriété de la Filiere (dérivée à l'affichage et à l'inscription).
 
   classes Classe[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // ADR-0018 : un seul choix (filière, niveau) par année courante (règle 2.1).
+  @@unique([filiereId, niveau, anneeAcademiqueId])
   @@index([anneeAcademiqueId])
   @@index([filiereId])
   @@index([maquetteVersionId])

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { MaquetteModuleDto, MaquetteVersionDto } from '@planit/contracts';
+import { semestreAbsolu, semestreLabel } from '@planit/utils';
 import { cn } from '@/lib/utils';
 
 // ── Palette UE (6 couleurs cycliques — miroir PLANIT-Design) ─────────
@@ -411,6 +412,8 @@ function SemestreTable({
 
 export interface SemestresViewProps {
   readonly version: MaquetteVersionDto | null;
+  /** Niveau de la maquette — pilote les libellés de semestre (S5/S6 pour L3…). */
+  readonly niveau: string;
   readonly isLoading: boolean;
   readonly isEditing: boolean;
   readonly edits: Record<string, Partial<MaquetteModuleDto>>;
@@ -421,6 +424,7 @@ export interface SemestresViewProps {
 
 export function SemestresView({
   version,
+  niveau,
   isLoading,
   isEditing,
   edits,
@@ -484,10 +488,10 @@ export function SemestresView({
               )}
             >
               <span className="flex-shrink-0 rounded-md bg-primary-100 px-2 py-1 font-mono text-[12px] font-bold tracking-wide text-primary">
-                S{s}
+                {semestreLabel(niveau, s)}
               </span>
               <span className="flex-1 text-[13.5px] font-semibold text-text">
-                Semestre {s === 1 ? 'impair' : 'pair'}
+                Semestre {semestreAbsolu(niveau, s)}
               </span>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <span className="rounded-full border border-border-soft bg-surface px-2.5 py-0.5 text-[11.5px] text-text-muted">

@@ -277,6 +277,15 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 - **Backups prod à 3 niveaux** ([backup.sh](infra/prod/scripts/backup.sh)) : local (rotation GFS) → off-box NFS **TrueNAS** → **off-site cloud S3-compatible (rclone B2/R2)**, dump chiffré **age**. Les 2 cibles off-site sont **fatales** (alerte Uptime Kuma) car couvrent des pannes distinctes (VM détruite / site on-prem KO). Variables dans `cd.env` (`PLANIT_BACKUP_*`).
 - **Onboarding prod = manuel via l'UI V03** : référentiel **et** étudiants saisis à la main (étudiants par le flux d'inscription **email-first** existant). **Pas d'import de masse** (décision TL — évite une dépendance de parsing). Pas d'écran admin (différé, `TD-V04-ADMIN-PROVISIONING`). Reset mot de passe au pilote = CLI (emails différés, TD-003).
 
+### Maquette pilotée par la formation + double-diplôme filière (ADR-0018)
+
+> Capitalisation issue de l'onboarding prod réel (révise ADR-0010/0011). **Acquis** : remettre en cause = nouvel ADR.
+
+- **La maquette est un sous-produit automatique de la formation** : on ne crée/renomme/renouvelle **plus** une maquette directement (endpoints `POST /maquettes`, `PUT /maquettes/:id`, `POST /maquettes/:id/renew` **retirés**). `FormationsService.create` appelle `MaquettesService.ensureMaquetteAndVersion(tx, …)` dans **une transaction** : find-or-create `Maquette(filière, niveau)` puis version de l'année courante (réutilise → renouvelle par clone profond modules+heures → sinon vide). `/maquettes` = **lecture + composition** uniquement.
+- **Création formation = filière + niveau** ; tout le reste **dérivé serveur** via helpers purs `@planit/utils` (mêmes formules backend + aperçu front) : `formationCode` (`{SIGLE}-{NIVEAU}-{libelléAnnée}`, ex. `GLRS-L3-2025-2026`), `maquetteNom` (`Maquette {niveau} {sigle}`), `semestreAbsolu`/`semestreLabel` (rang 1|2 → S1…S10 selon niveau). Garde `@@unique([filiereId, niveau, anneeAcademiqueId])` sur Formation (+ 409 lisible) ; `@@unique([filiereId, niveau])` sur Maquette (nom hors clé).
+- **Composition = on ajoute un _module_, l'UE suit** : un module ajouté démarre à **0 h** ; l'UE n'est jamais ajoutée explicitement (déduite de `Module.ueId`, sert d'en-tête de regroupement). Sélecteur = [module-picker-modal.tsx](apps/web/src/components/rp/maquettes/module-picker-modal.tsx) (groupé par UE, exclut les modules déjà présents).
+- **`isDoubleDiplome` = propriété de la `Filiere`** (retiré de `Formation`). Classes/inscriptions le **dérivent** via `Classe → Formation → Filiere`. `Inscription.isDoubleDiplome` reste **dénormalisé** (clé du `@@unique` ADR-0011 inchangé) ; seule la **source** change (`isDoubleDiplomeInscription` lit `formation.filiere.isDoubleDiplome`). Migration `20260612080000_formation_maquette_autoflow` (l'index partiel `EN_COURS` n'est pas touché).
+
 ---
 
 ## Sécurité — règles dès jour 1

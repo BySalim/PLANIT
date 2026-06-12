@@ -103,20 +103,13 @@ export const maquetteSchema = z.object({
   versionCount: z.number().int().min(0).optional(),
 });
 
-export const createMaquetteSchema = z.object({
-  nom: z.string().min(1).max(120),
-  filiereId: cuid,
-  niveau: niveauSchema,
-});
-
-// Filière + niveau figés : seul le renommage est autorisé (ADR-0010).
-export const updateMaquetteSchema = z.object({
-  nom: z.string().min(1).max(120).optional(),
-});
+// ADR-0018 : la maquette n'est plus créée ni renommée/renouvelée directement.
+// Sa création et son renouvellement sont **pilotés par la création de formation**
+// (le nom est dérivé « Maquette {niveau} {sigle} » via @planit/utils). Il n'y a
+// donc plus de schéma de création/màj public — seul `maquetteSchema` (lecture)
+// subsiste.
 
 export type MaquetteDto = z.infer<typeof maquetteSchema>;
-export type CreateMaquetteDto = z.infer<typeof createMaquetteSchema>;
-export type UpdateMaquetteDto = z.infer<typeof updateMaquetteSchema>;
 
 /**
  * MaquetteModule — heures **saisies** (CM/TD/TP/TPE) d'un module dans une
@@ -214,31 +207,22 @@ export const formationSchema = z.object({
   anneeAcademiqueId: cuid,
   anneeLibelle: z.string().optional(),
   maquetteVersionId: cuid,
-  isDoubleDiplome: z.boolean(),
   classeCount: z.number().int().min(0).optional(),
 });
 
 /**
- * Création — toujours pour l'**année courante** (le backend résout
- * `anneeAcademiqueId` via `resolveCurrentYear()`, jamais fourni par le client).
+ * Création (ADR-0018) — le RP choisit seulement **filière + niveau**. Le `code`
+ * (`{SIGLE}-{NIVEAU}-{libelléAnnée}`), la maquette `(filière, niveau)` et sa
+ * version pour l'année courante (créée ou **renouvelée** depuis l'an passé) sont
+ * **dérivés côté serveur**. Plus de champ double-diplôme (porté par la filière).
  */
 export const createFormationSchema = z.object({
-  code: z.string().min(1).max(40),
   niveau: niveauSchema,
   filiereId: cuid,
-  maquetteVersionId: cuid,
-  isDoubleDiplome: z.boolean().default(false),
-});
-
-export const updateFormationSchema = z.object({
-  code: z.string().min(1).max(40).optional(),
-  maquetteVersionId: cuid.optional(),
-  isDoubleDiplome: z.boolean().optional(),
 });
 
 export type FormationDto = z.infer<typeof formationSchema>;
 export type CreateFormationDto = z.infer<typeof createFormationSchema>;
-export type UpdateFormationDto = z.infer<typeof updateFormationSchema>;
 
 // ─────────────────────────────────────────────────────────────────────
 // Classe V3 (refonte — V3-D5 / ADR-0010)

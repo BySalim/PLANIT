@@ -44,20 +44,10 @@ function formatAnnee(a: AnneeAcademiqueDto) {
 export interface AnneesWidgetProps {
   readonly annees: readonly AnneeAcademiqueDto[];
   readonly selectedId: string | null;
-  readonly currentAnnee: AnneeAcademiqueDto | null;
-  readonly hasCurrentVersion: boolean;
   readonly onSelect: (id: string) => void;
-  readonly onRenew: () => void;
 }
 
-export function AnneesWidget({
-  annees,
-  selectedId,
-  currentAnnee,
-  hasCurrentVersion,
-  onSelect,
-  onRenew,
-}: AnneesWidgetProps) {
+export function AnneesWidget({ annees, selectedId, onSelect }: AnneesWidgetProps) {
   const [open, setOpen] = useState(false);
 
   const selected = annees.find((a) => a.id === selectedId) ?? annees[0] ?? null;
@@ -174,57 +164,6 @@ export function AnneesWidget({
                 </button>
               );
             })}
-
-            {/* Renouveler */}
-            {currentAnnee !== null && (
-              <button
-                type="button"
-                disabled={hasCurrentVersion}
-                onClick={() => {
-                  if (!hasCurrentVersion) {
-                    onRenew();
-                    setOpen(false);
-                  }
-                }}
-                className={cn(
-                  'flex w-full items-center gap-2.5 border-t border-border-soft px-4 py-3 text-left text-[12.5px] font-semibold transition-colors',
-                  hasCurrentVersion
-                    ? 'cursor-default bg-bg-warm text-text-muted'
-                    : 'bg-[#FFFBEB] text-[#92400E] hover:bg-[#FEF3C7]',
-                )}
-              >
-                {hasCurrentVersion ? (
-                  <>
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                    >
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    À jour pour {currentAnnee.libelle}
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <rect x="8" y="2" width="8" height="4" rx="1" />
-                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                    </svg>
-                    Renouveler pour {currentAnnee.libelle}
-                  </>
-                )}
-              </button>
-            )}
           </div>
         )}
       </div>

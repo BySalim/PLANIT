@@ -806,26 +806,27 @@ async function seedVague03(
   // GLRS L2 : versions 2024 + 2025 (historique d'inscription + GL2-A 2025).
   // GLRS L1 : version 2024 SEULEMENT → bouton « Renouveler » visible (démo).
   // GL  M1  : version 2025 (formation MASTER double-diplôme).
+  // ADR-0018 : nom dérivé « Maquette {niveau} {sigle} » (auto à la création).
   const maquettes = [
     {
       id: 'seed-maq-glrs-l3',
-      nom: 'Maquette GLRS L3',
+      nom: 'Maquette L3 GLRS',
       filiereId: filiereGlrsId,
       niveau: 'L3' as const,
     },
     {
       id: 'seed-maq-glrs-l2',
-      nom: 'Maquette GLRS L2',
+      nom: 'Maquette L2 GLRS',
       filiereId: filiereGlrsId,
       niveau: 'L2' as const,
     },
     {
       id: 'seed-maq-glrs-l1',
-      nom: 'Maquette GLRS L1',
+      nom: 'Maquette L1 GLRS',
       filiereId: filiereGlrsId,
       niveau: 'L1' as const,
     },
-    { id: 'seed-maq-gl-m1', nom: 'Maquette GL M1', filiereId: filiereGlId, niveau: 'M1' as const },
+    { id: 'seed-maq-gl-m1', nom: 'Maquette M1 GL', filiereId: filiereGlId, niveau: 'M1' as const },
   ];
   for (const m of maquettes) {
     await prisma.maquette.upsert({ where: { id: m.id }, update: m, create: m });
@@ -887,6 +888,10 @@ async function seedVague03(
   }
 
   // ── Formations (V3-D4 — instances annuelles d'une filière) ────────────
+  // ADR-0018 : plus de `isDoubleDiplome` sur la formation — la catégorie est
+  // dérivée de la filière (GL = double-diplôme, GLRS non). Codes historiques
+  // conservés (données démo) ; les nouvelles formations utilisent le format
+  // `{SIGLE}-{NIVEAU}-{libelléComplet}` (helper `formationCode`).
   const formations = [
     {
       id: 'seed-form-glrs-l3',
@@ -895,7 +900,6 @@ async function seedVague03(
       filiereId: filiereGlrsId,
       anneeAcademiqueId: ANNEE_2025,
       maquetteVersionId: 'seed-maqv-glrs-l3-2025',
-      isDoubleDiplome: false,
     },
     {
       id: 'seed-form-glrs-l2-2025',
@@ -904,7 +908,6 @@ async function seedVague03(
       filiereId: filiereGlrsId,
       anneeAcademiqueId: ANNEE_2025,
       maquetteVersionId: 'seed-maqv-glrs-l2-2025',
-      isDoubleDiplome: false,
     },
     {
       id: 'seed-form-glrs-l2-2024',
@@ -913,7 +916,6 @@ async function seedVague03(
       filiereId: filiereGlrsId,
       anneeAcademiqueId: ANNEE_2024,
       maquetteVersionId: 'seed-maqv-glrs-l2-2024',
-      isDoubleDiplome: false,
     },
     {
       id: 'seed-form-gl-m1',
@@ -922,7 +924,6 @@ async function seedVague03(
       filiereId: filiereGlId,
       anneeAcademiqueId: ANNEE_2025,
       maquetteVersionId: 'seed-maqv-gl-m1-2025',
-      isDoubleDiplome: true, // formation MASTER double-diplôme
     },
   ];
   for (const f of formations) {

@@ -1,22 +1,18 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
-import { createMaquetteSchema, updateMaquetteSchema } from '@planit/contracts';
-import type {
-  CreateMaquetteDto,
-  MaquetteDto,
-  MaquetteVersionDto,
-  UpdateMaquetteDto,
-} from '@planit/contracts';
+import type { MaquetteDto, MaquetteVersionDto } from '@planit/contracts';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { MaquettesService } from './maquettes.service';
 
 /**
- * `/api/maquettes` (A.2/A.3 + A.7).
+ * `/api/maquettes` (A.2/A.3 + A.7) — **lecture seule** (ADR-0018).
  *
- * **RP only** sur tout le contrôleur (lecture comprise) : les maquettes sont
- * hors périmètre AC (V3-D9) — un AC reçoit 403, comme tout rôle non-RP.
+ * **RP only** sur tout le contrôleur : les maquettes sont hors périmètre AC
+ * (V3-D9) — un AC reçoit 403, comme tout rôle non-RP. La **création** et le
+ * **renouvellement** ne sont plus exposés ici : ils sont pilotés automatiquement
+ * par la création d'une formation (`FormationsService` →
+ * `MaquettesService.ensureMaquetteAndVersion`). La composition (ajout/retrait de
+ * modules) reste sur `/maquette-versions` + `/maquette-modules`.
  */
 @ApiTags('Maquettes')
 @ApiCookieAuth('access')
@@ -46,43 +42,5 @@ export class MaquettesController {
   @ApiResponse({ status: 404, description: 'Maquette introuvable' })
   listVersions(@Param('id') id: string): Promise<MaquetteVersionDto[]> {
     return this.maquettes.listVersions(id);
-  }
-
-  @Post()
-  @HttpCode(201)
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Créer une maquette (nom + filière + niveau)' })
-  @ApiResponse({ status: 201, description: 'Maquette créée' })
-  @ApiResponse({ status: 409, description: 'Maquette déjà existante pour cette filière/niveau' })
-  create(
-    @Body(new ZodValidationPipe(createMaquetteSchema)) dto: CreateMaquetteDto,
-  ): Promise<MaquetteDto> {
-    return this.maquettes.create(dto);
-  }
-
-  @Put(':id')
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Renommer une maquette (filière + niveau figés)' })
-  @ApiResponse({ status: 200, description: 'Maquette mise à jour' })
-  @ApiResponse({ status: 404, description: 'Maquette introuvable' })
-  update(
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe(updateMaquetteSchema)) dto: UpdateMaquetteDto,
-  ): Promise<MaquetteDto> {
-    return this.maquettes.update(id, dto);
-  }
-
-  @Post(':id/renew')
-  @HttpCode(201)
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: "Renouveler : cloner la dernière version vers l'année courante" })
-  @ApiResponse({ status: 201, description: "Nouvelle version créée pour l'année courante" })
-  @ApiResponse({ status: 404, description: 'Maquette introuvable' })
-  @ApiResponse({
-    status: 409,
-    description: "Version déjà présente pour l'année courante, ou aucune version à cloner",
-  })
-  renew(@Param('id') id: string): Promise<MaquetteVersionDto> {
-    return this.maquettes.renew(id);
   }
 }

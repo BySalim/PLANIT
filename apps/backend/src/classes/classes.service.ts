@@ -199,7 +199,8 @@ function toDto(row: ClasseRow): ClasseV3Dto {
     filiere: filiere ? { id: filiere.id, sigle: filiere.sigle, libelle: filiere.libelle } : null,
     formationId: row.formationId,
     anneeLibelle: row.formation?.anneeAcademique.libelle ?? null,
-    isDoubleDiplome: row.formation?.isDoubleDiplome ?? false,
+    // ADR-0018 : double-diplôme dérivé de la filière (de la formation, sinon FK legacy).
+    isDoubleDiplome: (row.formation?.filiere ?? row.filiere)?.isDoubleDiplome ?? false,
     capaciteMax: row.capaciteMax,
     places: { inscrits: row._count.inscriptions, capaciteMax: row.capaciteMax },
   };

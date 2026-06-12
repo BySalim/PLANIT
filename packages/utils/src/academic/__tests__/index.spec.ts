@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { computeVHE, computeVHT, isDoubleDiplomeInscription, resolveCurrentYear } from '../index';
+import {
+  computeVHE,
+  computeVHT,
+  formationCode,
+  isDoubleDiplomeInscription,
+  maquetteNom,
+  resolveCurrentYear,
+  semestreAbsolu,
+  semestreLabel,
+} from '../index';
 
 describe('computeVHE', () => {
   it('somme CM + TD + TP (exclut TPE)', () => {
@@ -43,8 +52,37 @@ describe('resolveCurrentYear', () => {
 });
 
 describe('isDoubleDiplomeInscription', () => {
-  it('reflète la catégorie de la formation', () => {
-    expect(isDoubleDiplomeInscription({ isDoubleDiplome: true })).toBe(true);
-    expect(isDoubleDiplomeInscription({ isDoubleDiplome: false })).toBe(false);
+  it('reflète la catégorie de la filière de la formation (ADR-0018)', () => {
+    expect(isDoubleDiplomeInscription({ filiere: { isDoubleDiplome: true } })).toBe(true);
+    expect(isDoubleDiplomeInscription({ filiere: { isDoubleDiplome: false } })).toBe(false);
+  });
+});
+
+describe('formationCode', () => {
+  it('compose SIGLE-NIVEAU-libelléAnnée', () => {
+    expect(formationCode({ sigle: 'GLRS', niveau: 'L3', anneeLibelle: '2025-2026' })).toBe(
+      'GLRS-L3-2025-2026',
+    );
+  });
+});
+
+describe('maquetteNom', () => {
+  it('compose « Maquette {niveau} {sigle} »', () => {
+    expect(maquetteNom({ niveau: 'L1', sigle: 'GLRS' })).toBe('Maquette L1 GLRS');
+  });
+});
+
+describe('semestreAbsolu / semestreLabel', () => {
+  it('dérive le semestre absolu du niveau et du rang', () => {
+    expect(semestreAbsolu('L1', 1)).toBe(1);
+    expect(semestreAbsolu('L1', 2)).toBe(2);
+    expect(semestreAbsolu('L3', 1)).toBe(5);
+    expect(semestreAbsolu('L3', 2)).toBe(6);
+    expect(semestreAbsolu('M2', 2)).toBe(10);
+  });
+
+  it('formate le libellé Sn', () => {
+    expect(semestreLabel('L3', 1)).toBe('S5');
+    expect(semestreLabel('M1', 2)).toBe('S8');
   });
 });

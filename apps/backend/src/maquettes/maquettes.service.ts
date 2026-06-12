@@ -6,18 +6,16 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type {
-  CreateMaquetteDto,
   CreateMaquetteModuleDto,
   MaquetteDto,
   MaquetteExportDto,
   MaquetteModuleDto,
   MaquetteVersionDto,
-  UpdateMaquetteDto,
+  Niveau,
   UpdateMaquetteModuleDto,
 } from '@planit/contracts';
-import { computeVHE, computeVHT } from '@planit/utils';
+import { computeVHE, computeVHT, maquetteNom } from '@planit/utils';
 import { PrismaService } from '../common/prisma.service';
-import { AnneesService } from '../annees/annees.service';
 
 // `include` partagé pour charger un MaquetteModule prêt à mapper (module + UE).
 const moduleInclude = {
@@ -43,10 +41,7 @@ type MaquetteModuleRow = Prisma.MaquetteModuleGetPayload<{ include: typeof modul
  */
 @Injectable()
 export class MaquettesService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly annees: AnneesService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // ── Maquette (A.2) ───────────────────────────────────────────────────
 
@@ -68,49 +63,62 @@ export class MaquettesService {
     return toMaquetteDto(row);
   }
 
-  async create(dto: CreateMaquetteDto): Promise<MaquetteDto> {
-    const filiere = await this.prisma.filiere.findUnique({ where: { id: dto.filiereId } });
-    if (!filiere) throw new BadRequestException(`Filière ${dto.filiereId} introuvable`);
+  /**
+   * Provisionnement automatique (ADR-0018) — appelé **dans la transaction** de
+   * création d'une formation. Garantit que la maquette `(filière, niveau)` existe
+   * (nom dérivé) et qu'une `MaquetteVersion` existe pour l'année courante :
+   *  - version déjà présente pour l'année → réutilisée ;
+   *  - sinon, **renouvellement** = clone profond de la dernière version (modules +
+   *    heures) ; à défaut (maquette neuve) → version **vide**.
+   * Renvoie l'`id` de la version de l'année courante. Aucune création directe de
+   * maquette par le RP — c'est l'unique point d'entrée.
+   */
+  async ensureMaquetteAndVersion(
+    tx: Prisma.TransactionClient,
+    args: { filiereId: string; niveau: Niveau; sigle: string; currentYearId: string },
+  ): Promise<string> {
+    const { filiereId, niveau, sigle, currentYearId } = args;
 
-    try {
-      const row = await this.prisma.maquette.create({
-        data: { nom: dto.nom, filiereId: dto.filiereId, niveau: dto.niveau },
-        include: { filiere: true, _count: { select: { versions: true } } },
+    const maquette = await tx.maquette.upsert({
+      where: { filiereId_niveau: { filiereId, niveau } },
+      update: {},
+      create: { nom: maquetteNom({ niveau, sigle }), filiereId, niveau },
+    });
+
+    const existing = await tx.maquetteVersion.findUnique({
+      where: {
+        maquetteId_anneeAcademiqueId: {
+          maquetteId: maquette.id,
+          anneeAcademiqueId: currentYearId,
+        },
+      },
+    });
+    if (existing) return existing.id;
+
+    // Clone de la dernière version (toute année) — renouvellement immuable.
+    const source = await tx.maquetteVersion.findFirst({
+      where: { maquetteId: maquette.id },
+      orderBy: { anneeAcademique: { debut: 'desc' } },
+      include: { modules: true },
+    });
+
+    const version = await tx.maquetteVersion.create({
+      data: { maquetteId: maquette.id, anneeAcademiqueId: currentYearId },
+    });
+    if (source && source.modules.length > 0) {
+      await tx.maquetteModule.createMany({
+        data: source.modules.map((m) => ({
+          maquetteVersionId: version.id,
+          moduleId: m.moduleId,
+          semestre: m.semestre,
+          heuresCM: m.heuresCM,
+          heuresTD: m.heuresTD,
+          heuresTP: m.heuresTP,
+          heuresTPE: m.heuresTPE,
+        })),
       });
-      return toMaquetteDto(row);
-    } catch (err) {
-      if (isUniqueConstraintError(err)) {
-        throw new ConflictException(
-          `Une maquette « ${dto.nom} » existe déjà pour cette filière et ce niveau`,
-        );
-      }
-      throw err;
     }
-  }
-
-  /** Renommage uniquement — filière + niveau figés (ADR-0010). */
-  async update(id: string, dto: UpdateMaquetteDto): Promise<MaquetteDto> {
-    const exists = await this.prisma.maquette.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException(`Maquette ${id} introuvable`);
-
-    const data: Prisma.MaquetteUpdateInput = {};
-    if (dto.nom !== undefined) data.nom = dto.nom;
-
-    try {
-      const row = await this.prisma.maquette.update({
-        where: { id },
-        data,
-        include: { filiere: true, _count: { select: { versions: true } } },
-      });
-      return toMaquetteDto(row);
-    } catch (err) {
-      if (isUniqueConstraintError(err)) {
-        throw new ConflictException(
-          `Une maquette « ${dto.nom ?? ''} » existe déjà pour cette filière et ce niveau`,
-        );
-      }
-      throw err;
-    }
+    return version.id;
   }
 
   // ── Versions (A.3) ───────────────────────────────────────────────────
@@ -156,61 +164,6 @@ export class MaquettesService {
       createdAt: version.createdAt.toISOString(),
       updatedAt: version.updatedAt.toISOString(),
     };
-  }
-
-  /**
-   * « Renouveler » (A.3) : clone profondément la dernière version vers l'année
-   * courante. 409 si une version existe déjà pour l'année courante (le bouton
-   * n'est censé apparaître que sinon) ou si aucune version n'existe à cloner.
-   * Transaction : version + tous ses modules atomiquement.
-   */
-  async renew(maquetteId: string): Promise<MaquetteVersionDto> {
-    const maquette = await this.prisma.maquette.findUnique({ where: { id: maquetteId } });
-    if (!maquette) throw new NotFoundException(`Maquette ${maquetteId} introuvable`);
-
-    const currentYear = await this.annees.getCurrentEntityOrThrow();
-
-    const already = await this.prisma.maquetteVersion.findUnique({
-      where: { maquetteId_anneeAcademiqueId: { maquetteId, anneeAcademiqueId: currentYear.id } },
-    });
-    if (already) {
-      throw new ConflictException(
-        `Une version existe déjà pour l'année courante (« ${currentYear.libelle} »)`,
-      );
-    }
-
-    const source = await this.prisma.maquetteVersion.findFirst({
-      where: { maquetteId },
-      orderBy: { anneeAcademique: { debut: 'desc' } },
-      include: { modules: true },
-    });
-    if (!source) {
-      throw new ConflictException(
-        'Aucune version à renouveler — composez une première version pour cette maquette',
-      );
-    }
-
-    const created = await this.prisma.$transaction(async (tx) => {
-      const version = await tx.maquetteVersion.create({
-        data: { maquetteId, anneeAcademiqueId: currentYear.id },
-      });
-      if (source.modules.length > 0) {
-        await tx.maquetteModule.createMany({
-          data: source.modules.map((m) => ({
-            maquetteVersionId: version.id,
-            moduleId: m.moduleId,
-            semestre: m.semestre,
-            heuresCM: m.heuresCM,
-            heuresTD: m.heuresTD,
-            heuresTP: m.heuresTP,
-            heuresTPE: m.heuresTPE,
-          })),
-        });
-      }
-      return version;
-    });
-
-    return this.getVersion(created.id);
   }
 
   // ── Composer (A.4) ───────────────────────────────────────────────────

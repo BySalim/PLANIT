@@ -3,25 +3,18 @@ import {
   type ClasseV3Dto,
   type CreateClasseV3Dto,
   type CreateFormationDto,
-  type CreateMaquetteDto,
   type CreateMaquetteModuleDto,
   type FormationDto,
   type InscriptionDto,
   type InscriptionRequestDto,
-  type MaquetteDto,
   type MaquetteModuleDto,
-  type MaquetteVersionDto,
   type SuiviModuleDto,
   type UpdateClasseV3Dto,
-  type UpdateFormationDto,
-  type UpdateMaquetteDto,
   type UpdateMaquetteModuleDto,
   classeV3Schema,
   formationSchema,
   inscriptionSchema,
   maquetteModuleSchema,
-  maquetteSchema,
-  maquetteVersionSchema,
   suiviModuleSchema,
 } from '@planit/contracts';
 import { useFlash } from '@planit/ui';
@@ -39,65 +32,10 @@ function useInvalidateAcademic() {
   return () => qc.invalidateQueries({ queryKey: academicKeys.all });
 }
 
-// ── POST /api/maquettes ───────────────────────────────────────────────
-
-export function useCreateMaquetteMutation() {
-  const invalidate = useInvalidateAcademic();
-  const flash = useFlash();
-  return useMutation<MaquetteDto, Error, CreateMaquetteDto>({
-    mutationFn: (body) => apiPost('/maquettes', maquetteSchema, body),
-    onSuccess: (data) => {
-      invalidate();
-      flash.push('success', `Maquette « ${data.nom} » créée`);
-    },
-    onError: (err) => {
-      flash.push('error', `Création impossible : ${err.message}`);
-    },
-  });
-}
-
-// ── PUT /api/maquettes/:id ────────────────────────────────────────────
-// Seul le nom est modifiable (filière + niveau figés ADR-0010).
-
-export function useUpdateMaquetteMutation() {
-  const invalidate = useInvalidateAcademic();
-  const flash = useFlash();
-  return useMutation<MaquetteDto, Error, { id: string; body: UpdateMaquetteDto }>({
-    mutationFn: ({ id, body }) => apiPut(`/maquettes/${id}`, maquetteSchema, body),
-    onSuccess: () => {
-      invalidate();
-      flash.push('success', 'Maquette mise à jour');
-    },
-    onError: (err) => {
-      flash.push('error', `Modification impossible : ${err.message}`);
-    },
-  });
-}
-
-// ── POST /api/maquettes/:id/renew ─────────────────────────────────────
-// Clone la dernière version vers l'année courante (ADR-0010).
-// 409 si une version existe déjà pour l'année courante.
-
-export function useRenewMaquetteMutation() {
-  const invalidate = useInvalidateAcademic();
-  const flash = useFlash();
-  return useMutation<MaquetteVersionDto, Error, { maquetteId: string }>({
-    mutationFn: ({ maquetteId }) =>
-      apiPost(`/maquettes/${maquetteId}/renew`, maquetteVersionSchema),
-    onSuccess: () => {
-      invalidate();
-      flash.push('success', "Maquette renouvelée pour l'année courante");
-    },
-    onError: (err) => {
-      flash.push(
-        'error',
-        err.message.includes('409')
-          ? "Une version existe déjà pour l'année en cours"
-          : `Renouvellement impossible : ${err.message}`,
-      );
-    },
-  });
-}
+// ADR-0018 : plus de mutation de création / renommage / renouvellement de
+// maquette côté client — la maquette et sa version sont créées/renouvelées
+// automatiquement par la création d'une formation (voir useCreateFormationMutation).
+// Seule la **composition** (ajout/màj/retrait de modules) est mutable ici.
 
 // ── POST /api/maquette-versions/:vid/modules ──────────────────────────
 
@@ -178,27 +116,8 @@ export function useCreateFormationMutation() {
   });
 }
 
-// ── PUT /api/formations/:id ───────────────────────────────────────────
-
-export function useUpdateFormationMutation() {
-  const invalidate = useInvalidateAcademic();
-  const flash = useFlash();
-  return useMutation<FormationDto, Error, { id: string; body: UpdateFormationDto }>({
-    mutationFn: ({ id, body }) => apiPut(`/formations/${id}`, formationSchema, body),
-    onSuccess: () => {
-      invalidate();
-      flash.push('success', 'Formation mise à jour');
-    },
-    onError: (err) => {
-      flash.push(
-        'error',
-        err.message.includes('409')
-          ? 'Ce code de formation est déjà utilisé'
-          : `Modification impossible : ${err.message}`,
-      );
-    },
-  });
-}
+// ADR-0018 : pas de mutation de mise à jour de formation — code/maquette/version
+// sont dérivés et figés à la création (filière + niveau seulement).
 
 // ─────────────────────────────────────────────────────────────────────
 // Classes V3 (B.1 / LOT 4 C.3)
