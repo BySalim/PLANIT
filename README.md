@@ -10,8 +10,8 @@ Monorepo pnpm workspaces developpe en vibe-code autonome par une equipe de 5 etu
 | --------------- | ----------------------------------------------- |
 | Frontend Web    | Next.js 15 + React 19 + Tailwind v4 + shadcn/ui |
 | Backend         | NestJS + Prisma + Zod + Swagger + Socket.IO     |
-| Mobile          | Expo (Vague 04)                                 |
-| WhatsApp Bot    | Baileys (Vague 04)                              |
+| Mobile          | Expo (Vague 06)                                 |
+| WhatsApp Bot    | Baileys (Vague 06)                              |
 | Base de donnees | PostgreSQL 16 + Prisma                          |
 | Cache           | Redis 7 + BullMQ                                |
 | Fichiers        | MinIO                                           |
