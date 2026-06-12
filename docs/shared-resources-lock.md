@@ -5,9 +5,10 @@
 
 ## Ressources sous lock actif
 
-| Ressource            | Membre | Depuis | Motif |
-| -------------------- | ------ | ------ | ----- |
-| _(aucun lock actif)_ | —      | —      | —     |
+| Ressource                           | Membre | Depuis     | Motif                                                         |
+| ----------------------------------- | ------ | ---------- | ------------------------------------------------------------- |
+| `apps/backend/prisma/schema.prisma` | Salim  | 2026-06-12 | V05 LOT 0.3 — multi-tenance École (schema + migration)        |
+| `packages/contracts/`               | Salim  | 2026-06-12 | V05 LOT 0.4 — contracts v5 (Ecole, Admin, audit, DTOs scopés) |
 
 ## Ressources partagées sensibles
 
