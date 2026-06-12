@@ -189,7 +189,12 @@ services:
       - '443:443'
     environment:
       PLANIT_DOMAIN: ${PLANIT_DOMAIN:-localhost}
-      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:-admin@planit.local}
+      # TLS piloté par CADDY_TLS (consommé par Caddyfile.prod `tls {$CADDY_TLS}`) :
+      # `internal` (localhost/VM) ou un email ACME (`admin@planit.sn`) pour Let's
+      # Encrypt en prod. SANS cette ligne, $CADDY_TLS est absent du conteneur →
+      # Caddy retombe sur `internal` même en prod (HTTPS cassé). Régression go-live
+      # 2026-06-12 corrigée seulement sur la box à l'époque ; rapatriée ici.
+      CADDY_TLS: ${CADDY_TLS:-internal}
     volumes:
       - ./caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

@@ -40,3 +40,11 @@
 		reverse_proxy web:3000
 	}
 }
+
+# Redirige www → apex (301, chemin + query préservés). Cert ACME auto pour www en
+# prod, interne sinon. Sans ce bloc, `https://www.<domaine>` échoue en TLS (pas de
+# site/cert pour ce nom) — constaté au go-live 2026-06-12.
+www.{$PLANIT_DOMAIN:localhost} {
+	tls {$CADDY_TLS:internal}
+	redir https://{$PLANIT_DOMAIN:localhost}{uri} permanent
+}
