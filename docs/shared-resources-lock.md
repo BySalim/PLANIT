@@ -7,7 +7,7 @@
 
 | Ressource            | Membre | Depuis | Motif |
 | -------------------- | ------ | ------ | ----- |
-| _(aucun lock actif)_ | —      | —      | —     |
+| _(aucun lock actif)_ |        |        |       |
 
 ## Ressources partagées sensibles
 

@@ -1,8 +1,10 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { createFormationSchema, updateFormationSchema } from '@planit/contracts';
-import type { CreateFormationDto, FormationDto, UpdateFormationDto } from '@planit/contracts';
+import { createFormationSchema } from '@planit/contracts';
+import type { CreateFormationDto, FormationDto } from '@planit/contracts';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { FormationsService } from './formations.service';
@@ -24,13 +26,17 @@ export class FormationsController {
   @ApiQuery({ name: 'filiereId', required: false })
   @ApiResponse({ status: 200, description: 'Liste des formations' })
   list(
+    @CurrentUser() user: CurrentUserPayload,
     @Query('anneeId') anneeId?: string,
     @Query('filiereId') filiereId?: string,
   ): Promise<FormationDto[]> {
-    return this.formations.list({
-      ...(anneeId ? { anneeId } : {}),
-      ...(filiereId ? { filiereId } : {}),
-    });
+    return this.formations.list(
+      {
+        ...(anneeId ? { anneeId } : {}),
+        ...(filiereId ? { filiereId } : {}),
+      },
+      user.ecoleId,
+    );
   }
 
   @Get(':id')
@@ -55,18 +61,5 @@ export class FormationsController {
     @Body(new ZodValidationPipe(createFormationSchema)) dto: CreateFormationDto,
   ): Promise<FormationDto> {
     return this.formations.create(dto);
-  }
-
-  @Put(':id')
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Mettre à jour une formation' })
-  @ApiResponse({ status: 200, description: 'Formation mise à jour' })
-  @ApiResponse({ status: 404, description: 'Formation introuvable' })
-  @ApiResponse({ status: 409, description: 'Code de formation déjà utilisé' })
-  update(
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe(updateFormationSchema)) dto: UpdateFormationDto,
-  ): Promise<FormationDto> {
-    return this.formations.update(id, dto);
   }
 }

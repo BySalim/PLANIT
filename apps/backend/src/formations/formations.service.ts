@@ -5,9 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { CreateFormationDto, FormationDto, UpdateFormationDto } from '@planit/contracts';
+import type { CreateFormationDto, FormationDto } from '@planit/contracts';
+import { formationCode } from '@planit/utils';
 import { PrismaService } from '../common/prisma.service';
 import { AnneesService } from '../annees/annees.service';
+import { MaquettesService } from '../maquettes/maquettes.service';
 
 const formationInclude = {
   filiere: true,
@@ -23,32 +25,42 @@ interface ListQuery {
 }
 
 /**
- * Formations (A.6 / V3-D4 / ADR-0010) — instances annuelles d'une filière
- * regroupant des classes.
+ * Formations (A.6 / V3-D4 / ADR-0010, refonte ADR-0018) — instances annuelles
+ * d'une filière regroupant des classes.
  *
- * Création **pour l'année courante uniquement** : `anneeAcademiqueId` est résolu
- * côté serveur via `AnneesService`, jamais fourni par le client. La version de
- * maquette référencée doit appartenir à cette même année (cohérence : une
- * formation 2025 s'appuie sur une maquette 2025 — le RP « Renouvelle » d'abord
- * si besoin). Une version d'une autre année → 400.
+ * Création **pour l'année courante uniquement** (résolue côté serveur). Le RP ne
+ * fournit que **filière + niveau** ; le reste est **dérivé** :
+ *  - le `code` = `{SIGLE}-{NIVEAU}-{libelléAnnée}` (helper pur `formationCode`) ;
+ *  - la **maquette `(filière, niveau)`** et sa **version pour l'année courante**
+ *    sont créées ou **renouvelées** automatiquement
+ *    (`MaquettesService.ensureMaquetteAndVersion`), dans la même transaction.
+ * Au plus **une** formation par `(filière, niveau, année)` (garde + `@@unique`).
+ * `isDoubleDiplome` n'existe plus ici : c'est une propriété de la filière.
  */
 @Injectable()
 export class FormationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly annees: AnneesService,
+    private readonly maquettes: MaquettesService,
   ) {}
 
-  /** Liste filtrable (défaut = année courante si `anneeId` absent). */
-  async list(query: ListQuery): Promise<FormationDto[]> {
-    const where: Prisma.FormationWhereInput = {};
+  /**
+   * Liste filtrable (défaut = année courante si `anneeId` absent), **scopée à
+   * l'école** de l'acteur via la filière (V05 / ADR-0019 §3). `ecoleId === null`
+   * (ADMIN) ⇒ liste vide.
+   */
+  async list(query: ListQuery, ecoleId: string | null): Promise<FormationDto[]> {
+    if (!ecoleId) return [];
+    const where: Prisma.FormationWhereInput = { filiere: { ecoleId } };
 
     if (query.anneeId) {
       where.anneeAcademiqueId = query.anneeId;
     } else {
-      // Défaut : année courante. Si aucune n'est en cours, on ne filtre pas
-      // (liste vide plutôt qu'erreur — la page reste affichable).
-      const current = await this.annees.findCurrentEntity();
+      // Défaut : année courante de l'école. Si aucune n'est en cours, on ne
+      // filtre pas par année (liste vide plutôt qu'erreur — la page reste
+      // affichable).
+      const current = await this.annees.findCurrentEntity(ecoleId);
       if (current) where.anneeAcademiqueId = current.id;
     }
     if (query.filiereId) where.filiereId = query.filiereId;
@@ -70,76 +82,68 @@ export class FormationsService {
     return toDto(row);
   }
 
+  /**
+   * Création pilote (ADR-0018) : filière + niveau → tout le reste est dérivé.
+   * Transaction atomique : maquette + version garanties (créées ou renouvelées)
+   * puis formation reliée. Garde anti-doublon `(filière, niveau, année)` avec un
+   * message lisible avant la contrainte `@@unique`.
+   */
   async create(dto: CreateFormationDto): Promise<FormationDto> {
-    const currentYear = await this.annees.getCurrentEntityOrThrow();
-
+    // L'école de la formation est celle de sa filière (racine de scope) ; on la
+    // résout d'abord pour obtenir l'année courante DE CETTE école (ADR-0019 §2).
     const filiere = await this.prisma.filiere.findUnique({ where: { id: dto.filiereId } });
     if (!filiere) throw new BadRequestException(`Filière ${dto.filiereId} introuvable`);
 
-    await this.assertVersionInYear(dto.maquetteVersionId, currentYear.id);
+    const currentYear = await this.annees.getCurrentEntityOrThrow(filiere.ecoleId);
 
-    try {
-      const row = await this.prisma.formation.create({
-        data: {
-          code: dto.code,
-          niveau: dto.niveau,
+    const duplicate = await this.prisma.formation.findUnique({
+      where: {
+        filiereId_niveau_anneeAcademiqueId: {
           filiereId: dto.filiereId,
+          niveau: dto.niveau,
           anneeAcademiqueId: currentYear.id,
-          maquetteVersionId: dto.maquetteVersionId,
-          isDoubleDiplome: dto.isDoubleDiplome,
         },
-        include: formationInclude,
-      });
-      return toDto(row);
-    } catch (err) {
-      if (isUniqueConstraintError(err)) {
-        throw new ConflictException(`Le code de formation "${dto.code}" est déjà utilisé`);
-      }
-      throw err;
-    }
-  }
-
-  async update(id: string, dto: UpdateFormationDto): Promise<FormationDto> {
-    const exists = await this.prisma.formation.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException(`Formation ${id} introuvable`);
-
-    // Changer la version : la nouvelle doit rester dans l'année de la formation.
-    if (dto.maquetteVersionId !== undefined) {
-      await this.assertVersionInYear(dto.maquetteVersionId, exists.anneeAcademiqueId);
+      },
+    });
+    if (duplicate) {
+      throw new ConflictException(
+        `Une formation ${dto.niveau} ${filiere.sigle} existe déjà pour ${currentYear.libelle}`,
+      );
     }
 
-    const data: Prisma.FormationUpdateInput = {};
-    if (dto.code !== undefined) data.code = dto.code;
-    if (dto.isDoubleDiplome !== undefined) data.isDoubleDiplome = dto.isDoubleDiplome;
-    if (dto.maquetteVersionId !== undefined) {
-      data.maquetteVersion = { connect: { id: dto.maquetteVersionId } };
-    }
+    const code = formationCode({
+      sigle: filiere.sigle,
+      niveau: dto.niveau,
+      anneeLibelle: currentYear.libelle,
+    });
 
     try {
-      const row = await this.prisma.formation.update({
-        where: { id },
-        data,
-        include: formationInclude,
+      const created = await this.prisma.$transaction(async (tx) => {
+        const maquetteVersionId = await this.maquettes.ensureMaquetteAndVersion(tx, {
+          filiereId: dto.filiereId,
+          niveau: dto.niveau,
+          sigle: filiere.sigle,
+          currentYearId: currentYear.id,
+        });
+        return tx.formation.create({
+          data: {
+            code,
+            niveau: dto.niveau,
+            filiereId: dto.filiereId,
+            anneeAcademiqueId: currentYear.id,
+            maquetteVersionId,
+          },
+          include: formationInclude,
+        });
       });
-      return toDto(row);
+      return toDto(created);
     } catch (err) {
       if (isUniqueConstraintError(err)) {
-        throw new ConflictException(`Le code de formation "${dto.code ?? ''}" est déjà utilisé`);
+        throw new ConflictException(
+          `Une formation ${dto.niveau} ${filiere.sigle} existe déjà pour ${currentYear.libelle}`,
+        );
       }
       throw err;
-    }
-  }
-
-  /** La version doit exister ET appartenir à `anneeId`, sinon 400. */
-  private async assertVersionInYear(versionId: string, anneeId: string): Promise<void> {
-    const version = await this.prisma.maquetteVersion.findUnique({ where: { id: versionId } });
-    if (!version) {
-      throw new BadRequestException(`Version de maquette ${versionId} introuvable`);
-    }
-    if (version.anneeAcademiqueId !== anneeId) {
-      throw new BadRequestException(
-        "La version de maquette doit appartenir à l'année de la formation (renouvelez la maquette pour l'année courante d'abord)",
-      );
     }
   }
 }
@@ -154,7 +158,6 @@ function toDto(row: FormationRow): FormationDto {
     anneeAcademiqueId: row.anneeAcademiqueId,
     anneeLibelle: row.anneeAcademique.libelle,
     maquetteVersionId: row.maquetteVersionId,
-    isDoubleDiplome: row.isDoubleDiplome,
     classeCount: row._count.classes,
   };
 }

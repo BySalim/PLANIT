@@ -61,7 +61,7 @@ function MaquetteItem({ maquette, selected, lastAnnee, onClick }: MaquetteItemPr
             <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
             <path d="M6 12v5c3 3 9 3 12 0v-5" />
           </svg>
-          {maquette.filiere?.sigle ?? '—'}
+          {maquette.filiere?.sigle ?? ''}
         </span>
         {meta !== null && lastAnnee !== null ? (
           <span
@@ -155,7 +155,6 @@ export interface MaquetteListProps {
   readonly selectedId: string | null;
   readonly isLoading: boolean;
   readonly onSelect: (id: string) => void;
-  readonly onCreate: () => void;
 }
 
 export function MaquetteList({
@@ -164,7 +163,6 @@ export function MaquetteList({
   selectedId,
   isLoading,
   onSelect,
-  onCreate,
 }: MaquetteListProps) {
   const [search, setSearch] = useState('');
 
@@ -208,24 +206,6 @@ export function MaquetteList({
           <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
             {filtered.length} maquette{filtered.length !== 1 ? 's' : ''}
           </span>
-          <button
-            type="button"
-            onClick={onCreate}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-hover"
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Nouvelle
-          </button>
         </div>
         <input
           type="search"

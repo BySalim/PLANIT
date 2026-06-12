@@ -14,12 +14,27 @@ datasource db {
 enum Role {
   SUPER_ADMIN
   ADMIN
+  DIRECTION // V05 — pilotage scopé à une école (ADR-0020)
   RESPONSABLE_PROGRAMME
   ASSISTANT_PROGRAMME
   ENSEIGNANT
   ETUDIANT
   RESPONSABLE_CLASSE
   PARTENAIRE
+}
+
+// V05 — cycle de vie d'un compte (V5-D7 / ADR-0020). Suspendu = login refusé +
+// sessions invalidées. L'archivage passe par `User.deletedAt` (soft-delete).
+enum UserStatut {
+  EN_ATTENTE
+  ACTIF
+  SUSPENDU
+}
+
+// V05 — état d'une école (ADR-0019). Archivée = sort des listes, jamais supprimée.
+enum EcoleStatut {
+  ACTIVE
+  ARCHIVEE
 }
 
 // V01 enum — kept for backward compatibility with the V01 SeanceService/mapper.
@@ -94,6 +109,50 @@ enum AnneeEtat {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Multi-tenance — Vague 05 (ADR-0019 / ADR-0020)
+// ─────────────────────────────────────────────────────────────────────────────
+// `Ecole` = tenant racine. `ecoleId` ajouté sur les racines de scope (User,
+// Filiere, Salle, Enseignant, AnneeAcademique) ; les chaînes héritent par FK.
+// Migration additive + backfill « École d'Ingénieurs » (cf. migration scriptée).
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Ecole {
+  id         String      @id @default(cuid())
+  nom        String      @unique
+  statut     EcoleStatut @default(ACTIVE)
+  archivedAt DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  users            User[]
+  filieres         Filiere[]
+  salles           Salle[]
+  enseignants      Enseignant[]
+  anneesAcademiques AnneeAcademique[]
+
+  @@map("ecoles")
+}
+
+// Journal d'audit des actions sensibles (V5-D8 / ADR-0020). Écrit dans la même
+// transaction que l'action quand c'est possible, via un AuditService mutualisé.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      User     @relation("AuditActor", fields: [actorId], references: [id])
+  action     String // ex. « user.suspend », « ecole.archive », « annee.debuter »
+  targetType String
+  targetId   String?
+  ecoleId    String? // scope optionnel (null = action cross-école)
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([ecoleId, createdAt])
+  @@index([actorId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Auth
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -102,6 +161,10 @@ model User {
   email          String    @unique
   fullName       String
   role           Role
+  // V05 — null pour ADMIN/SUPER_ADMIN (cross-école), requis sinon (ADR-0019).
+  ecoleId        String?
+  ecole          Ecole?     @relation(fields: [ecoleId], references: [id])
+  statut         UserStatut @default(ACTIF) // V05 — cycle de vie compte (ADR-0020)
   passwordHash   String?
   refreshTokenId String? // V01 placeholder, deprecated by `refreshTokens` (LOT 2 cleanup)
   matricule      String?   @unique
@@ -137,7 +200,14 @@ model User {
   // V03 — salles dont ce RP est responsable (V3-D10).
   responsableSalles Salle[] @relation("SalleResponsable")
 
+  // V05 — filières dont ce RP est le Responsable (V5-D5 / ADR-0020).
+  responsableFilieres Filiere[] @relation("FiliereResponsable")
+
+  // V05 — actions tracées au journal d'audit (ADR-0020).
+  auditLogs AuditLog[] @relation("AuditActor")
+
   @@index([managerRpId])
+  @@index([ecoleId])
   @@map("users")
 }
 
@@ -175,10 +245,21 @@ model Filiere {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
+  // V05 — école propriétaire (ADR-0019, requis après backfill).
+  ecoleId String
+  ecole   Ecole  @relation(fields: [ecoleId], references: [id])
+
+  // V05 — RP responsable de la filière (« Responsable », V5-D5 / ADR-0020).
+  // Nullable : filière sans RP attitré (affichage « — / Non assigné »).
+  responsableRpId String?
+  responsableRp   User?   @relation("FiliereResponsable", fields: [responsableRpId], references: [id], onDelete: SetNull)
+
   // V03 — plans d'études et formations de cette filière (ADR-0010 / V3-D4).
   maquettes  Maquette[]
   formations Formation[]
 
+  @@index([ecoleId])
+  @@index([responsableRpId])
   @@map("filieres")
 }
 
@@ -262,19 +343,27 @@ model Module {
 
 model Salle {
   id        String   @id @default(cuid())
-  name      String   @unique
+  name      String
   type      String
   capacity  Int
   seances   Seance[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // V05 — école propriétaire (ADR-0019, requis après backfill).
+  ecoleId String
+  ecole   Ecole  @relation(fields: [ecoleId], references: [id])
+
   // V03 — RP responsable de la salle (V3-D10 / ADR-0010). Nullable : permet
-  // le filtrage « salles dont son RP est responsable » côté AC.
+  // le filtrage « salles dont son RP est responsable » côté AC. null ⇒ salle
+  // commune (V5-D6) accessible à tous DANS l'école.
   rpResponsableId String?
   rpResponsable   User?   @relation("SalleResponsable", fields: [rpResponsableId], references: [id], onDelete: SetNull)
 
+  // V05 — nom unique PAR école (plus global) : deux écoles peuvent avoir une « Salle 101 ».
+  @@unique([ecoleId, name])
   @@index([rpResponsableId])
+  @@index([ecoleId])
   @@map("salles")
 }
 
@@ -293,9 +382,14 @@ model Enseignant {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   taughtSeances Seance[] @relation("SeanceEnseignant")
 
+  // V05 — école propriétaire (ADR-0019, requis après backfill).
+  ecoleId String
+  ecole   Ecole  @relation(fields: [ecoleId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([ecoleId])
   @@map("enseignants")
 }
 
@@ -406,10 +500,14 @@ model SeanceClasse {
 // Année académique — source de vérité de « l'année courante » (V3-D1 / ADR-0010).
 model AnneeAcademique {
   id      String    @id @default(cuid())
-  libelle String    @unique // « 2025-2026 »
+  libelle String // « 2025-2026 » — unique PAR école (V05), plus global
   debut   DateTime
   fin     DateTime
   etat    AnneeEtat @default(PLANIFIEE)
+
+  // V05 — école propriétaire (ADR-0019 §2, requis après backfill).
+  ecoleId String
+  ecole   Ecole  @relation(fields: [ecoleId], references: [id])
 
   maquetteVersions MaquetteVersion[]
   formations       Formation[]
@@ -418,9 +516,12 @@ model AnneeAcademique {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // NB : l'unicité « au plus une EN_COURS » est garantie par un index unique
-  // partiel Postgres (cf. migration). @@index simple ici pour les filtres.
+  // V05 — l'invariant « au plus une EN_COURS » devient « par école » : index
+  // unique partiel Postgres sur (ecoleId) WHERE etat='EN_COURS' (cf. migration,
+  // Prisma ne sait pas l'exprimer). @@index simple ici pour les filtres.
+  @@unique([ecoleId, libelle])
   @@index([etat])
+  @@index([ecoleId])
   @@map("annee_academiques")
 }
 
@@ -438,7 +539,9 @@ model Maquette {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([filiereId, niveau, nom])
+  // ADR-0018 : une seule maquette par (filière, niveau). Le `nom` est dérivé
+  // (« Maquette {niveau} {sigle} ») — il n'entre plus dans la clé d'unicité.
+  @@unique([filiereId, niveau])
   @@index([filiereId])
   @@map("maquettes")
 }
@@ -497,13 +600,17 @@ model Formation {
   anneeAcademique   AnneeAcademique @relation(fields: [anneeAcademiqueId], references: [id])
   maquetteVersionId String
   maquetteVersion   MaquetteVersion @relation(fields: [maquetteVersionId], references: [id])
-  isDoubleDiplome   Boolean         @default(false)
+
+  // ADR-0018 : `isDoubleDiplome` n'est PLUS porté par la formation — c'est une
+  // propriété de la Filiere (dérivée à l'affichage et à l'inscription).
 
   classes Classe[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // ADR-0018 : un seul choix (filière, niveau) par année courante (règle 2.1).
+  @@unique([filiereId, niveau, anneeAcademiqueId])
   @@index([anneeAcademiqueId])
   @@index([filiereId])
   @@index([maquetteVersionId])

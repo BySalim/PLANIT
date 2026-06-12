@@ -59,40 +59,51 @@ describe('Formations (A.6)', () => {
     expect(res.body.classeCount).toBeGreaterThanOrEqual(2); // GL3-A + GL3-B
   });
 
-  it("crée une formation pour l'année courante (version de l'année)", async () => {
+  it('crée une formation (filière + niveau) : code dérivé + maquette/version auto (ADR-0018)', async () => {
     const session = await rp();
-    const res = await api().post('/api/formations').set('Cookie', session.cookieHeader).send({
-      code: 'GLRS-M2-2025',
-      niveau: 'M2',
-      filiereId: 'seed-filiere-glrs',
-      maquetteVersionId: 'seed-maqv-glrs-l3-2025', // version année courante
-      isDoubleDiplome: false,
-    });
+    const res = await api()
+      .post('/api/formations')
+      .set('Cookie', session.cookieHeader)
+      .send({ filiereId: 'seed-filiere-glrs', niveau: 'M2' });
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ code: 'GLRS-M2-2025', anneeLibelle: '2025-2026' });
+    // Code dérivé {SIGLE}-{NIVEAU}-{libelléComplet}.
+    expect(res.body).toMatchObject({ code: 'GLRS-M2-2025-2026', anneeLibelle: '2025-2026' });
+    // La maquette (GLRS, M2) + sa version année courante sont créées (nom dérivé).
+    const maquette = await prisma.maquette.findUnique({
+      where: { filiereId_niveau: { filiereId: 'seed-filiere-glrs', niveau: 'M2' } },
+      include: { versions: true },
+    });
+    expect(maquette?.nom).toBe('Maquette M2 GLRS');
+    expect(maquette?.versions).toHaveLength(1);
   });
 
-  it('refuse une version de maquette hors année courante → 400', async () => {
+  it("renouvelle automatiquement la maquette de l'année précédente (clone des modules)", async () => {
     const session = await rp();
-    const res = await api().post('/api/formations').set('Cookie', session.cookieHeader).send({
-      code: 'GLRS-X-2025',
-      niveau: 'L2',
-      filiereId: 'seed-filiere-glrs',
-      maquetteVersionId: 'seed-maqv-glrs-l2-2024', // version 2024 (clôturée)
-      isDoubleDiplome: false,
+    // GLRS L1 n'a qu'une version 2024 (3 modules) → créer la formation L1 pour
+    // l'année courante clone ces 3 modules dans une nouvelle version 2025.
+    const res = await api()
+      .post('/api/formations')
+      .set('Cookie', session.cookieHeader)
+      .send({ filiereId: 'seed-filiere-glrs', niveau: 'L1' });
+    expect(res.status).toBe(201);
+    const versionId = (res.body as { maquetteVersionId: string }).maquetteVersionId;
+    expect(versionId).not.toBe('seed-maqv-glrs-l1-2024');
+    const cloned = await prisma.maquetteModule.count({ where: { maquetteVersionId: versionId } });
+    expect(cloned).toBe(3);
+    // L'ancienne version 2024 reste intacte (immutabilité inter-années).
+    const old = await prisma.maquetteModule.count({
+      where: { maquetteVersionId: 'seed-maqv-glrs-l1-2024' },
     });
-    expect(res.status).toBe(400);
+    expect(old).toBe(3);
   });
 
-  it('refuse un code de formation déjà utilisé → 409', async () => {
+  it('refuse un doublon (filière + niveau + année courante) → 409', async () => {
     const session = await rp();
-    const res = await api().post('/api/formations').set('Cookie', session.cookieHeader).send({
-      code: 'GLRS-L3-2025', // déjà seedé
-      niveau: 'L3',
-      filiereId: 'seed-filiere-glrs',
-      maquetteVersionId: 'seed-maqv-glrs-l3-2025',
-      isDoubleDiplome: false,
-    });
+    // GLRS L3 existe déjà pour 2025-2026 (seed).
+    const res = await api()
+      .post('/api/formations')
+      .set('Cookie', session.cookieHeader)
+      .send({ filiereId: 'seed-filiere-glrs', niveau: 'L3' });
     expect(res.status).toBe(409);
   });
 

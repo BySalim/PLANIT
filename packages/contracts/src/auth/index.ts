@@ -6,6 +6,7 @@ import { z } from 'zod';
 export const roleSchema = z.enum([
   'SUPER_ADMIN',
   'ADMIN',
+  'DIRECTION', // V05 — pilotage scopé à une école (ADR-0020)
   'RESPONSABLE_PROGRAMME',
   'ASSISTANT_PROGRAMME',
   'ENSEIGNANT',
@@ -15,6 +16,10 @@ export const roleSchema = z.enum([
 ]);
 
 export type Role = z.infer<typeof roleSchema>;
+
+// ── V05 — cycle de vie d'un compte (V5-D7 / ADR-0020) ───────────────
+export const userStatutSchema = z.enum(['EN_ATTENTE', 'ACTIF', 'SUSPENDU']);
+export type UserStatut = z.infer<typeof userStatutSchema>;
 
 // ── Login / Register (V01 — kept) ────────────────────────────────────
 export const loginSchema = z.object({
@@ -38,6 +43,8 @@ export const authMeSchema = z.object({
   role: roleSchema,
   fullName: z.string(),
   matricule: z.string().nullable(),
+  // V05 — école de rattachement (null pour ADMIN/SUPER_ADMIN, ADR-0019).
+  ecoleId: z.string().nullable(),
 });
 
 export type LoginDto = z.infer<typeof loginSchema>;

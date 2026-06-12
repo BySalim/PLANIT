@@ -39,12 +39,14 @@ export interface PaginatedEnseignants {
 export class EnseignantsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** B.6 — liste avec pagination + filtres optionnels. */
-  async list(query: ListQuery): Promise<PaginatedEnseignants> {
+  /** B.6 — liste avec pagination + filtres optionnels, **scopée à l'école**. */
+  async list(query: ListQuery, ecoleId: string | null): Promise<PaginatedEnseignants> {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(200, Math.max(1, query.pageSize ?? 50));
 
-    const where: Prisma.EnseignantWhereInput = {};
+    if (!ecoleId) return { items: [], total: 0, page, pageSize };
+
+    const where: Prisma.EnseignantWhereInput = { ecoleId };
     if (query.statut) where.statut = query.statut;
     if (query.specialite) where.specialite = { contains: query.specialite, mode: 'insensitive' };
 
@@ -77,7 +79,7 @@ export class EnseignantsService {
    * et `passwordHash` argon2id du mot de passe fourni. L'Enseignant est
    * lié 1-1 via `userId`.
    */
-  async create(dto: CreateEnseignantDto): Promise<EnseignantDto> {
+  async create(dto: CreateEnseignantDto, ecoleId: string): Promise<EnseignantDto> {
     // Email unique sur User ET sur emailInstitutionnel (séparés mais alignés
     // dans le seed et l'API).
     const existing = await this.prisma.user.findUnique({
@@ -89,6 +91,8 @@ export class EnseignantsService {
 
     const passwordHash = await argon2Hash(dto.password, ARGON2_OPTS);
 
+    // V05 — le compte User et la fiche Enseignant sont rattachés à la même école
+    // que l'acteur créateur (ADR-0019 : enseignant = personnel d'une école).
     const enseignant = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -96,6 +100,7 @@ export class EnseignantsService {
           fullName: dto.nomComplet,
           role: 'ENSEIGNANT',
           passwordHash,
+          ecoleId,
         },
       });
       return tx.enseignant.create({
@@ -106,6 +111,7 @@ export class EnseignantsService {
           whatsapp: dto.whatsapp ?? null,
           statut: dto.statut,
           specialite: dto.specialite,
+          ecoleId,
         },
       });
     });

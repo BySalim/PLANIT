@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { type FormationDto } from '@planit/contracts';
 import { ChevronRightIcon } from '@planit/ui';
 import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
@@ -10,25 +9,6 @@ import { useFilieresQuery } from '@/lib/queries';
 import { useAnneesQuery, useFormationsQuery } from '@/lib/queries-v3';
 import { FormationModal } from '@/components/rp/formations/formation-modal';
 import { FormationsTableSkeleton } from '@/components/rp/formations/formations-table-skeleton';
-
-// ── Icône inline ──────────────────────────────────────────────────────
-function PencilIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
-  );
-}
 
 function NiveauBadge({ niveau }: { niveau: string }) {
   return (
@@ -46,12 +26,6 @@ function SigleBadge({ sigle }: { sigle: string }) {
   );
 }
 
-// ── Types modal ───────────────────────────────────────────────────────
-type ModalState =
-  | { open: false }
-  | { open: true; mode: 'create' }
-  | { open: true; mode: 'edit'; initial: FormationDto };
-
 const COLS = 'grid grid-cols-[150px_70px_1fr_120px_auto] items-center gap-3';
 
 // ── Page ──────────────────────────────────────────────────────────────
@@ -60,7 +34,7 @@ export default function FormationsPage() {
 
   const [filiereFilter, setFiliereFilter] = useState('');
   const [anneeFilter, setAnneeFilter] = useState('');
-  const [modal, setModal] = useState<ModalState>({ open: false });
+  const [createOpen, setCreateOpen] = useState(false);
 
   const filieresQuery = useFilieresQuery();
   const anneesQuery = useAnneesQuery();
@@ -126,11 +100,7 @@ export default function FormationsPage() {
             ))}
           </select>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setModal({ open: true, mode: 'create' })}
-        >
+        <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
           + Nouvelle formation
         </Button>
       </div>
@@ -145,11 +115,7 @@ export default function FormationsPage() {
       ) : !formations || formations.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16">
           <p className="text-sm text-text-muted">Aucune formation pour ce filtre.</p>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setModal({ open: true, mode: 'create' })}
-          >
+          <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
             Créer une formation
           </Button>
         </div>
@@ -187,11 +153,6 @@ export default function FormationsPage() {
               <div className="flex items-center gap-2">
                 {f.filiere ? <SigleBadge sigle={f.filiere.sigle} /> : null}
                 <span className="truncate text-sm text-text-sec">{f.filiere?.libelle ?? '—'}</span>
-                {f.isDoubleDiplome ? (
-                  <span className="rounded-full border border-primary-100 bg-primary-100 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                    Double diplôme
-                  </span>
-                ) : null}
               </div>
               <span className="text-[13px] tabular-nums text-text-sec">
                 {f.anneeLibelle ?? '—'}
@@ -221,26 +182,13 @@ export default function FormationsPage() {
                   Maquette
                   <ChevronRightIcon size={12} color="currentColor" />
                 </button>
-                <button
-                  type="button"
-                  title="Modifier la formation"
-                  onClick={() => setModal({ open: true, mode: 'edit', initial: f })}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-text"
-                >
-                  <PencilIcon />
-                </button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      <FormationModal
-        isOpen={modal.open}
-        onClose={() => setModal({ open: false })}
-        mode={modal.open ? modal.mode : 'create'}
-        initial={modal.open && modal.mode === 'edit' ? modal.initial : undefined}
-      />
+      <FormationModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />
     </Shell>
   );
 }

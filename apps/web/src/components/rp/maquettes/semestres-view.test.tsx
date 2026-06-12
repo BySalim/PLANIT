@@ -56,6 +56,7 @@ describe('SemestresView — Mode composition', () => {
     const { container } = render(
       <SemestresView
         version={buildVersion()}
+        niveau="L3"
         isLoading={false}
         isEditing
         edits={{}}
@@ -71,6 +72,7 @@ describe('SemestresView — Mode composition', () => {
     render(
       <SemestresView
         version={buildVersion()}
+        niveau="L3"
         isLoading={false}
         isEditing={false}
         edits={{}}
@@ -83,5 +85,23 @@ describe('SemestresView — Mode composition', () => {
     const headers = screen.getAllByRole('button', { name: /Semestre/i });
     expect(headers.length).toBeGreaterThan(0);
     expect(headers[0]).toHaveAttribute('aria-expanded');
+  });
+
+  it('dérive les libellés de semestre du niveau (L3 → S5/S6)', () => {
+    render(
+      <SemestresView
+        version={buildVersion()}
+        niveau="L3"
+        isLoading={false}
+        isEditing={false}
+        edits={{}}
+        onFieldChange={noop}
+        onRemoveModule={noop}
+        onAddModule={noop}
+      />,
+    );
+    expect(screen.getByText('S5')).toBeInTheDocument();
+    expect(screen.getByText('S6')).toBeInTheDocument();
+    expect(screen.getByText('Semestre 5')).toBeInTheDocument();
   });
 });

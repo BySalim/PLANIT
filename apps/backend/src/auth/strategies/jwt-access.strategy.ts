@@ -27,6 +27,7 @@ interface AccessPayload {
   sub?: unknown;
   email?: unknown;
   role?: unknown;
+  ecoleId?: unknown;
 }
 
 /**
@@ -57,6 +58,8 @@ export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt-access') 
     if (!role.success) {
       throw new UnauthorizedException('Rôle inconnu dans le JWT access');
     }
-    return { id: payload.sub, email: payload.email, role: role.data };
+    // V05 — ecoleId embarqué (string) ou null pour ADMIN/SUPER_ADMIN (ADR-0019).
+    const ecoleId = typeof payload.ecoleId === 'string' ? payload.ecoleId : null;
+    return { id: payload.sub, email: payload.email, role: role.data, ecoleId };
   }
 }

@@ -3,6 +3,8 @@ import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { Throttle } from '@nestjs/throttler';
 import { createFiliereSchema, updateFiliereSchema } from '@planit/contracts';
 import type { CreateFiliereDto, FiliereDto, UpdateFiliereDto } from '@planit/contracts';
+import { CurrentUser, requireEcole } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { FilieresService } from './filieres.service';
@@ -15,10 +17,10 @@ export class FilieresController {
   constructor(private readonly filieres: FilieresService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Liste des filières' })
+  @ApiOperation({ summary: 'Liste des filières de son école' })
   @ApiResponse({ status: 200, description: 'Liste filières' })
-  list(): Promise<FiliereDto[]> {
-    return this.filieres.list();
+  list(@CurrentUser() user: CurrentUserPayload): Promise<FiliereDto[]> {
+    return this.filieres.list(user.ecoleId);
   }
 
   @Get(':id')
@@ -34,11 +36,13 @@ export class FilieresController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Créer une filière' })
   @ApiResponse({ status: 201, description: 'Filière créée' })
+  @ApiResponse({ status: 403, description: 'Acteur sans école de rattachement' })
   @ApiResponse({ status: 409, description: 'Sigle déjà utilisé' })
   create(
+    @CurrentUser() user: CurrentUserPayload,
     @Body(new ZodValidationPipe(createFiliereSchema)) dto: CreateFiliereDto,
   ): Promise<FiliereDto> {
-    return this.filieres.create(dto);
+    return this.filieres.create(dto, requireEcole(user));
   }
 
   @Put(':id')

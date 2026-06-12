@@ -117,15 +117,24 @@ export type UpdateModuleDto = z.infer<typeof updateModuleSchema>;
 
 // ── Filière ─────────────────────────────────────────────────────────
 
+// V05 — référence légère au RP responsable (V5-D5), surfacée comme « Responsable ».
+export const responsableRefSchema = z.object({ id: cuid, fullName: z.string() });
+export type ResponsableRefDto = z.infer<typeof responsableRefSchema>;
+
 export const filiereSchema = z.object({
   id: cuid,
   sigle: z.string().min(1).max(20),
   libelle: z.string().min(1).max(120),
   isDoubleDiplome: z.boolean(),
   grade: filiereGradeSchema,
+  // V05 (V5-D5 / ADR-0020) — RP responsable, nullable (« — » si non assigné).
+  responsableRpId: cuid.nullable(),
+  responsable: responsableRefSchema.nullable().optional(),
 });
 
-export const createFiliereSchema = filiereSchema.omit({ id: true });
+export const createFiliereSchema = filiereSchema
+  .omit({ id: true, responsable: true })
+  .extend({ responsableRpId: cuid.nullable().optional() });
 export const updateFiliereSchema = createFiliereSchema.partial();
 
 export type FiliereDto = z.infer<typeof filiereSchema>;
