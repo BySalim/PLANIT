@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import { ChevronDownIcon, DownloadIcon, LayersIcon, PlusIcon } from '@planit/ui';
 import { cn } from '@/lib/utils';
+import { ExportMenu } from '@/components/ui/export-menu';
 import { ViewModeTabs, type ViewMode } from './view-mode-tabs';
 import { WeekNavigator } from './week-navigator';
 
@@ -102,78 +102,21 @@ function ClassSelector({ label = 'M1 IA' }: { label?: string | undefined }) {
   );
 }
 
-// LOT 7 (X.2) — bouton export câblé sur onExport. Affiche un menu
-// déroulant PNG / PDF. Désactivé si onExport est absent (état chargement).
-function ExportButton({
-  onExport,
-  isExporting,
-}: {
-  onExport?: ((format: 'png' | 'pdf') => void) | undefined;
-  isExporting?: boolean | undefined;
-}) {
-  const [open, setOpen] = useState(false);
-  const busy = isExporting === true;
-
-  if (onExport === undefined) {
-    return (
-      <button
-        type="button"
-        disabled
-        title="Export non disponible"
-        className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border-soft bg-surface px-2.5 text-[12px] font-medium text-text-muted"
-      >
-        <DownloadIcon size={13} color="currentColor" />
-        <span>Exporter</span>
-        <ChevronDownIcon size={11} color="currentColor" />
-      </button>
-    );
-  }
-
+// LOT 7 (X.2) — fallback désactivé quand l'export n'est pas encore prêt
+// (onExport absent / données en chargement). Le menu actif est délégué au
+// composant réutilisable `ExportMenu` (portail, échappe au clipping toolbar).
+function ExportDisabled() {
   return (
-    <div className="relative">
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Exporter le planning"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className={cn(
-          'inline-flex h-8 flex-shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium transition-colors',
-          busy
-            ? 'cursor-wait border-border-soft bg-surface text-text-muted'
-            : 'border-border bg-surface text-text hover:border-primary hover:text-primary',
-        )}
-      >
-        <DownloadIcon size={13} color="currentColor" />
-        <span>{busy ? 'Génération…' : 'Exporter'}</span>
-        <ChevronDownIcon size={11} color="currentColor" />
-      </button>
-
-      {open && !busy && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-50 mt-1 min-w-[148px] overflow-hidden rounded-xl border border-border bg-surface shadow-lg"
-          onMouseLeave={() => setOpen(false)}
-        >
-          {(['png', 'pdf'] as const).map((fmt) => (
-            <button
-              key={fmt}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onExport(fmt);
-              }}
-              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-medium text-text transition-colors hover:bg-bg-warm"
-            >
-              <DownloadIcon size={13} color="currentColor" />
-              {fmt === 'png' ? 'Image PNG' : 'Document PDF'}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <button
+      type="button"
+      disabled
+      title="Export non disponible"
+      className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border-soft bg-surface px-2.5 text-[12px] font-medium text-text-muted"
+    >
+      <DownloadIcon size={13} color="currentColor" />
+      <span>Exporter</span>
+      <ChevronDownIcon size={11} color="currentColor" />
+    </button>
   );
 }
 
@@ -231,7 +174,11 @@ export function PlanningToolbar({
 
       {/* Right : view modes + export + (new session si RP) */}
       <ViewModeTabs active={viewMode} onChange={onViewModeChange} />
-      <ExportButton onExport={onExport} isExporting={isExporting} />
+      {onExport === undefined ? (
+        <ExportDisabled />
+      ) : (
+        <ExportMenu onExport={onExport} isExporting={isExporting} align="right" />
+      )}
       {readOnly ? null : (
         <>
           <ToolbarSeparator />

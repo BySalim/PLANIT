@@ -81,7 +81,7 @@ export function MaquetteInfosModal({
         {/* Nom dérivé */}
         <div>
           <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-text-muted">
-            Nom (généré automatiquement)
+            Nom
           </p>
           <p className="font-display text-[18px] font-semibold text-text">{maquette.nom}</p>
         </div>
@@ -121,14 +121,14 @@ export function MaquetteInfosModal({
           </div>
         </div>
 
-        {/* Champs figés (info) */}
+        {/* Filière + niveau */}
         <div className="flex flex-wrap items-end gap-3">
           <div className="rounded-lg border border-border bg-bg px-3 py-2">
             <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-text-faint">
               Filière
             </p>
             <p className="text-[13px] font-semibold text-text">
-              {maquette.filiere ? `${maquette.filiere.sigle} — ${maquette.filiere.libelle}` : '—'}
+              {maquette.filiere ? `${maquette.filiere.sigle} · ${maquette.filiere.libelle}` : ''}
             </p>
           </div>
           <div className="rounded-lg border border-border bg-bg px-3 py-2">
@@ -137,9 +137,6 @@ export function MaquetteInfosModal({
             </p>
             <p className="text-[13px] font-semibold text-text">{maquette.niveau}</p>
           </div>
-          <p className="self-end text-[11.5px] text-text-muted">
-            Filière, niveau et nom dérivés de la formation — non modifiables (ADR-0018)
-          </p>
         </div>
 
         {/* Action */}

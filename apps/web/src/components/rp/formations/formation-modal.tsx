@@ -64,7 +64,7 @@ export function FormationModal({ isOpen, onClose }: FormationModalProps) {
     ev.preventDefault();
     setError(null);
     if (currentYear === null) {
-      setError("Aucune année académique en cours — créez-la d'abord.");
+      setError("Aucune année académique en cours, créez-la d'abord.");
       return;
     }
     const parsed = createFormationSchema.safeParse({ niveau, filiereId });
@@ -112,7 +112,7 @@ export function FormationModal({ isOpen, onClose }: FormationModalProps) {
               value={filiereId}
               onChange={(e) => setFiliereId(e.target.value)}
             >
-              <option value="">— Choisir une filière —</option>
+              <option value="">Choisir une filière</option>
               {filieres.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.sigle} · {f.libelle}
@@ -139,29 +139,14 @@ export function FormationModal({ isOpen, onClose }: FormationModalProps) {
           )}
         </FormField>
 
-        {/* Aperçu du code + de la maquette dérivés (ADR-0018) */}
-        <div className="rounded-lg border border-border-soft bg-bg px-3 py-2.5">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-            Code de la formation (généré)
-          </p>
-          {codePreview !== null ? (
-            <p className="font-mono text-[13px] font-semibold text-primary">{codePreview}</p>
-          ) : (
-            <p className="text-[12.5px] italic text-text-faint">
-              {currentYear === null
-                ? 'Aucune année académique en cours.'
-                : 'Choisissez une filière pour voir le code.'}
-            </p>
-          )}
-          <p className="mt-2 text-[12px] text-text-muted">
-            La maquette{' '}
-            <span className="font-semibold text-text-sec">
-              Maquette {niveau} {selectedFiliere?.sigle ?? '…'}
-            </span>{' '}
-            sera créée ou renouvelée automatiquement (clonée depuis l’année précédente si elle
-            existe).
-          </p>
-        </div>
+        {codePreview !== null && (
+          <div className="flex items-center justify-between rounded-lg border border-border-soft bg-bg px-3 py-2.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              Code
+            </span>
+            <span className="font-mono text-[13px] font-semibold text-primary">{codePreview}</span>
+          </div>
+        )}
 
         {error !== null ? (
           <div className="rounded-lg bg-err-100 px-4 py-2 text-sm text-err">{error}</div>

@@ -5,15 +5,11 @@ import type { MaquetteModuleDto, MaquetteVersionDto } from '@planit/contracts';
 import { semestreAbsolu, semestreLabel } from '@planit/utils';
 import { cn } from '@/lib/utils';
 
-// ── Palette UE (6 couleurs cycliques — miroir PLANIT-Design) ─────────
-const UE_PALETTE = [
-  { bar: '#E8620A', bg: '#FEF3E2', text: '#7C2D12', soft: '#FFF7ED', chip: '#FDE8D0' },
-  { bar: '#1E40AF', bg: '#DBEAFE', text: '#1E3A8A', soft: '#EFF6FF', chip: '#BFDBFE' },
-  { bar: '#15803D', bg: '#DCFCE7', text: '#14532D', soft: '#F0FDF4', chip: '#BBF7D0' },
-  { bar: '#9D174D', bg: '#FCE7F3', text: '#831843', soft: '#FDF2F8', chip: '#FBCFE8' },
-  { bar: '#5B21B6', bg: '#EDE9FE', text: '#4C1D95', soft: '#F5F3FF', chip: '#DDD6FE' },
-  { bar: '#B91C1C', bg: '#FEE2E2', text: '#7F1D1D', soft: '#FEF2F2', chip: '#FECACA' },
-] as const;
+// Teintes dérivées de la couleur RÉELLE de l'UE (référentiel) — on ne remplace
+// jamais la couleur de l'entité par une palette arbitraire. Alpha hex en suffixe.
+function ueShades(hex: string) {
+  return { bar: hex, bg: `${hex}1F`, text: hex, soft: `${hex}10`, chip: `${hex}29` };
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -61,7 +57,7 @@ function NumCell({ value, field, mfId, isVH = false, isEditing = false, onChange
             : 'text-text',
       )}
     >
-      {value === 0 && !isVH ? '—' : value}
+      {value === 0 && !isVH ? '·' : value}
     </td>
   );
 }
@@ -74,7 +70,7 @@ interface SemestreTableProps {
   readonly edits: Record<string, Partial<MaquetteModuleDto>>;
   readonly onChange: (mfId: string, field: string, val: number) => void;
   readonly onRemove: (mfId: string) => void;
-  readonly onAddModule: () => void;
+  readonly onAdd: () => void;
 }
 
 function SemestreTable({
@@ -83,7 +79,7 @@ function SemestreTable({
   edits,
   onChange,
   onRemove,
-  onAddModule,
+  onAdd,
 }: SemestreTableProps) {
   // Grouper par UE (code UE)
   const groups = useMemo(() => {
@@ -93,7 +89,7 @@ function SemestreTable({
     >();
     for (const m of modules) {
       const ueId = m.module?.ue?.id ?? 'sans-ue';
-      const ueCode = m.module?.ue?.code ?? '—';
+      const ueCode = m.module?.ue?.code ?? '';
       const ueLibelle = m.module?.ue?.libelle ?? 'Sans UE';
       const ueColorRaw = m.module?.ue?.color;
       if (!map.has(ueId)) {
@@ -125,7 +121,32 @@ function SemestreTable({
     );
   }, [modules, edits]);
 
-  if (modules.length === 0 && !isEditing) {
+  if (modules.length === 0) {
+    if (isEditing) {
+      return (
+        <div className="flex flex-col items-center gap-3 bg-surface px-6 py-10 text-center">
+          <p className="text-[13px] text-text-muted">Ce semestre ne contient aucun module.</p>
+          <button
+            type="button"
+            onClick={onAdd}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-primary-hover"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Ajouter un module
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center gap-2 bg-surface px-6 py-12 text-center">
         <div className="flex size-14 items-center justify-center rounded-full bg-bg-warm text-text-muted">
@@ -141,10 +162,7 @@ function SemestreTable({
             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
           </svg>
         </div>
-        <p className="text-[14px] font-semibold text-text-sec">Aucun module pour ce semestre</p>
-        <p className="text-[12.5px] text-text-muted">
-          Passez en mode composition pour ajouter des modules.
-        </p>
+        <p className="text-[13px] font-medium text-text-muted">Aucun module</p>
       </div>
     );
   }
@@ -183,8 +201,8 @@ function SemestreTable({
           </tr>
         </thead>
         <tbody>
-          {groups.map((group, gIdx) => {
-            const pal = UE_PALETTE[gIdx % UE_PALETTE.length]!;
+          {groups.map((group) => {
+            const pal = ueShades(group.ueColor ?? '#64748B');
             const groupModules = group.modules.map(
               (m) => ({ ...m, ...edits[m.id] }) as MaquetteModuleDto,
             );
@@ -234,12 +252,17 @@ function SemestreTable({
                   style={{ borderLeft: `3px solid ${pal.bar}` }}
                 >
                   <td className="px-3 py-2">
-                    <span
-                      className="rounded px-1.5 py-0.5 font-mono text-[10.5px] font-semibold"
-                      style={{ background: pal.bg, color: pal.text }}
-                    >
-                      {m.module?.code ?? '—'}
-                    </span>
+                    {(() => {
+                      const c = m.module?.color ?? pal.bar;
+                      return (
+                        <span
+                          className="rounded px-1.5 py-0.5 font-mono text-[10.5px] font-semibold"
+                          style={{ background: `${c}1F`, color: c }}
+                        >
+                          {m.module?.code ?? ''}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="border-l border-border-soft px-3 py-2 text-[13px] font-medium text-text">
                     {m.module?.libelle ?? m.moduleId}
@@ -380,30 +403,6 @@ function SemestreTable({
           )}
         </tbody>
       </table>
-
-      {/* Bouton ajouter module en mode composer */}
-      {isEditing && (
-        <div className="border-t border-border bg-bg p-3">
-          <button
-            type="button"
-            onClick={onAddModule}
-            className="inline-flex items-center gap-2 rounded-lg border border-dashed border-primary px-3 py-1.5 text-[12.5px] font-semibold text-primary transition-colors hover:bg-primary-50"
-          >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Ajouter un module
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -419,6 +418,7 @@ export interface SemestresViewProps {
   readonly edits: Record<string, Partial<MaquetteModuleDto>>;
   readonly onFieldChange: (mfId: string, field: string, val: number) => void;
   readonly onRemoveModule: (mfId: string) => void;
+  /** Ouvre la modale d'ajout pour le semestre demandé (rang 1 ou 2). */
   readonly onAddModule: (semestre: 1 | 2) => void;
 }
 
@@ -507,9 +507,20 @@ export function SemestresView({
                       e.stopPropagation();
                       onAddModule(s);
                     }}
-                    className="rounded-md bg-primary px-2.5 py-1 text-[11.5px] font-semibold text-white transition-colors hover:bg-primary-hover"
+                    className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-[11.5px] font-semibold text-white transition-colors hover:bg-primary-hover"
                   >
-                    + Ajouter
+                    <svg
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                    >
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Ajouter
                   </button>
                 )}
                 <span
@@ -540,7 +551,7 @@ export function SemestresView({
                   edits={edits}
                   onChange={onFieldChange}
                   onRemove={onRemoveModule}
-                  onAddModule={() => onAddModule(s)}
+                  onAdd={() => onAddModule(s)}
                 />
               </div>
             )}

@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { FiliereRef } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
-import { useFilieresQuery } from '@/lib/queries';
 import { useAnneesQuery, useMaquettesQuery } from '@/lib/queries-v3';
 import { MaquetteList } from './maquette-list';
 import { MaquettePanel, MaquettePanelEmpty } from './maquette-panel';
@@ -31,15 +29,9 @@ function MaquettesPageInner() {
   // Queries
   const maquettesQuery = useMaquettesQuery();
   const anneesQuery = useAnneesQuery();
-  const filieresQuery = useFilieresQuery();
 
   const maquettes = maquettesQuery.data ?? [];
   const annees = anneesQuery.data ?? [];
-  const filieres: FiliereRef[] = (filieresQuery.data ?? []).map((f) => ({
-    id: f.id,
-    sigle: f.sigle,
-    libelle: f.libelle,
-  }));
 
   const selected = maquettes.find((m) => m.id === selectedId) ?? null;
 
@@ -59,7 +51,7 @@ function MaquettesPageInner() {
 
       {/* Panneau droit */}
       {selected !== null ? (
-        <MaquettePanel key={selected.id} maquette={selected} annees={annees} filieres={filieres} />
+        <MaquettePanel key={selected.id} maquette={selected} annees={annees} />
       ) : (
         <MaquettePanelEmpty />
       )}

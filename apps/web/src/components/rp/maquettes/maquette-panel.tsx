@@ -1,13 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type {
-  AnneeAcademiqueDto,
-  FiliereRef,
-  MaquetteDto,
-  MaquetteModuleDto,
-  MaquetteVersionDto,
-} from '@planit/contracts';
+import type { AnneeAcademiqueDto, MaquetteDto, MaquetteModuleDto } from '@planit/contracts';
 import { useFlash } from '@planit/ui';
 import {
   useAddMaquetteModuleMutation,
@@ -15,97 +9,13 @@ import {
   useUpdateMaquetteModuleMutation,
 } from '@/lib/mutations-v3';
 import { useMaquetteVersionDetailQuery, useMaquetteVersionsQuery } from '@/lib/queries-v3';
+import { useUesQuery } from '@/lib/queries-v2';
 import { exportNodeToImage, exportNodeToPdf } from '@/lib/export';
+import { ExportMenu } from '@/components/ui/export-menu';
 import { AnneesWidget } from './annees-widget';
 import { MaquetteInfosModal } from './maquette-infos-modal';
-import { ModulePickerModal } from './module-picker-modal';
 import { SemestresView } from './semestres-view';
-
-// ── Bouton export maquette (LOT 7 X.3) ───────────────────────────────
-
-function ExportMaquetteButton({
-  onExport,
-  isExporting,
-}: {
-  onExport: (fmt: 'png' | 'pdf') => void;
-  isExporting: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        disabled={isExporting}
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Exporter la maquette"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-semibold text-text-sec transition-colors hover:border-primary hover:text-primary disabled:cursor-wait disabled:opacity-60"
-      >
-        <svg
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          aria-hidden
-        >
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="7 10 12 15 17 10" />
-          <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
-        {isExporting ? 'Génération…' : 'Exporter'}
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          aria-hidden
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-      {open && !isExporting && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-50 mt-1 min-w-[148px] overflow-hidden rounded-xl border border-border bg-surface shadow-lg"
-          onMouseLeave={() => setOpen(false)}
-        >
-          {(['png', 'pdf'] as const).map((fmt) => (
-            <button
-              key={fmt}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onExport(fmt);
-              }}
-              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-medium text-text transition-colors hover:bg-bg-warm"
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              {fmt === 'png' ? 'Image PNG' : 'Document PDF'}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+import { AddModuleModal, type ModulePickerGroup } from './add-module-modal';
 
 // ── Empty state ───────────────────────────────────────────────────────
 
@@ -125,10 +35,33 @@ export function MaquettePanelEmpty() {
           <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
         </svg>
       </div>
-      <p className="text-[14px] font-semibold text-text-sec">Sélectionnez une maquette à gauche</p>
-      <p className="text-[12.5px] text-text-muted">
-        pour la composer. Les maquettes naissent de la création d’une formation.
-      </p>
+      <p className="text-[14px] font-semibold text-text-sec">Sélectionnez une maquette</p>
+    </div>
+  );
+}
+
+// ── Pilule de statistique compacte ────────────────────────────────────
+
+function Stat({
+  value,
+  label,
+  accent,
+}: {
+  value: string | number;
+  label: string;
+  accent?: string;
+}) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span
+        className="font-display text-[19px] font-semibold tabular-nums leading-none"
+        style={{ color: accent ?? 'var(--color-text)' }}
+      >
+        {value}
+      </span>
+      <span className="text-[10.5px] font-semibold uppercase tracking-wider text-text-muted">
+        {label}
+      </span>
     </div>
   );
 }
@@ -138,13 +71,11 @@ export function MaquettePanelEmpty() {
 export interface MaquettePanelProps {
   readonly maquette: MaquetteDto;
   readonly annees: readonly AnneeAcademiqueDto[];
-  readonly filieres: readonly FiliereRef[];
 }
 
-export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps) {
+export function MaquettePanel({ maquette, annees }: MaquettePanelProps) {
   const flash = useFlash();
 
-  // LOT 7 (X.3) — ref sur la section semestres + état export
   const semestresRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -161,13 +92,13 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
         } else {
           await exportNodeToPdf(node, {
             filename,
-            title: `PLANIT — Maquette ${maquette.nom} (${maquette.niveau})`,
+            title: `PLANIT · Maquette ${maquette.nom} (${maquette.niveau})`,
             orientation: 'portrait',
           });
         }
-        flash.push('success', fmt === 'png' ? 'Image exportée ✓' : 'PDF exporté ✓');
+        flash.push('success', fmt === 'png' ? 'Image exportée' : 'PDF exporté');
       } catch {
-        flash.push('error', "Erreur lors de l'export — réessayez.");
+        flash.push('error', "Erreur lors de l'export, réessayez.");
       } finally {
         setIsExporting(false);
       }
@@ -179,70 +110,67 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
   const versionsQuery = useMaquetteVersionsQuery(maquette.id);
   const versions = useMemo(() => versionsQuery.data ?? [], [versionsQuery.data]);
 
-  // Années utilisées (via versions)
   const usedAnnees = useMemo(() => {
     const ids = new Set(versions.map((v) => v.anneeAcademiqueId));
     return annees.filter((a) => ids.has(a.id)).sort((a, b) => b.libelle.localeCompare(a.libelle));
   }, [versions, annees]);
 
-  // Version sélectionnée (défaut = la plus récente)
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const effectiveVersionId = selectedVersionId ?? versions[0]?.id ?? null;
 
-  // Détail de la version sélectionnée (avec modules + classes)
   const versionDetailQuery = useMaquetteVersionDetailQuery(effectiveVersionId);
   const versionDetail = versionDetailQuery.data ?? null;
 
   // ── Mode composer
   const [isComposing, setIsComposing] = useState(false);
   const [edits, setEdits] = useState<Record<string, Partial<MaquetteModuleDto>>>({});
-  const [snapshot, setSnapshot] = useState<Record<string, Partial<MaquetteModuleDto>> | null>(null);
-
-  // ── Modales
   const [showInfosModal, setShowInfosModal] = useState(false);
+  // Semestre cible de la modale d'ajout (null = fermée).
+  const [addSemestre, setAddSemestre] = useState<1 | 2 | null>(null);
 
-  // ── Mutations
   const addModule = useAddMaquetteModuleMutation();
   const updateModule = useUpdateMaquetteModuleMutation();
   const deleteModule = useDeleteMaquetteModuleMutation();
 
-  // Sélecteur de module (composer) : semestre cible mémorisé tant qu'il est ouvert.
-  const [pickerSemestre, setPickerSemestre] = useState<1 | 2 | null>(null);
+  // Modules ajoutables = référentiel UE/modules moins ceux déjà dans la version.
+  const uesQuery = useUesQuery();
   const presentModuleIds = useMemo(
     () => new Set((versionDetail?.modules ?? []).map((m) => m.moduleId)),
     [versionDetail],
   );
+  const availableGroups = useMemo<ModulePickerGroup[]>(() => {
+    return (uesQuery.data ?? [])
+      .map((ue) => ({
+        ueId: ue.id,
+        ueCode: ue.code,
+        ueLibelle: ue.libelle,
+        ueColor: ue.color,
+        modules: (ue.modules ?? [])
+          .filter((m) => !presentModuleIds.has(m.id))
+          .map((m) => ({ id: m.id, code: m.code, libelle: m.libelle, color: m.color })),
+      }))
+      .filter((g) => g.modules.length > 0);
+  }, [uesQuery.data, presentModuleIds]);
 
-  // ── Handlers composer
   function startCompose() {
-    setSnapshot({});
     setEdits({});
     setIsComposing(true);
   }
-
   function cancelCompose() {
-    if (snapshot !== null) setEdits(snapshot);
-    setSnapshot(null);
+    setEdits({});
     setIsComposing(false);
   }
-
   async function saveCompose() {
-    if (!versionDetail?.modules || effectiveVersionId === null) return;
-
-    // Batch update des modules modifiés
+    if (effectiveVersionId === null) return;
     const mutations = Object.entries(edits).map(([id, changes]) =>
       updateModule.mutateAsync({ id, body: changes }),
     );
     try {
       await Promise.all(mutations);
-      flash.push(
-        'success',
-        `Maquette enregistrée (${mutations.length} module${mutations.length > 1 ? 's' : ''} mis à jour)`,
-      );
+      if (mutations.length > 0) flash.push('success', 'Maquette enregistrée');
     } catch {
       flash.push('error', "Certaines modifications n'ont pas pu être sauvegardées");
     }
-    setSnapshot(null);
     setEdits({});
     setIsComposing(false);
   }
@@ -252,40 +180,22 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
   }, []);
 
   const handleRemoveModule = useCallback(
-    async (mfId: string) => {
-      await deleteModule.mutateAsync({ id: mfId });
-    },
+    (mfId: string) => void deleteModule.mutateAsync({ id: mfId }),
     [deleteModule],
   );
 
-  const handleAddModule = useCallback((semestre: 1 | 2) => {
-    setPickerSemestre(semestre);
-  }, []);
-
-  const handlePickModule = useCallback(
-    async (moduleId: string) => {
-      if (effectiveVersionId === null || pickerSemestre === null) return;
-      try {
-        await addModule.mutateAsync({
-          versionId: effectiveVersionId,
-          body: {
-            moduleId,
-            semestre: pickerSemestre,
-            heuresCM: 0,
-            heuresTD: 0,
-            heuresTP: 0,
-            heuresTPE: 0,
-          },
-        });
-        setPickerSemestre(null);
-      } catch {
-        // flash géré par la mutation
-      }
+  const handleAddModule = useCallback(
+    (moduleId: string, semestre: 1 | 2) => {
+      if (effectiveVersionId === null) return;
+      void addModule.mutateAsync({
+        versionId: effectiveVersionId,
+        body: { moduleId, semestre, heuresCM: 0, heuresTD: 0, heuresTP: 0, heuresTPE: 0 },
+      });
     },
-    [addModule, effectiveVersionId, pickerSemestre],
+    [addModule, effectiveVersionId],
   );
 
-  // ── Stats globales
+  // ── Stats globales (résumé en ligne)
   const stats = useMemo(() => {
     const modules = versionDetail?.modules ?? [];
     const ueIds = new Set(modules.map((m) => m.module?.ue?.id).filter(Boolean));
@@ -296,92 +206,53 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
     return { ueCount: ueIds.size, modCount: modules.length, vht };
   }, [versionDetail]);
 
-  function KpiCard({
-    label,
-    value,
-    suffix,
-    accent,
-  }: {
-    label: string;
-    value: number;
-    suffix?: string;
-    accent?: string;
-  }) {
-    return (
-      <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
-        <p className="mb-1.5 truncate text-[10.5px] font-semibold uppercase tracking-wider text-text-muted">
-          {label}
-        </p>
-        <div className="flex items-baseline gap-1.5">
-          <span
-            className="font-display text-[24px] font-semibold tabular-nums leading-none"
-            style={{ color: accent ?? 'var(--color-text)' }}
-          >
-            {value}
-          </span>
-          {suffix !== undefined && (
-            <span className="text-[12px] font-medium text-text-muted">{suffix}</span>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const selectedAnneeId = effectiveVersionId
+    ? (versions.find((v) => v.id === effectiveVersionId)?.anneeAcademiqueId ?? null)
+    : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-bg">
       <div className="px-7 pb-12 pt-5">
-        {/* ── En-tête maquette ── */}
-        <div className="mb-4 flex items-start gap-4">
+        {/* ── En-tête ── */}
+        <div className="mb-5 flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            <div className="mb-2 flex flex-wrap items-center gap-2.5">
               <h1 className="font-display text-[22px] font-semibold leading-tight tracking-tight text-text">
                 {maquette.nom}
               </h1>
+              <span className="rounded-md bg-bg-warm px-2 py-0.5 text-[11px] font-bold tracking-wide text-text-sec">
+                {maquette.niveau}
+              </span>
               {isComposing && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-warn px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-warn-text">
                   <span className="size-1.5 rounded-full bg-warn-text" />
-                  Mode composition
+                  Composition
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-bg-warm px-2.5 py-1 text-[11px] font-bold tracking-wide text-text-sec">
-                {maquette.niveau}
-              </span>
-              {maquette.filiere !== undefined && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-100 px-2.5 py-1 text-[11px] font-semibold text-accent-800">
+            {maquette.filiere !== undefined && (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[14px]">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-accent-100 px-2.5 py-1 text-[12px] font-bold text-accent-800">
                   <svg
-                    width="11"
-                    height="11"
+                    width="12"
+                    height="12"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
+                    aria-hidden
                   >
                     <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
                     <path d="M6 12v5c3 3 9 3 12 0v-5" />
                   </svg>
-                  {maquette.filiere.sigle} — {maquette.filiere.libelle}
+                  {maquette.filiere.sigle}
                 </span>
-              )}
-              <span className="flex items-center gap-1 text-[12px] text-text-muted">
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                </svg>
-                {versions.length} version{versions.length !== 1 ? 's' : ''}
-              </span>
-            </div>
+                <span className="font-medium text-text-sec">{maquette.filiere.libelle}</span>
+              </div>
+            )}
           </div>
 
-          {/* Boutons */}
+          {/* Actions */}
           <div className="flex flex-shrink-0 items-center gap-2">
             {isComposing ? (
               <>
@@ -408,33 +279,34 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
                   >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  Enregistrer
+                  Terminer
                 </button>
               </>
             ) : (
               <>
                 <button
                   type="button"
-                  title="Modifier les informations"
+                  title="Informations"
                   onClick={() => setShowInfosModal(true)}
                   className="flex size-9 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:border-primary hover:text-primary"
                 >
                   <svg
-                    width="15"
-                    height="15"
+                    width="16"
+                    height="16"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
                   >
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
                   </svg>
                 </button>
-                {/* LOT 7 (X.3) — bouton export maquette (PNG + PDF) */}
-                <ExportMaquetteButton
+                <ExportMenu
                   onExport={(fmt) => void handleExport(fmt)}
                   isExporting={isExporting}
+                  align="right"
                 />
                 <button
                   type="button"
@@ -442,65 +314,43 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
                   className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-primary-hover"
                 >
                   <svg
-                    width="13"
-                    height="13"
+                    width="14"
+                    height="14"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
                   >
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
                   </svg>
-                  Composer la maquette
+                  Composer
                 </button>
               </>
             )}
           </div>
         </div>
 
-        {/* ── Carte infos + années (compact) ── */}
-        <section className="mb-5 grid grid-cols-3 gap-6 rounded-xl border border-border bg-surface p-5 shadow-sm">
-          <div>
-            <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wider text-text-muted">
-              Date de création
-            </p>
-            <p className="text-[15px] font-semibold tabular-nums text-text">
-              {/* format simple sans librairie pour rester léger ici */}
-              {new Date(maquette.createdAt).toLocaleDateString('fr-FR', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
-            </p>
-          </div>
-          <div>
-            <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wider text-text-muted">
-              Dernière modification
-            </p>
-            <p className="text-[15px] font-semibold tabular-nums text-text">
-              {new Date(maquette.updatedAt).toLocaleDateString('fr-FR', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
-            </p>
-          </div>
+        {/* ── Barre méta : année + résumé chiffré ── */}
+        <section className="mb-5 flex flex-wrap items-center justify-between gap-x-8 gap-y-3 rounded-xl border border-border bg-surface px-5 py-3 shadow-sm">
           <AnneesWidget
             annees={usedAnnees}
-            selectedId={
-              effectiveVersionId
-                ? (versions.find((v) => v.id === effectiveVersionId)?.anneeAcademiqueId ?? null)
-                : null
-            }
+            selectedId={selectedAnneeId}
             onSelect={(anneeId) => {
               const v = versions.find((ver) => ver.anneeAcademiqueId === anneeId);
               if (v) setSelectedVersionId(v.id);
             }}
           />
+          {versionDetail !== null && (
+            <div className="flex items-center gap-6">
+              <Stat value={stats.ueCount} label="UE" />
+              <Stat value={stats.modCount} label="Modules" accent="var(--color-primary)" />
+              <Stat value={`${stats.vht} h`} label="Volume horaire" accent="#92400E" />
+            </div>
+          )}
         </section>
 
-        {/* ── Semestres (ref LOT 7 X.3 : capturé pour export) ── */}
+        {/* ── Semestres (capturé pour export) ── */}
         <div ref={semestresRef}>
           <SemestresView
             version={versionDetail}
@@ -509,59 +359,49 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
             isEditing={isComposing}
             edits={edits}
             onFieldChange={handleFieldChange}
-            onRemoveModule={(mfId) => void handleRemoveModule(mfId)}
-            onAddModule={handleAddModule}
+            onRemoveModule={handleRemoveModule}
+            onAddModule={(s) => setAddSemestre(s)}
           />
         </div>
 
-        {/* ── Stats + Classes (sous les semestres, 2 colonnes) ── */}
-        {versionDetail !== null && (
-          <div className="mt-6 grid grid-cols-2 gap-6">
-            {/* Colonne 1 — KPIs */}
-            <div className="flex flex-col gap-3">
-              <KpiCard label="Unités d'enseignement" value={stats.ueCount} />
-              <KpiCard label="Modules" value={stats.modCount} accent="var(--color-primary)" />
-              <KpiCard label="Volume horaire total" value={stats.vht} suffix="h" accent="#92400E" />
-            </div>
-
-            {/* Colonne 2 — Classes suivant cette version */}
-            <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
-              <p className="mb-3 text-[10.5px] font-bold uppercase tracking-wider text-text-muted">
-                Classes suivant cette version
-              </p>
-              {versionDetail.classes === undefined || versionDetail.classes.length === 0 ? (
-                <p className="text-[12.5px] italic text-text-faint">
-                  Aucune classe ne suit cette version.
-                </p>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {versionDetail.classes.map((c) => (
-                    <div
-                      key={c.id}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-border-soft bg-bg px-3 py-2"
+        {/* ── Classes rattachées (affiché seulement s'il y en a) ── */}
+        {versionDetail !== null &&
+          versionDetail.classes !== undefined &&
+          versionDetail.classes.length > 0 && (
+            <section className="mt-6">
+              <h2 className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                Classes ({versionDetail.classes.length})
+              </h2>
+              <div className="grid grid-cols-2 gap-2">
+                {versionDetail.classes.map((c) => (
+                  <a
+                    key={c.id}
+                    href={`/classes?id=${c.id}`}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-border-soft bg-surface px-3 py-2 transition-colors hover:border-primary"
+                  >
+                    <span className="min-w-0 truncate">
+                      <span className="font-mono text-[11px] font-bold text-primary">{c.code}</span>
+                      <span className="ml-2 text-[12.5px] text-text-sec">{c.name}</span>
+                    </span>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="flex-shrink-0 text-text-faint"
+                      aria-hidden
                     >
-                      <div>
-                        <span className="font-mono text-[11px] font-bold text-primary">
-                          {c.code}
-                        </span>
-                        <span className="ml-2 text-[12.5px] text-text-sec">{c.name}</span>
-                      </div>
-                      <a
-                        href={`/classes?id=${c.id}`}
-                        className="rounded-md border border-border px-2 py-1 text-[11px] font-semibold text-text-muted transition-colors hover:border-primary hover:text-primary"
-                      >
-                        Voir →
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
       </div>
 
-      {/* ── Modal infos (lecture seule) ── */}
       <MaquetteInfosModal
         open={showInfosModal}
         maquette={maquette}
@@ -570,13 +410,15 @@ export function MaquettePanel({ maquette, annees, filieres }: MaquettePanelProps
         onClose={() => setShowInfosModal(false)}
       />
 
-      {/* ── Sélecteur de module (composer) ── */}
-      <ModulePickerModal
-        isOpen={pickerSemestre !== null}
-        presentModuleIds={presentModuleIds}
-        isAdding={addModule.isPending}
-        onClose={() => setPickerSemestre(null)}
-        onSelect={(moduleId) => void handlePickModule(moduleId)}
+      <AddModuleModal
+        open={addSemestre !== null}
+        niveau={maquette.niveau}
+        semestre={addSemestre}
+        groups={availableGroups}
+        onAdd={(moduleId) => {
+          if (addSemestre !== null) handleAddModule(moduleId, addSemestre);
+        }}
+        onClose={() => setAddSemestre(null)}
       />
     </div>
   );
