@@ -61,12 +61,12 @@ const PROFILES = {
 export function scenarioOptions(endpoints = []) {
   const thresholds = {
     http_req_failed: ['rate<0.01'], // < 1 % d'erreurs HTTP (4xx + 5xx)
-    http_req_duration: ['p95<800'], // p95 global < 800 ms
+    http_req_duration: ['p(95)<800'], // p95 global < 800 ms
     server_errors: ['count<1'], // aucune réponse 5xx
     checks: ['rate>0.99'], // > 99 % de statuts attendus
   };
   for (const name of endpoints) {
-    thresholds[`http_req_duration{endpoint:${name}}`] = ['p95<800'];
+    thresholds[`http_req_duration{endpoint:${name}}`] = ['p(95)<800'];
   }
   const load = PROFILES[PROFILE] || PROFILES.smoke;
   return {
