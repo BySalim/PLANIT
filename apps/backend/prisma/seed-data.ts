@@ -36,6 +36,13 @@ const ARGON2_OPTS = {
 // que la base publique ne soit pas accessible avec le mot de passe par défaut.
 const SEED_PASSWORD = process.env['SEED_PASSWORD'] ?? 'Test1234!';
 
+// ── Écoles (V05 / ADR-0019) ──────────────────────────────────────────────────
+// A = école pilote « École d'Ingénieurs » : reçoit TOUT l'existant V02/V03
+//     (id stable aligné sur le backfill de la migration v5).
+// B = 2ᵉ école minimale, strictement disjointe — sert à PROUVER l'isolation.
+const ECOLE_A_ID = 'ecole_ism';
+const ECOLE_B_ID = 'seed-ecole-b';
+
 /**
  * Idempotently seed the vague-02 dataset (upsert-based — safe to run repeatedly).
  *
@@ -51,7 +58,75 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
   const monday = mondayOfCurrentWeek();
   const passwordHash = await hash(SEED_PASSWORD, ARGON2_OPTS);
 
-  // ── Filières ─────────────────────────────────────────────────────────
+  // ── Écoles (V5-D1) : A pilote + B isolation ──────────────────────────
+  await prisma.ecole.upsert({
+    where: { id: ECOLE_A_ID },
+    update: { nom: "École d'Ingénieurs" },
+    create: { id: ECOLE_A_ID, nom: "École d'Ingénieurs" },
+  });
+  await prisma.ecole.upsert({
+    where: { id: ECOLE_B_ID },
+    update: { nom: 'École de Management' },
+    create: { id: ECOLE_B_ID, nom: 'École de Management' },
+  });
+
+  // ── Comptes système (V5-D2) : cross-école, ecoleId = null ────────────
+  await prisma.user.upsert({
+    where: { id: 'seed-superadmin' },
+    update: {
+      email: 'superadmin@planit.test',
+      fullName: 'Super Admin PLANIT',
+      role: 'SUPER_ADMIN',
+      passwordHash,
+      ecoleId: null,
+    },
+    create: {
+      id: 'seed-superadmin',
+      email: 'superadmin@planit.test',
+      fullName: 'Super Admin PLANIT',
+      role: 'SUPER_ADMIN',
+      passwordHash,
+    },
+  });
+  await prisma.user.upsert({
+    where: { id: 'seed-admin' },
+    update: {
+      email: 'admin@planit.test',
+      fullName: 'Admin Système',
+      role: 'ADMIN',
+      passwordHash,
+      ecoleId: null,
+    },
+    create: {
+      id: 'seed-admin',
+      email: 'admin@planit.test',
+      fullName: 'Admin Système',
+      role: 'ADMIN',
+      passwordHash,
+    },
+  });
+
+  // ── Direction de l'école A (V5-D2) ───────────────────────────────────
+  await prisma.user.upsert({
+    where: { id: 'seed-direction-a' },
+    update: {
+      email: 'direction.ingenieurs@planit.test',
+      fullName: 'Direction École d’Ingénieurs',
+      role: 'DIRECTION',
+      passwordHash,
+      ecoleId: ECOLE_A_ID,
+    },
+    create: {
+      id: 'seed-direction-a',
+      email: 'direction.ingenieurs@planit.test',
+      fullName: 'Direction École d’Ingénieurs',
+      role: 'DIRECTION',
+      passwordHash,
+      ecoleId: ECOLE_A_ID,
+    },
+  });
+
+  // ── Filières (rattachées à l'école A) ────────────────────────────────
   const filiereGlrs = await prisma.filiere.upsert({
     where: { id: 'seed-filiere-glrs' },
     update: {
@@ -59,6 +134,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
       libelle: 'Génie Logiciel Réseaux et Système',
       grade: 'LICENCE',
       isDoubleDiplome: false,
+      ecoleId: ECOLE_A_ID,
     },
     create: {
       id: 'seed-filiere-glrs',
@@ -66,6 +142,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
       libelle: 'Génie Logiciel Réseaux et Système',
       grade: 'LICENCE',
       isDoubleDiplome: false,
+      ecoleId: ECOLE_A_ID,
     },
   });
 
@@ -76,6 +153,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
       libelle: 'Génie Logiciel',
       grade: 'MASTER',
       isDoubleDiplome: true,
+      ecoleId: ECOLE_A_ID,
     },
     create: {
       id: 'seed-filiere-gl',
@@ -83,6 +161,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
       libelle: 'Génie Logiciel',
       grade: 'MASTER',
       isDoubleDiplome: true,
+      ecoleId: ECOLE_A_ID,
     },
   });
 
@@ -140,6 +219,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
       fullName: 'Mme Aminata Diallo',
       role: 'RESPONSABLE_PROGRAMME',
       passwordHash,
+      ecoleId: ECOLE_A_ID,
     },
     create: {
       id: 'seed-rp',
@@ -147,6 +227,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
       fullName: 'Mme Aminata Diallo',
       role: 'RESPONSABLE_PROGRAMME',
       passwordHash,
+      ecoleId: ECOLE_A_ID,
     },
   });
 
@@ -188,6 +269,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
         fullName: t.fullName,
         role: 'ENSEIGNANT',
         passwordHash,
+        ecoleId: ECOLE_A_ID,
       },
       create: {
         id: t.id,
@@ -195,6 +277,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
         fullName: t.fullName,
         role: 'ENSEIGNANT',
         passwordHash,
+        ecoleId: ECOLE_A_ID,
       },
     });
     await prisma.enseignant.upsert({
@@ -206,6 +289,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
         whatsapp: t.whatsapp,
         statut: t.statut,
         specialite: t.specialite,
+        ecoleId: ECOLE_A_ID,
       },
       create: {
         id: t.enseignantId,
@@ -215,6 +299,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
         whatsapp: t.whatsapp,
         statut: t.statut,
         specialite: t.specialite,
+        ecoleId: ECOLE_A_ID,
       },
     });
   }
@@ -228,6 +313,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
       classeId: classeGl3a.id,
       passwordHash,
       matricule: 'ISM-2024-0001',
+      ecoleId: ECOLE_A_ID,
     },
     create: {
       id: 'seed-student',
@@ -237,6 +323,7 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
       classeId: classeGl3a.id,
       passwordHash,
       matricule: 'ISM-2024-0001',
+      ecoleId: ECOLE_A_ID,
     },
   });
 
@@ -320,15 +407,22 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
     await prisma.module.upsert({ where: { id: mod.id }, update: mod, create: mod });
   }
 
-  // ── Salles (V01 + Salle 202 pour démo multi-classes) ────────────────
+  // ── Salles (école A — V01 + Salle 202 + Amphi mutualisé commune V5-D6) ─
   const salles = [
     { id: 'seed-salle-amphi', name: 'Amphi A', type: 'Amphithéâtre', capacity: 120 },
     { id: 'seed-salle-201', name: 'Salle 201', type: 'Salle de cours', capacity: 30 },
     { id: 'seed-salle-labo', name: 'Labo Informatique', type: 'Laboratoire', capacity: 30 },
     { id: 'seed-salle-202', name: 'Salle 202', type: 'Salle de cours', capacity: 40 },
+    // Salle commune (V5-D6) : rpResponsableId reste null → accessible à tous
+    // les RP de l'école A.
+    { id: 'seed-salle-mutualisee', name: 'Amphi mutualisé', type: 'Amphithéâtre', capacity: 150 },
   ];
   for (const salle of salles) {
-    await prisma.salle.upsert({ where: { id: salle.id }, update: salle, create: salle });
+    await prisma.salle.upsert({
+      where: { id: salle.id },
+      update: { ...salle, ecoleId: ECOLE_A_ID },
+      create: { ...salle, ecoleId: ECOLE_A_ID },
+    });
   }
 
   // ── Settings (singleton) ─────────────────────────────────────────────
@@ -638,6 +732,8 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
     filiereGlrsId: filiereGlrs.id,
     filiereGlId: filiereGl.id,
   });
+
+  await seedEcoleB(prisma, passwordHash);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -695,7 +791,11 @@ async function seedVague03(
     },
   ];
   for (const a of annees) {
-    await prisma.anneeAcademique.upsert({ where: { id: a.id }, update: a, create: a });
+    await prisma.anneeAcademique.upsert({
+      where: { id: a.id },
+      update: { ...a, ecoleId: ECOLE_A_ID },
+      create: { ...a, ecoleId: ECOLE_A_ID },
+    });
   }
   const ANNEE_2024 = 'seed-annee-2024';
   const ANNEE_2025 = 'seed-annee-2025'; // année courante
@@ -708,6 +808,7 @@ async function seedVague03(
       fullName: 'M. Cheikh Diop',
       role: 'RESPONSABLE_PROGRAMME',
       passwordHash,
+      ecoleId: ECOLE_A_ID,
     },
     create: {
       id: 'seed-rp2',
@@ -715,6 +816,7 @@ async function seedVague03(
       fullName: 'M. Cheikh Diop',
       role: 'RESPONSABLE_PROGRAMME',
       passwordHash,
+      ecoleId: ECOLE_A_ID,
     },
   });
 
@@ -726,6 +828,7 @@ async function seedVague03(
       role: 'ASSISTANT_PROGRAMME',
       managerRpId: 'seed-rp', // Aminata Diallo (RP1)
       passwordHash,
+      ecoleId: ECOLE_A_ID,
     },
     create: {
       id: 'seed-ac',
@@ -734,7 +837,20 @@ async function seedVague03(
       role: 'ASSISTANT_PROGRAMME',
       managerRpId: 'seed-rp',
       passwordHash,
+      ecoleId: ECOLE_A_ID,
     },
+  });
+
+  // ── Responsable (RP) des filières (V5-D5) : Aminata Diallo sur GLRS + GL ──
+  // Posé ici (après création de seed-rp) car la FK Filiere.responsableRpId
+  // pointe sur un User RP.
+  await prisma.filiere.update({
+    where: { id: filiereGlrsId },
+    data: { responsableRpId: 'seed-rp' },
+  });
+  await prisma.filiere.update({
+    where: { id: filiereGlId },
+    data: { responsableRpId: 'seed-rp' },
   });
 
   // ── Étudiants supplémentaires (~6 au total avec seed-student) ──────────
@@ -787,6 +903,7 @@ async function seedVague03(
         matricule: s.matricule,
         classeId: s.classeId,
         passwordHash,
+        ecoleId: ECOLE_A_ID,
       },
       create: {
         id: s.id,
@@ -796,9 +913,59 @@ async function seedVague03(
         matricule: s.matricule,
         classeId: s.classeId,
         passwordHash,
+        ecoleId: ECOLE_A_ID,
       },
     });
   }
+
+  // ── Comptes de démo cycle de vie (V5-D7) : 1 SUSPENDU + 1 archivé ─────
+  // Rattachés à l'école B (et non A) pour démontrer le filtrage de l'espace
+  // Admin sans perturber le décompte des étudiants de l'école A (jeu V03 figé,
+  // assertions existantes). Aucune inscription/classe.
+  await prisma.user.upsert({
+    where: { id: 'seed-student-suspendu' },
+    update: {
+      email: 'compte.suspendu@planit.test',
+      fullName: 'Compte Suspendu (démo)',
+      role: 'ETUDIANT',
+      matricule: 'MGT-2025-9001',
+      passwordHash,
+      ecoleId: ECOLE_B_ID,
+      statut: 'SUSPENDU',
+    },
+    create: {
+      id: 'seed-student-suspendu',
+      email: 'compte.suspendu@planit.test',
+      fullName: 'Compte Suspendu (démo)',
+      role: 'ETUDIANT',
+      matricule: 'MGT-2025-9001',
+      passwordHash,
+      ecoleId: ECOLE_B_ID,
+      statut: 'SUSPENDU',
+    },
+  });
+  await prisma.user.upsert({
+    where: { id: 'seed-student-archive' },
+    update: {
+      email: 'compte.archive@planit.test',
+      fullName: 'Compte Archivé (démo)',
+      role: 'ETUDIANT',
+      matricule: 'MGT-2025-9002',
+      passwordHash,
+      ecoleId: ECOLE_B_ID,
+      deletedAt: new Date(),
+    },
+    create: {
+      id: 'seed-student-archive',
+      email: 'compte.archive@planit.test',
+      fullName: 'Compte Archivé (démo)',
+      role: 'ETUDIANT',
+      matricule: 'MGT-2025-9002',
+      passwordHash,
+      ecoleId: ECOLE_B_ID,
+      deletedAt: new Date(),
+    },
+  });
 
   // ── Maquettes + versions + modules (V3-D2/D3) ─────────────────────────
   // GLRS L3 : versions 2024 + 2025 (immutabilité ; SEC absent → ajoutable en
@@ -1052,5 +1219,268 @@ async function seedVague03(
         },
       });
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Vague 05 — École B (multi-tenance, ADR-0019, LOT 0.6)
+// ─────────────────────────────────────────────────────────────────────────────
+// 2ᵉ école minimale et STRICTEMENT DISJOINTE de l'école A : Direction, RP,
+// filière, année EN_COURS (propre à B — l'index partiel autorise 1 EN_COURS
+// PAR école), maquette + version + formation, 1 classe, 1 enseignant, 1 salle,
+// 2 étudiants inscrits. Sert exclusivement à PROUVER l'isolation cross-école :
+// aucune liste de l'école A ne doit contenir une de ces données. Idempotent.
+// ─────────────────────────────────────────────────────────────────────────────
+async function seedEcoleB(prisma: PrismaClient, passwordHash: string): Promise<void> {
+  // ── Direction + RP de l'école B ──────────────────────────────────────
+  await prisma.user.upsert({
+    where: { id: 'seed-direction-b' },
+    update: {
+      email: 'direction.ecoleb@planit.test',
+      fullName: 'Direction École de Management',
+      role: 'DIRECTION',
+      passwordHash,
+      ecoleId: ECOLE_B_ID,
+    },
+    create: {
+      id: 'seed-direction-b',
+      email: 'direction.ecoleb@planit.test',
+      fullName: 'Direction École de Management',
+      role: 'DIRECTION',
+      passwordHash,
+      ecoleId: ECOLE_B_ID,
+    },
+  });
+  await prisma.user.upsert({
+    where: { id: 'seed-rp-b' },
+    update: {
+      email: 'rp.ecoleb@planit.test',
+      fullName: 'M. Ousmane Ka',
+      role: 'RESPONSABLE_PROGRAMME',
+      passwordHash,
+      ecoleId: ECOLE_B_ID,
+    },
+    create: {
+      id: 'seed-rp-b',
+      email: 'rp.ecoleb@planit.test',
+      fullName: 'M. Ousmane Ka',
+      role: 'RESPONSABLE_PROGRAMME',
+      passwordHash,
+      ecoleId: ECOLE_B_ID,
+    },
+  });
+
+  // ── Filière B (responsable = RP B) ───────────────────────────────────
+  await prisma.filiere.upsert({
+    where: { id: 'seed-filiere-b' },
+    update: {
+      sigle: 'MGT',
+      libelle: 'Management des Organisations',
+      grade: 'LICENCE',
+      isDoubleDiplome: false,
+      ecoleId: ECOLE_B_ID,
+      responsableRpId: 'seed-rp-b',
+    },
+    create: {
+      id: 'seed-filiere-b',
+      sigle: 'MGT',
+      libelle: 'Management des Organisations',
+      grade: 'LICENCE',
+      isDoubleDiplome: false,
+      ecoleId: ECOLE_B_ID,
+      responsableRpId: 'seed-rp-b',
+    },
+  });
+
+  // ── Année EN_COURS propre à B (index partiel par école) ──────────────
+  await prisma.anneeAcademique.upsert({
+    where: { id: 'seed-annee-b-2025' },
+    update: {
+      libelle: '2025-2026',
+      debut: new Date(Date.UTC(2025, 8, 1)),
+      fin: new Date(Date.UTC(2026, 7, 31)),
+      etat: 'EN_COURS',
+      ecoleId: ECOLE_B_ID,
+    },
+    create: {
+      id: 'seed-annee-b-2025',
+      libelle: '2025-2026',
+      debut: new Date(Date.UTC(2025, 8, 1)),
+      fin: new Date(Date.UTC(2026, 7, 31)),
+      etat: 'EN_COURS',
+      ecoleId: ECOLE_B_ID,
+    },
+  });
+
+  // ── Maquette + version + formation B ─────────────────────────────────
+  await prisma.maquette.upsert({
+    where: { id: 'seed-maq-b' },
+    update: { nom: 'Maquette L1 MGT', filiereId: 'seed-filiere-b', niveau: 'L1' },
+    create: { id: 'seed-maq-b', nom: 'Maquette L1 MGT', filiereId: 'seed-filiere-b', niveau: 'L1' },
+  });
+  await prisma.maquetteVersion.upsert({
+    where: { id: 'seed-maqv-b-2025' },
+    update: { maquetteId: 'seed-maq-b', anneeAcademiqueId: 'seed-annee-b-2025' },
+    create: {
+      id: 'seed-maqv-b-2025',
+      maquetteId: 'seed-maq-b',
+      anneeAcademiqueId: 'seed-annee-b-2025',
+    },
+  });
+  await prisma.formation.upsert({
+    where: { id: 'seed-form-b' },
+    update: {
+      code: 'MGT-L1-2025-2026',
+      niveau: 'L1',
+      filiereId: 'seed-filiere-b',
+      anneeAcademiqueId: 'seed-annee-b-2025',
+      maquetteVersionId: 'seed-maqv-b-2025',
+    },
+    create: {
+      id: 'seed-form-b',
+      code: 'MGT-L1-2025-2026',
+      niveau: 'L1',
+      filiereId: 'seed-filiere-b',
+      anneeAcademiqueId: 'seed-annee-b-2025',
+      maquetteVersionId: 'seed-maqv-b-2025',
+    },
+  });
+
+  // ── Classe B ─────────────────────────────────────────────────────────
+  await prisma.classe.upsert({
+    where: { id: 'seed-classe-b' },
+    update: {
+      code: 'MGT1-A',
+      name: 'Management 1ère année A',
+      filiereId: 'seed-filiere-b',
+      formationId: 'seed-form-b',
+      capaciteMax: 40,
+    },
+    create: {
+      id: 'seed-classe-b',
+      code: 'MGT1-A',
+      name: 'Management 1ère année A',
+      filiereId: 'seed-filiere-b',
+      formationId: 'seed-form-b',
+      capaciteMax: 40,
+    },
+  });
+
+  // ── Enseignant B (User + fiche) ──────────────────────────────────────
+  const ensBUser = await prisma.user.upsert({
+    where: { id: 'seed-teacher-b' },
+    update: {
+      email: 'prof.ecoleb@planit.test',
+      fullName: 'Mme Coumba Diène',
+      role: 'ENSEIGNANT',
+      passwordHash,
+      ecoleId: ECOLE_B_ID,
+    },
+    create: {
+      id: 'seed-teacher-b',
+      email: 'prof.ecoleb@planit.test',
+      fullName: 'Mme Coumba Diène',
+      role: 'ENSEIGNANT',
+      passwordHash,
+      ecoleId: ECOLE_B_ID,
+    },
+  });
+  await prisma.enseignant.upsert({
+    where: { id: 'seed-enseignant-b' },
+    update: {
+      userId: ensBUser.id,
+      nomComplet: 'Mme Coumba Diène',
+      emailInstitutionnel: 'prof.ecoleb@planit.test',
+      whatsapp: null,
+      statut: 'PERMANENT',
+      specialite: 'Gestion',
+      ecoleId: ECOLE_B_ID,
+    },
+    create: {
+      id: 'seed-enseignant-b',
+      userId: ensBUser.id,
+      nomComplet: 'Mme Coumba Diène',
+      emailInstitutionnel: 'prof.ecoleb@planit.test',
+      whatsapp: null,
+      statut: 'PERMANENT',
+      specialite: 'Gestion',
+      ecoleId: ECOLE_B_ID,
+    },
+  });
+
+  // ── Salle B ──────────────────────────────────────────────────────────
+  await prisma.salle.upsert({
+    where: { id: 'seed-salle-b' },
+    update: {
+      name: 'Salle B-101',
+      type: 'Salle de cours',
+      capacity: 50,
+      ecoleId: ECOLE_B_ID,
+      rpResponsableId: 'seed-rp-b',
+    },
+    create: {
+      id: 'seed-salle-b',
+      name: 'Salle B-101',
+      type: 'Salle de cours',
+      capacity: 50,
+      ecoleId: ECOLE_B_ID,
+      rpResponsableId: 'seed-rp-b',
+    },
+  });
+
+  // ── 2 étudiants B inscrits ───────────────────────────────────────────
+  const studentsB = [
+    {
+      id: 'seed-student-b1',
+      email: 'etu1.ecoleb@planit.test',
+      fullName: 'Aïssatou Bâ',
+      matricule: 'MGT-2025-0001',
+    },
+    {
+      id: 'seed-student-b2',
+      email: 'etu2.ecoleb@planit.test',
+      fullName: 'Modou Gueye',
+      matricule: 'MGT-2025-0002',
+    },
+  ];
+  for (const s of studentsB) {
+    await prisma.user.upsert({
+      where: { id: s.id },
+      update: {
+        email: s.email,
+        fullName: s.fullName,
+        role: 'ETUDIANT',
+        matricule: s.matricule,
+        classeId: 'seed-classe-b',
+        passwordHash,
+        ecoleId: ECOLE_B_ID,
+      },
+      create: {
+        id: s.id,
+        email: s.email,
+        fullName: s.fullName,
+        role: 'ETUDIANT',
+        matricule: s.matricule,
+        classeId: 'seed-classe-b',
+        passwordHash,
+        ecoleId: ECOLE_B_ID,
+      },
+    });
+    await prisma.inscription.upsert({
+      where: { id: `seed-insc-${s.id}` },
+      update: {
+        etudiantId: s.id,
+        classeId: 'seed-classe-b',
+        anneeAcademiqueId: 'seed-annee-b-2025',
+        isDoubleDiplome: false,
+      },
+      create: {
+        id: `seed-insc-${s.id}`,
+        etudiantId: s.id,
+        classeId: 'seed-classe-b',
+        anneeAcademiqueId: 'seed-annee-b-2025',
+        isDoubleDiplome: false,
+      },
+    });
   }
 }
