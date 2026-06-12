@@ -52,22 +52,26 @@ export class ClassesService {
   ) {}
 
   async list(user: CurrentUserPayload, query: ListQuery): Promise<ClasseV3Dto[]> {
-    const where: Prisma.ClasseWhereInput = {};
-    const formationWhere: Prisma.FormationWhereInput = {};
+    // Scope multi-école : une classe hérite de l'école de sa filière (via la
+    // formation). ADMIN (ecoleId null) ne consulte pas ce référentiel scopé.
+    if (!user.ecoleId) return [];
 
-    // Année : défaut = année courante (si aucune EN_COURS, pas de filtre année).
+    const where: Prisma.ClasseWhereInput = {};
+    const filiereWhere: Prisma.FiliereWhereInput = { ecoleId: user.ecoleId };
+    const formationWhere: Prisma.FormationWhereInput = { filiere: filiereWhere };
+
+    // Année : défaut = année courante de l'école (si aucune EN_COURS, pas de
+    // filtre année).
     if (query.anneeId) {
       formationWhere.anneeAcademiqueId = query.anneeId;
     } else {
-      const current = await this.annees.findCurrentEntity();
+      const current = await this.annees.findCurrentEntity(user.ecoleId);
       if (current) formationWhere.anneeAcademiqueId = current.id;
     }
     if (query.filiereSigle) {
-      formationWhere.filiere = { sigle: query.filiereSigle };
+      filiereWhere.sigle = query.filiereSigle;
     }
-    if (Object.keys(formationWhere).length > 0) {
-      where.formation = formationWhere;
-    }
+    where.formation = formationWhere;
 
     if (query.q) {
       where.OR = [
@@ -174,10 +178,15 @@ export class ClassesService {
   private async requireCurrentYearFormation(
     formationId: string,
   ): Promise<{ id: string; filiereId: string }> {
-    const formation = await this.prisma.formation.findUnique({ where: { id: formationId } });
+    // On charge la filière pour résoudre l'école (racine de scope) et donc
+    // l'année courante DE CETTE école (V05 / ADR-0019 §2).
+    const formation = await this.prisma.formation.findUnique({
+      where: { id: formationId },
+      include: { filiere: { select: { ecoleId: true } } },
+    });
     if (!formation) throw new BadRequestException(`Formation ${formationId} introuvable`);
 
-    const current = await this.annees.getCurrentEntityOrThrow();
+    const current = await this.annees.getCurrentEntityOrThrow(formation.filiere.ecoleId);
     if (formation.anneeAcademiqueId !== current.id) {
       throw new BadRequestException(
         "La classe doit être rattachée à une formation de l'année courante",

@@ -33,21 +33,37 @@ describe('computeVHT', () => {
 
 describe('resolveCurrentYear', () => {
   const annees = [
-    { libelle: '2024-2025', etat: 'CLOTUREE' },
-    { libelle: '2025-2026', etat: 'EN_COURS' },
-    { libelle: '2026-2027', etat: 'PLANIFIEE' },
+    { libelle: '2024-2025', etat: 'CLOTUREE', ecoleId: 'ecole_a' },
+    { libelle: '2025-2026', etat: 'EN_COURS', ecoleId: 'ecole_a' },
+    { libelle: '2026-2027', etat: 'PLANIFIEE', ecoleId: 'ecole_a' },
+    // École B : sa propre année EN_COURS, isolée de A (ADR-0019 §2).
+    { libelle: '2025-2026', etat: 'EN_COURS', ecoleId: 'ecole_b' },
   ];
 
-  it("renvoie l'unique année EN_COURS", () => {
-    expect(resolveCurrentYear(annees)?.libelle).toBe('2025-2026');
+  it("renvoie l'unique année EN_COURS de l'école demandée", () => {
+    expect(resolveCurrentYear(annees, 'ecole_a')?.libelle).toBe('2025-2026');
+  });
+
+  it("scope par école : ne renvoie pas l'année EN_COURS d'une autre école", () => {
+    expect(resolveCurrentYear(annees, 'ecole_b')?.ecoleId).toBe('ecole_b');
+    // Une école sans année EN_COURS dans la liste → null malgré d'autres EN_COURS.
+    expect(resolveCurrentYear(annees, 'ecole_inconnue')).toBeNull();
   });
 
   it('renvoie null si aucune année en cours', () => {
-    expect(resolveCurrentYear([{ etat: 'PLANIFIEE' }, { etat: 'CLOTUREE' }])).toBeNull();
+    expect(
+      resolveCurrentYear(
+        [
+          { etat: 'PLANIFIEE', ecoleId: 'ecole_a' },
+          { etat: 'CLOTUREE', ecoleId: 'ecole_a' },
+        ],
+        'ecole_a',
+      ),
+    ).toBeNull();
   });
 
   it('renvoie null sur liste vide', () => {
-    expect(resolveCurrentYear([])).toBeNull();
+    expect(resolveCurrentYear([], 'ecole_a')).toBeNull();
   });
 });
 

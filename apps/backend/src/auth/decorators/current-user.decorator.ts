@@ -1,4 +1,4 @@
-import { createParamDecorator } from '@nestjs/common';
+import { createParamDecorator, ForbiddenException } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import type { Role } from '@planit/contracts';
 
@@ -14,6 +14,25 @@ export interface CurrentUserPayload {
   id: string;
   email: string;
   role: Role;
+  // V05 — école de rattachement embarquée dans le JWT (ADR-0019). null pour
+  // ADMIN/SUPER_ADMIN (cross-école). Pas de hit BD : les scopes serveur le lisent ici.
+  ecoleId: string | null;
+}
+
+/**
+ * Résout l'`ecoleId` **non-null** d'un acteur pour les opérations qui exigent
+ * un rattachement à une école (création de référentiel scopé : filière,
+ * enseignant, année…). Lève 403 pour un ADMIN/SUPER_ADMIN (`ecoleId = null`,
+ * cross-école) qui n'opère jamais sur le référentiel d'une école donnée sans
+ * la cibler explicitement (V05 / ADR-0019 §3). Garde-fou serveur, jamais UI.
+ */
+export function requireEcole(user: CurrentUserPayload): string {
+  if (!user.ecoleId) {
+    throw new ForbiddenException(
+      "Action réservée à un acteur rattaché à une école (l'ADMIN ne crée pas de référentiel scopé)",
+    );
+  }
+  return user.ecoleId;
 }
 
 /**

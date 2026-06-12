@@ -40,18 +40,28 @@ export type AnneeEtatLike = 'PLANIFIEE' | 'EN_COURS' | 'CLOTUREE' | 'SUSPENDUE';
 /** Forme minimale d'une année exploitable par `resolveCurrentYear`. */
 export interface AnneeLike {
   etat: AnneeEtatLike | string;
+  // V05 — multi-tenance : l'année courante se résout PAR école (ADR-0019 §2).
+  ecoleId: string;
 }
 
 /**
- * Année courante = l'unique année `EN_COURS` (V3-D1 / ADR-0010 §1).
+ * Année courante d'une école = l'unique année `EN_COURS` de cette école
+ * (V3-D1 / ADR-0010 §1, scopée par école en ADR-0019 §2).
  *
  * Fonction pure sur une liste : le backend fournit les années (ex.
- * `prisma.anneeAcademique.findMany()`), ce helper applique la sélection. La
- * base garantit qu'il y en a **au plus une** (index unique partiel) — on
- * renvoie donc la première trouvée, ou `null` si aucune n'est en cours.
+ * `prisma.anneeAcademique.findMany()`), ce helper applique la sélection
+ * **scopée à `ecoleId`**. La base garantit qu'il y en a **au plus une par
+ * école** (index unique partiel sur `ecoleId`) — on renvoie la première
+ * trouvée pour cette école, ou `null` si aucune n'est en cours.
+ *
+ * La signature exige `ecoleId` (et non un défaut implicite) : c'est le garde-fou
+ * typecheck contre un appel oubliant le scope (ADR-0019 §2 / Conséquences).
  */
-export function resolveCurrentYear<T extends AnneeLike>(annees: readonly T[]): T | null {
-  return annees.find((a) => a.etat === 'EN_COURS') ?? null;
+export function resolveCurrentYear<T extends AnneeLike>(
+  annees: readonly T[],
+  ecoleId: string,
+): T | null {
+  return annees.find((a) => a.etat === 'EN_COURS' && a.ecoleId === ecoleId) ?? null;
 }
 
 /**

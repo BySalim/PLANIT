@@ -25,9 +25,15 @@ export class EtudiantsService {
     private readonly acScope: AcScopeService,
   ) {}
 
-  /** Recherche par nom / matricule / email (B.2). */
+  /** Recherche par nom / matricule / email (B.2), **scopée à l'école** (V05). */
   async list(user: CurrentUserPayload, q?: string): Promise<EtudiantDto[]> {
-    const where: Prisma.UserWhereInput = { role: 'ETUDIANT', deletedAt: null };
+    // Scope multi-école (ADR-0019 §3) : un acteur ne voit que les étudiants de
+    // son école. ADMIN (ecoleId null) ⇒ aucun étudiant ici (espace dédié).
+    const where: Prisma.UserWhereInput = {
+      role: 'ETUDIANT',
+      deletedAt: null,
+      ecoleId: user.ecoleId,
+    };
 
     if (q) {
       where.OR = [
@@ -49,7 +55,7 @@ export class EtudiantsService {
   /** Fiche : identité + historique d'inscriptions par année (B.2 / E.3). */
   async findOne(user: CurrentUserPayload, id: string): Promise<EtudiantDetailDto> {
     const row = await this.prisma.user.findFirst({
-      where: { id, role: 'ETUDIANT', deletedAt: null },
+      where: { id, role: 'ETUDIANT', deletedAt: null, ecoleId: user.ecoleId },
       include: {
         inscriptions: {
           include: {

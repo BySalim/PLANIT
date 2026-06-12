@@ -7,8 +7,13 @@ import { PrismaService } from '../common/prisma.service';
 export class FilieresService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(): Promise<FiliereDto[]> {
-    const rows = await this.prisma.filiere.findMany({ orderBy: { sigle: 'asc' } });
+  /** Liste scopée à l'école (V05 / ADR-0019 §3). */
+  async list(ecoleId: string | null): Promise<FiliereDto[]> {
+    if (!ecoleId) return [];
+    const rows = await this.prisma.filiere.findMany({
+      where: { ecoleId },
+      orderBy: { sigle: 'asc' },
+    });
     return rows.map(toDto);
   }
 
@@ -18,7 +23,8 @@ export class FilieresService {
     return toDto(row);
   }
 
-  async create(dto: CreateFiliereDto): Promise<FiliereDto> {
+  /** Création rattachée à l'école de l'acteur (V05 / ADR-0019). */
+  async create(dto: CreateFiliereDto, ecoleId: string): Promise<FiliereDto> {
     try {
       const row = await this.prisma.filiere.create({
         data: {
@@ -26,6 +32,10 @@ export class FilieresService {
           libelle: dto.libelle,
           isDoubleDiplome: dto.isDoubleDiplome,
           grade: dto.grade,
+          ecoleId,
+          // V5-D5 — RP responsable optionnel. La validation « le RP appartient
+          // à la même école » relève du durcissement scope (LOT 2).
+          responsableRpId: dto.responsableRpId ?? null,
         },
       });
       return toDto(row);
@@ -80,6 +90,7 @@ function toDto(row: {
   libelle: string;
   isDoubleDiplome: boolean;
   grade: 'LICENCE' | 'MASTER' | 'DOCTORAT';
+  responsableRpId: string | null;
 }): FiliereDto {
   return {
     id: row.id,
@@ -87,6 +98,7 @@ function toDto(row: {
     libelle: row.libelle,
     isDoubleDiplome: row.isDoubleDiplome,
     grade: row.grade,
+    responsableRpId: row.responsableRpId,
   };
 }
 

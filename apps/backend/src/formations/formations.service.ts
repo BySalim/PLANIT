@@ -45,16 +45,22 @@ export class FormationsService {
     private readonly maquettes: MaquettesService,
   ) {}
 
-  /** Liste filtrable (défaut = année courante si `anneeId` absent). */
-  async list(query: ListQuery): Promise<FormationDto[]> {
-    const where: Prisma.FormationWhereInput = {};
+  /**
+   * Liste filtrable (défaut = année courante si `anneeId` absent), **scopée à
+   * l'école** de l'acteur via la filière (V05 / ADR-0019 §3). `ecoleId === null`
+   * (ADMIN) ⇒ liste vide.
+   */
+  async list(query: ListQuery, ecoleId: string | null): Promise<FormationDto[]> {
+    if (!ecoleId) return [];
+    const where: Prisma.FormationWhereInput = { filiere: { ecoleId } };
 
     if (query.anneeId) {
       where.anneeAcademiqueId = query.anneeId;
     } else {
-      // Défaut : année courante. Si aucune n'est en cours, on ne filtre pas
-      // (liste vide plutôt qu'erreur — la page reste affichable).
-      const current = await this.annees.findCurrentEntity();
+      // Défaut : année courante de l'école. Si aucune n'est en cours, on ne
+      // filtre pas par année (liste vide plutôt qu'erreur — la page reste
+      // affichable).
+      const current = await this.annees.findCurrentEntity(ecoleId);
       if (current) where.anneeAcademiqueId = current.id;
     }
     if (query.filiereId) where.filiereId = query.filiereId;
@@ -83,10 +89,12 @@ export class FormationsService {
    * message lisible avant la contrainte `@@unique`.
    */
   async create(dto: CreateFormationDto): Promise<FormationDto> {
-    const currentYear = await this.annees.getCurrentEntityOrThrow();
-
+    // L'école de la formation est celle de sa filière (racine de scope) ; on la
+    // résout d'abord pour obtenir l'année courante DE CETTE école (ADR-0019 §2).
     const filiere = await this.prisma.filiere.findUnique({ where: { id: dto.filiereId } });
     if (!filiere) throw new BadRequestException(`Filière ${dto.filiereId} introuvable`);
+
+    const currentYear = await this.annees.getCurrentEntityOrThrow(filiere.ecoleId);
 
     const duplicate = await this.prisma.formation.findUnique({
       where: {

@@ -8,6 +8,8 @@ import {
   z,
 } from '@planit/contracts';
 import type { CreateEnseignantDto, EnseignantDto, UpdateEnseignantDto } from '@planit/contracts';
+import { CurrentUser, requireEcole } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { EnseignantsService } from './enseignants.service';
@@ -40,14 +42,18 @@ export class EnseignantsController {
   @ApiResponse({ status: 200, description: 'Liste paginée' })
   @ApiResponse({ status: 403, description: 'Rôle insuffisant' })
   list(
+    @CurrentUser() user: CurrentUserPayload,
     @Query(new ZodValidationPipe(listQuerySchema)) query: ListQueryDto,
   ): Promise<PaginatedEnseignants> {
-    return this.enseignants.list({
-      page: query.page,
-      pageSize: query.pageSize,
-      ...(query.statut !== undefined ? { statut: query.statut } : {}),
-      ...(query.specialite !== undefined ? { specialite: query.specialite } : {}),
-    });
+    return this.enseignants.list(
+      {
+        page: query.page,
+        pageSize: query.pageSize,
+        ...(query.statut !== undefined ? { statut: query.statut } : {}),
+        ...(query.specialite !== undefined ? { specialite: query.specialite } : {}),
+      },
+      user.ecoleId,
+    );
   }
 
   @Get(':id')
@@ -66,11 +72,13 @@ export class EnseignantsController {
   @ApiOperation({ summary: 'Créer un enseignant (et le compte User lié)' })
   @ApiResponse({ status: 201, description: 'Enseignant créé' })
   @ApiResponse({ status: 400, description: 'Corps invalide' })
+  @ApiResponse({ status: 403, description: 'Acteur sans école de rattachement' })
   @ApiResponse({ status: 409, description: 'Email déjà utilisé' })
   create(
+    @CurrentUser() user: CurrentUserPayload,
     @Body(new ZodValidationPipe(createEnseignantSchema)) dto: CreateEnseignantDto,
   ): Promise<EnseignantDto> {
-    return this.enseignants.create(dto);
+    return this.enseignants.create(dto, requireEcole(user));
   }
 
   @Put(':id')

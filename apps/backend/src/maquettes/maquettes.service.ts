@@ -45,9 +45,14 @@ export class MaquettesService {
 
   // ── Maquette (A.2) ───────────────────────────────────────────────────
 
-  /** Liste lite : identité + filière + niveau + compteur de versions. */
-  async list(): Promise<MaquetteDto[]> {
+  /**
+   * Liste lite : identité + filière + niveau + compteur de versions, **scopée à
+   * l'école** via la filière (V05 / ADR-0019 §3). ADMIN (ecoleId null) ⇒ vide.
+   */
+  async list(ecoleId: string | null): Promise<MaquetteDto[]> {
+    if (!ecoleId) return [];
     const rows = await this.prisma.maquette.findMany({
+      where: { filiere: { ecoleId } },
       orderBy: [{ niveau: 'asc' }, { nom: 'asc' }],
       include: { filiere: true, _count: { select: { versions: true } } },
     });

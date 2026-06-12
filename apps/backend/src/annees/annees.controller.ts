@@ -7,6 +7,8 @@ import type {
   CreateAnneeAcademiqueDto,
   UpdateAnneeAcademiqueDto,
 } from '@planit/contracts';
+import { CurrentUser, requireEcole } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AnneesService } from './annees.service';
@@ -26,31 +28,33 @@ export class AnneesController {
   constructor(private readonly annees: AnneesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Liste des années académiques (tri début décroissant)' })
+  @ApiOperation({ summary: 'Liste des années académiques de son école (tri début décroissant)' })
   @ApiResponse({ status: 200, description: 'Liste des années' })
-  list(): Promise<AnneeAcademiqueDto[]> {
-    return this.annees.list();
+  list(@CurrentUser() user: CurrentUserPayload): Promise<AnneeAcademiqueDto[]> {
+    return this.annees.list(user.ecoleId);
   }
 
   @Get('current')
-  @ApiOperation({ summary: "Année académique en cours (source de vérité de l'année courante)" })
+  @ApiOperation({ summary: "Année en cours de son école (source de vérité de l'année courante)" })
   @ApiResponse({ status: 200, description: 'Année en cours' })
   @ApiResponse({ status: 404, description: 'Aucune année en cours' })
-  getCurrent(): Promise<AnneeAcademiqueDto> {
-    return this.annees.getCurrent();
+  getCurrent(@CurrentUser() user: CurrentUserPayload): Promise<AnneeAcademiqueDto> {
+    return this.annees.getCurrent(user.ecoleId);
   }
 
   @Post()
   @Roles('RESPONSABLE_PROGRAMME')
   @HttpCode(201)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Créer une année académique (RP)' })
+  @ApiOperation({ summary: 'Créer une année académique (RP, rattachée à son école)' })
   @ApiResponse({ status: 201, description: 'Année créée' })
+  @ApiResponse({ status: 403, description: 'Acteur sans école de rattachement' })
   @ApiResponse({ status: 409, description: 'Libellé déjà utilisé ou une année est déjà EN_COURS' })
   create(
+    @CurrentUser() user: CurrentUserPayload,
     @Body(new ZodValidationPipe(createAnneeAcademiqueSchema)) dto: CreateAnneeAcademiqueDto,
   ): Promise<AnneeAcademiqueDto> {
-    return this.annees.create(dto);
+    return this.annees.create(dto, requireEcole(user));
   }
 
   @Put(':id')

@@ -88,16 +88,31 @@ async function main(): Promise<void> {
 
   const prisma = new PrismaClient();
   try {
+    // ── École pilote (multi-tenance V05 / ADR-0019) ──────────────────────
+    // Tous les comptes cœur y sont rattachés. Id stable aligné sur le backfill
+    // de la migration v5 ; idempotent (find-or-create).
+    const ecole = await prisma.ecole.upsert({
+      where: { id: 'ecole_ism' },
+      update: {},
+      create: { id: 'ecole_ism', nom: "École d'Ingénieurs" },
+    });
+
     // ── RP ───────────────────────────────────────────────────────────────
     const rpHash = await hash(rp.password, ARGON2_OPTS);
     const rpUser = await prisma.user.upsert({
       where: { email: rp.email },
-      update: { fullName: rp.fullName, role: 'RESPONSABLE_PROGRAMME', passwordHash: rpHash },
+      update: {
+        fullName: rp.fullName,
+        role: 'RESPONSABLE_PROGRAMME',
+        passwordHash: rpHash,
+        ecoleId: ecole.id,
+      },
       create: {
         email: rp.email,
         fullName: rp.fullName,
         role: 'RESPONSABLE_PROGRAMME',
         passwordHash: rpHash,
+        ecoleId: ecole.id,
       },
     });
 
@@ -110,6 +125,7 @@ async function main(): Promise<void> {
         role: 'ASSISTANT_PROGRAMME',
         managerRpId: rpUser.id,
         passwordHash: acHash,
+        ecoleId: ecole.id,
       },
       create: {
         email: ac.email,
@@ -117,6 +133,7 @@ async function main(): Promise<void> {
         role: 'ASSISTANT_PROGRAMME',
         managerRpId: rpUser.id,
         passwordHash: acHash,
+        ecoleId: ecole.id,
       },
     });
 
@@ -124,12 +141,18 @@ async function main(): Promise<void> {
     const ensHash = await hash(ens.password, ARGON2_OPTS);
     const ensUser = await prisma.user.upsert({
       where: { email: ens.email },
-      update: { fullName: ens.fullName, role: 'ENSEIGNANT', passwordHash: ensHash },
+      update: {
+        fullName: ens.fullName,
+        role: 'ENSEIGNANT',
+        passwordHash: ensHash,
+        ecoleId: ecole.id,
+      },
       create: {
         email: ens.email,
         fullName: ens.fullName,
         role: 'ENSEIGNANT',
         passwordHash: ensHash,
+        ecoleId: ecole.id,
       },
     });
     await prisma.enseignant.upsert({
@@ -140,6 +163,7 @@ async function main(): Promise<void> {
         whatsapp: ens.whatsapp,
         statut: ens.statut,
         specialite: ens.specialite,
+        ecoleId: ecole.id,
       },
       create: {
         userId: ensUser.id,
@@ -148,6 +172,7 @@ async function main(): Promise<void> {
         whatsapp: ens.whatsapp,
         statut: ens.statut,
         specialite: ens.specialite,
+        ecoleId: ecole.id,
       },
     });
 
@@ -160,6 +185,7 @@ async function main(): Promise<void> {
         role: 'ETUDIANT',
         matricule: etu.matricule,
         passwordHash: etuHash,
+        ecoleId: ecole.id,
       },
       create: {
         email: etu.email,
@@ -167,6 +193,7 @@ async function main(): Promise<void> {
         role: 'ETUDIANT',
         matricule: etu.matricule,
         passwordHash: etuHash,
+        ecoleId: ecole.id,
       },
     });
 

@@ -26,6 +26,7 @@ interface AccessJwtPayload {
   sub: string;
   email: string;
   role: Role;
+  ecoleId: string | null; // V05 — école embarquée (ADR-0019)
 }
 
 /** Payload signé dans le JWT de refresh. */
@@ -62,7 +63,7 @@ export class AuthService {
 
     const familyId = randomUUID();
     const tokens = await this.issueTokens(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role, ecoleId: user.ecoleId },
       familyId,
       ctx,
     );
@@ -176,6 +177,7 @@ export class AuthService {
         sub: existing.user.id,
         email: existing.user.email,
         role: existing.user.role,
+        ecoleId: existing.user.ecoleId,
       } satisfies AccessJwtPayload,
       {
         secret: this.requiredEnv('JWT_ACCESS_SECRET'),
@@ -234,7 +236,7 @@ export class AuthService {
 
   /** Émet une paire access+refresh et persiste la row `RefreshToken`. */
   private async issueTokens(
-    user: { id: string; email: string; role: Role },
+    user: { id: string; email: string; role: Role; ecoleId: string | null },
     familyId: string,
     ctx: AuthContext,
   ): Promise<Pick<AuthTokens, 'accessToken' | 'refreshToken'>> {
@@ -263,7 +265,12 @@ export class AuthService {
     });
 
     const accessToken = await this.jwt.signAsync(
-      { sub: user.id, email: user.email, role: user.role } satisfies AccessJwtPayload,
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        ecoleId: user.ecoleId,
+      } satisfies AccessJwtPayload,
       {
         secret: this.requiredEnv('JWT_ACCESS_SECRET'),
         expiresIn: accessTtlSeconds(),
@@ -294,6 +301,7 @@ export class AuthService {
     role: Role;
     fullName: string;
     matricule: string | null;
+    ecoleId: string | null;
   }): AuthMeDto {
     return {
       id: user.id,
@@ -301,6 +309,7 @@ export class AuthService {
       role: user.role,
       fullName: user.fullName,
       matricule: user.matricule,
+      ecoleId: user.ecoleId,
     };
   }
 }

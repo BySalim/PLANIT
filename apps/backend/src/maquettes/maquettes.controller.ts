@@ -1,6 +1,8 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { MaquetteDto, MaquetteVersionDto } from '@planit/contracts';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { MaquettesService } from './maquettes.service';
 
@@ -22,10 +24,10 @@ export class MaquettesController {
   constructor(private readonly maquettes: MaquettesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Liste des maquettes (niveau + filière + compteur de versions)' })
+  @ApiOperation({ summary: 'Liste des maquettes de son école (niveau + filière + versions)' })
   @ApiResponse({ status: 200, description: 'Liste des maquettes' })
-  list(): Promise<MaquetteDto[]> {
-    return this.maquettes.list();
+  list(@CurrentUser() user: CurrentUserPayload): Promise<MaquetteDto[]> {
+    return this.maquettes.list(user.ecoleId);
   }
 
   @Get(':id')

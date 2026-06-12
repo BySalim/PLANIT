@@ -3,6 +3,8 @@ import { ApiCookieAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@ne
 import { Throttle } from '@nestjs/throttler';
 import { createFormationSchema } from '@planit/contracts';
 import type { CreateFormationDto, FormationDto } from '@planit/contracts';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { FormationsService } from './formations.service';
@@ -24,13 +26,17 @@ export class FormationsController {
   @ApiQuery({ name: 'filiereId', required: false })
   @ApiResponse({ status: 200, description: 'Liste des formations' })
   list(
+    @CurrentUser() user: CurrentUserPayload,
     @Query('anneeId') anneeId?: string,
     @Query('filiereId') filiereId?: string,
   ): Promise<FormationDto[]> {
-    return this.formations.list({
-      ...(anneeId ? { anneeId } : {}),
-      ...(filiereId ? { filiereId } : {}),
-    });
+    return this.formations.list(
+      {
+        ...(anneeId ? { anneeId } : {}),
+        ...(filiereId ? { filiereId } : {}),
+      },
+      user.ecoleId,
+    );
   }
 
   @Get(':id')

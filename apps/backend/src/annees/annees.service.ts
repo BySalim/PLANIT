@@ -24,15 +24,23 @@ import { PrismaService } from '../common/prisma.service';
 export class AnneesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** A.1 — liste triée par date de début décroissante (année récente en tête). */
-  async list(): Promise<AnneeAcademiqueDto[]> {
-    const rows = await this.prisma.anneeAcademique.findMany({ orderBy: { debut: 'desc' } });
+  /**
+   * A.1 — liste triée par date de début décroissante (année récente en tête),
+   * **scopée à l'école** (V05 / ADR-0019 §3). `ecoleId === null` (ADMIN
+   * cross-école) ⇒ liste vide (l'admin gère les années via l'espace dédié).
+   */
+  async list(ecoleId: string | null): Promise<AnneeAcademiqueDto[]> {
+    if (!ecoleId) return [];
+    const rows = await this.prisma.anneeAcademique.findMany({
+      where: { ecoleId },
+      orderBy: { debut: 'desc' },
+    });
     return rows.map(toDto);
   }
 
-  /** A.1 — `GET /api/annees/current`. 404 si aucune année en cours. */
-  async getCurrent(): Promise<AnneeAcademiqueDto> {
-    const current = await this.findCurrentEntity();
+  /** A.1 — `GET /api/annees/current`. 404 si aucune année en cours dans l'école. */
+  async getCurrent(ecoleId: string | null): Promise<AnneeAcademiqueDto> {
+    const current = await this.findCurrentEntity(ecoleId);
     if (!current) {
       throw new NotFoundException('Aucune année académique en cours');
     }
@@ -40,22 +48,27 @@ export class AnneesService {
   }
 
   /**
-   * Entité de l'année courante, ou `null`. Utilisée en interne par les
-   * créations rattachées à l'année courante (formations, classes, inscriptions).
-   * Délègue la sélection au helper pur partagé.
+   * Entité de l'année courante **de l'école `ecoleId`**, ou `null` (V05 / ADR-0019
+   * §2 : une année courante par école). Utilisée en interne par les créations
+   * rattachées à l'année courante (formations, classes, inscriptions). Délègue la
+   * sélection au helper pur partagé. `ecoleId === null` (cas ADMIN cross-école)
+   * ⇒ pas d'année courante résolue.
    */
-  async findCurrentEntity(): Promise<AnneeAcademique | null> {
-    const rows = await this.prisma.anneeAcademique.findMany({ where: { etat: 'EN_COURS' } });
-    return resolveCurrentYear(rows);
+  async findCurrentEntity(ecoleId: string | null): Promise<AnneeAcademique | null> {
+    if (!ecoleId) return null;
+    const rows = await this.prisma.anneeAcademique.findMany({
+      where: { etat: 'EN_COURS', ecoleId },
+    });
+    return resolveCurrentYear(rows, ecoleId);
   }
 
   /**
-   * Année courante ou 409 — pour les opérations qui *exigent* une année en
-   * cours (création de formation/classe/inscription). Le 409 (et non 404)
-   * signale un état serveur incohérent côté métier, pas une route absente.
+   * Année courante de l'école ou 409 — pour les opérations qui *exigent* une
+   * année en cours (création de formation/classe/inscription). Le 409 (et non
+   * 404) signale un état serveur incohérent côté métier, pas une route absente.
    */
-  async getCurrentEntityOrThrow(): Promise<AnneeAcademique> {
-    const current = await this.findCurrentEntity();
+  async getCurrentEntityOrThrow(ecoleId: string | null): Promise<AnneeAcademique> {
+    const current = await this.findCurrentEntity(ecoleId);
     if (!current) {
       throw new ConflictException(
         "Aucune année académique en cours — impossible de rattacher la ressource à l'année courante",
@@ -64,9 +77,9 @@ export class AnneesService {
     return current;
   }
 
-  async create(dto: CreateAnneeAcademiqueDto): Promise<AnneeAcademiqueDto> {
+  async create(dto: CreateAnneeAcademiqueDto, ecoleId: string): Promise<AnneeAcademiqueDto> {
     if (dto.etat === 'EN_COURS') {
-      await this.assertNoOtherEnCours();
+      await this.assertNoOtherEnCours(ecoleId);
     }
     try {
       const row = await this.prisma.anneeAcademique.create({
@@ -75,6 +88,7 @@ export class AnneesService {
           debut: new Date(dto.debut),
           fin: new Date(dto.fin),
           etat: dto.etat,
+          ecoleId,
         },
       });
       return toDto(row);
@@ -91,7 +105,8 @@ export class AnneesService {
     if (!exists) throw new NotFoundException(`Année ${id} introuvable`);
 
     if (dto.etat === 'EN_COURS' && exists.etat !== 'EN_COURS') {
-      await this.assertNoOtherEnCours(id);
+      // Garde scopée à l'école de l'année (l'unicité EN_COURS est par école).
+      await this.assertNoOtherEnCours(exists.ecoleId, id);
     }
 
     const data: Prisma.AnneeAcademiqueUpdateInput = {};
@@ -111,9 +126,12 @@ export class AnneesService {
     }
   }
 
-  /** Garde « une seule EN_COURS » — 409 explicite avant de heurter l'index partiel. */
-  private async assertNoOtherEnCours(exceptId?: string): Promise<void> {
-    const where: Prisma.AnneeAcademiqueWhereInput = { etat: 'EN_COURS' };
+  /**
+   * Garde « une seule EN_COURS **par école** » — 409 explicite avant de heurter
+   * l'index partiel par-école (ADR-0019 §2).
+   */
+  private async assertNoOtherEnCours(ecoleId: string, exceptId?: string): Promise<void> {
+    const where: Prisma.AnneeAcademiqueWhereInput = { etat: 'EN_COURS', ecoleId };
     if (exceptId) where.id = { not: exceptId };
     const conflicting = await this.prisma.anneeAcademique.findFirst({ where });
     if (conflicting) {
