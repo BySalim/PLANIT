@@ -39,6 +39,8 @@ describe('Sidebar — variant RP vs AC (LOT 6 G.2)', () => {
         email: 'rp@planit',
         role: 'RESPONSABLE_PROGRAMME',
         fullName: 'Aïssatou Diallo',
+        ecoleId: 'ecole-ism',
+        matricule: null,
       }),
     );
     render(<Sidebar />);
@@ -59,6 +61,8 @@ describe('Sidebar — variant RP vs AC (LOT 6 G.2)', () => {
         email: 'ac@planit',
         role: 'ASSISTANT_PROGRAMME',
         fullName: 'Fatou Sow',
+        ecoleId: 'ecole-ism',
+        matricule: null,
       }),
     );
     render(<Sidebar />);
@@ -80,6 +84,30 @@ describe('Sidebar — variant RP vs AC (LOT 6 G.2)', () => {
     // Label rôle UI = « Attaché de classe » (jamais « AP »).
     expect(screen.getByText('Attaché de classe')).toBeTruthy();
     expect(screen.queryByText(/\bAP\b/)).toBeNull();
+  });
+
+  it('rend le menu Admin (Écoles · Utilisateurs · Journal) pour un ADMIN', () => {
+    useAuthMock.mockReturnValue(
+      authState({
+        id: 'admin1',
+        email: 'admin@planit',
+        role: 'ADMIN',
+        fullName: 'Admin Système',
+        ecoleId: null,
+        matricule: null,
+      }),
+    );
+    render(<Sidebar />);
+    // Entrées de l'espace système (V05 LOT 1.6).
+    expect(screen.getAllByText('Écoles').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Utilisateurs').length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Journal d'audit").length).toBeGreaterThan(0);
+    // Aucune entrée RP/AC.
+    expect(screen.queryByText('Filières')).toBeNull();
+    expect(screen.queryByText('Suivi des modules')).toBeNull();
+    expect(screen.queryByText('Classes')).toBeNull();
+    // Libellé rôle.
+    expect(screen.getByText('Administrateur·rice')).toBeTruthy();
   });
 
   it('affiche le fallback « … » quand auth en chargement', () => {
