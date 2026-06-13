@@ -24,6 +24,8 @@ export class MaquettesController {
   constructor(private readonly maquettes: MaquettesService) {}
 
   @Get()
+  // V05 LOT 2 — Direction lit les maquettes de son école.
+  @Roles('RESPONSABLE_PROGRAMME', 'DIRECTION')
   @ApiOperation({ summary: 'Liste des maquettes de son école (niveau + filière + versions)' })
   @ApiResponse({ status: 200, description: 'Liste des maquettes' })
   list(@CurrentUser() user: CurrentUserPayload): Promise<MaquetteDto[]> {
@@ -31,6 +33,7 @@ export class MaquettesController {
   }
 
   @Get(':id')
+  @Roles('RESPONSABLE_PROGRAMME', 'DIRECTION')
   @ApiOperation({ summary: 'Détail identité maquette' })
   @ApiResponse({ status: 200, description: 'Maquette trouvée' })
   @ApiResponse({ status: 404, description: 'Maquette introuvable' })
@@ -39,7 +42,8 @@ export class MaquettesController {
   }
 
   @Get(':id/versions')
-  @ApiOperation({ summary: "Versions d'une maquette (année + compteur de modules)" })
+  @Roles('RESPONSABLE_PROGRAMME', 'DIRECTION')
+  @ApiOperation({ summary: "Versions d'une maquette (annee + compteur de modules)" })
   @ApiResponse({ status: 200, description: 'Liste des versions' })
   @ApiResponse({ status: 404, description: 'Maquette introuvable' })
   listVersions(@Param('id') id: string): Promise<MaquetteVersionDto[]> {

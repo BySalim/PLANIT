@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Put } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { createAnneeAcademiqueSchema, updateAnneeAcademiqueSchema } from '@planit/contracts';
@@ -69,5 +69,35 @@ export class AnneesController {
     @Body(new ZodValidationPipe(updateAnneeAcademiqueSchema)) dto: UpdateAnneeAcademiqueDto,
   ): Promise<AnneeAcademiqueDto> {
     return this.annees.update(id, dto);
+  }
+
+  /** Transition PLANIFIEE → EN_COURS (LOT 2 / V5-D2). */
+  @Patch(':id/debuter')
+  @Roles('DIRECTION')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Débuter une année (PLANIFIEE → EN_COURS) — Direction' })
+  @ApiResponse({ status: 200, description: 'Année débutée' })
+  @ApiResponse({ status: 404, description: 'Année introuvable ou hors périmètre' })
+  @ApiResponse({ status: 409, description: 'Une année est déjà EN_COURS dans cette école' })
+  debuter(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<AnneeAcademiqueDto> {
+    return this.annees.debuter(id, requireEcole(user));
+  }
+
+  /** Transition EN_COURS → CLOTUREE (LOT 2 / V5-D2). */
+  @Patch(':id/cloturer')
+  @Roles('DIRECTION')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Clôturer une année (EN_COURS → CLOTUREE) — Direction' })
+  @ApiResponse({ status: 200, description: 'Année clôturée' })
+  @ApiResponse({ status: 404, description: 'Année introuvable ou hors périmètre' })
+  @ApiResponse({ status: 409, description: "L'année n'est pas EN_COURS" })
+  cloturer(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<AnneeAcademiqueDto> {
+    return this.annees.cloturer(id, requireEcole(user));
   }
 }

@@ -8,6 +8,7 @@ import { EcolesModule } from './ecoles/ecoles.module';
 import { UtilisateursModule } from './utilisateurs/utilisateurs.module';
 import { AnneesModule } from './annees/annees.module';
 import { AuthModule } from './auth/auth.module';
+import { DirectionModule } from './direction/direction.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { ClassesModule } from './classes/classes.module';
@@ -72,6 +73,8 @@ const DEFAULT_LIMIT = isTest ? 10_000 : 100;
     AuditModule,
     EcolesModule,
     UtilisateursModule,
+    // V05 LOT 2 — Direction scope école : personnel, audit, transitions année, salles
+    DirectionModule,
   ],
   providers: [
     // Ordre important : throttler → auth → RBAC.
