@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { ActorHomeView } from '@/components/consult/actor-home-view';
+import { DirectionHomeView } from '@/components/direction/direction-home-view';
 import { RpPlanningView } from '@/components/rp/rp-planning-view';
 import { useAuth, ROLE_HOME } from '@/contexts/auth-context';
 
@@ -45,5 +46,7 @@ function HomeByRole() {
   }
   // Admin : redirection en cours (effet ci-dessus) → ne rien rendre.
   if (role === 'ADMIN' || role === 'SUPER_ADMIN') return null;
+  // Direction : vue pilotage école (V05 LOT 3).
+  if (role === 'DIRECTION') return <DirectionHomeView />;
   return <ActorHomeView />;
 }
