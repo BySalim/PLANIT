@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { type SuiviModuleDto } from '@planit/contracts';
-import { ChevronLeftIcon } from '@planit/ui';
+import { CheckIcon, ChevronLeftIcon } from '@planit/ui';
 import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
+import { RowActionButton } from '@/components/ui/row-action-button';
+import { useAuth } from '@/contexts/auth-context';
+import { useRouvrirSuiviMutation, useTerminerSuiviMutation } from '@/lib/mutations-v3';
 import { useClasseEtudiantsQuery, useClasseQuery, useClasseSuiviQuery } from '@/lib/queries-v3';
 import { InscriptionModal } from '@/components/inscriptions/inscription-modal';
 import {
@@ -46,9 +49,30 @@ function ProgressBar({ pct }: { pct: number }) {
   );
 }
 
-const SUIVI_COLS = 'grid grid-cols-[1.6fr_70px_70px_160px_1.2fr] items-center gap-3';
+const SUIVI_COLS_EDIT =
+  'grid grid-cols-[minmax(0,1.6fr)_48px_58px_58px_120px_minmax(0,1fr)_108px] items-center gap-3';
+const SUIVI_COLS_RO =
+  'grid grid-cols-[minmax(0,1.6fr)_48px_64px_64px_150px_minmax(0,1fr)] items-center gap-3';
 
-function SuiviTab({ suivi, isLoading }: { suivi: SuiviModuleDto[]; isLoading: boolean }) {
+function SuiviTab({
+  suivi,
+  isLoading,
+  canEdit,
+}: {
+  suivi: SuiviModuleDto[];
+  isLoading: boolean;
+  canEdit: boolean;
+}) {
+  // Tri : avancement décroissant (heures faites) ; modules terminés en fin de liste.
+  const sorted = useMemo(
+    () =>
+      [...suivi].sort((a, b) => {
+        if (a.estTermine !== b.estTermine) return a.estTermine ? 1 : -1;
+        return b.heuresFaites - a.heuresFaites;
+      }),
+    [suivi],
+  );
+
   if (isLoading) {
     return <ClasseSuiviTabSkeleton />;
   }
@@ -59,66 +83,112 @@ function SuiviTab({ suivi, isLoading }: { suivi: SuiviModuleDto[]; isLoading: bo
       </div>
     );
   }
+
+  const cols = canEdit ? SUIVI_COLS_EDIT : SUIVI_COLS_RO;
+  const head = 'text-[10.5px] font-semibold uppercase tracking-wide text-text-muted';
   return (
     <div className="overflow-hidden rounded-xl border border-border-soft bg-surface">
-      <div className={`${SUIVI_COLS} border-b border-border-soft bg-bg px-4 py-2.5`}>
-        <span className="text-[10.5px] font-semibold uppercase tracking-wide text-text-muted">
-          Module
-        </span>
-        <span className="text-right text-[10.5px] font-semibold uppercase tracking-wide text-text-muted">
-          Prévu
-        </span>
-        <span className="text-right text-[10.5px] font-semibold uppercase tracking-wide text-text-muted">
-          Fait
-        </span>
-        <span className="text-[10.5px] font-semibold uppercase tracking-wide text-text-muted">
-          Progression
-        </span>
-        <span className="text-[10.5px] font-semibold uppercase tracking-wide text-text-muted">
-          Enseignant·e·s
-        </span>
+      <div className={`${cols} border-b border-border-soft bg-bg px-4 py-2.5`}>
+        <span className={head}>Module</span>
+        <span className={`text-center ${head}`}>Sem.</span>
+        <span className={`text-right ${head}`}>Prévu</span>
+        <span className={`text-right ${head}`}>Fait</span>
+        <span className={head}>Progression</span>
+        <span className={head}>Enseignants</span>
+        {canEdit ? <span className={`text-right ${head}`}>Action</span> : null}
       </div>
-      {suivi.map((s, idx) => (
-        <div
+      {sorted.map((s, idx) => (
+        <SuiviClasseRow
           key={s.id}
-          className={`${SUIVI_COLS} px-4 py-3 ${idx < suivi.length - 1 ? 'border-b border-border-soft' : ''} ${s.estTermine ? 'bg-ok/5' : ''}`}
-        >
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span
-              className="h-7 w-1 flex-shrink-0 rounded"
-              style={{ backgroundColor: s.module.ue?.color ?? s.module.color }}
-            />
-            <div className="min-w-0">
-              <div className="truncate text-[13px] font-semibold text-text">{s.module.libelle}</div>
-              <div className="font-mono text-[11px] font-semibold text-primary">
-                {s.module.code}
-              </div>
-            </div>
-          </div>
-          <span className="text-right text-[13px] font-semibold tabular-nums text-text">
-            {s.heuresPrevues}h
-          </span>
-          <span
-            className={`text-right text-[13px] font-semibold tabular-nums ${s.heuresFaites > 0 ? 'text-ok' : 'text-text-faint'}`}
-          >
-            {s.heuresFaites}h
-          </span>
-          <ProgressBar pct={s.progression} />
-          <div className="flex min-w-0 flex-col gap-0.5">
-            {s.enseignants.length === 0 ? (
-              <span className="text-[11.5px] italic text-text-faint">Non enseigné</span>
-            ) : (
-              s.enseignants.map((t) => (
-                <div key={t.id} className="flex items-center gap-1.5 text-[11.5px] text-text-sec">
-                  <span className="truncate">{t.nom}</span>
-                  <span className="text-text-faint">·</span>
-                  <span className="font-semibold tabular-nums text-ok">{t.heures}h</span>
-                </div>
-              ))
-            )}
+          suivi={s}
+          canEdit={canEdit}
+          cols={cols}
+          last={idx === sorted.length - 1}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SuiviClasseRow({
+  suivi: s,
+  canEdit,
+  cols,
+  last,
+}: {
+  suivi: SuiviModuleDto;
+  canEdit: boolean;
+  cols: string;
+  last: boolean;
+}) {
+  const terminer = useTerminerSuiviMutation();
+  const rouvrir = useRouvrirSuiviMutation();
+  const isPending = terminer.isPending || rouvrir.isPending;
+
+  return (
+    <div
+      className={`${cols} px-4 py-3 ${last ? '' : 'border-b border-border-soft'} ${s.estTermine ? 'bg-ok/5' : ''}`}
+    >
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span
+          className="h-7 w-1 flex-shrink-0 rounded"
+          style={{ backgroundColor: s.module.color }}
+          aria-hidden
+        />
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-semibold text-text">{s.module.libelle}</div>
+          <div className="font-mono text-[11px] font-semibold" style={{ color: s.module.color }}>
+            {s.module.code}
           </div>
         </div>
-      ))}
+      </div>
+      <div className="text-center">
+        {s.semestre !== null ? (
+          <span className="inline-flex h-5 items-center rounded bg-bg px-1.5 text-[11px] font-semibold tabular-nums text-text-sec">
+            S{s.semestre}
+          </span>
+        ) : null}
+      </div>
+      <span className="text-right text-[13px] font-semibold tabular-nums text-text">
+        {s.heuresPrevues}h
+      </span>
+      <span
+        className={`text-right text-[13px] font-semibold tabular-nums ${s.heuresFaites > 0 ? 'text-ok' : 'text-text-faint'}`}
+      >
+        {s.heuresFaites}h
+      </span>
+      <ProgressBar pct={s.progression} />
+      <div className="flex min-w-0 flex-col gap-0.5">
+        {s.enseignants.length === 0 ? (
+          <span className="text-[11.5px] italic text-text-faint">Non enseigné</span>
+        ) : (
+          s.enseignants.map((t) => (
+            <div key={t.id} className="flex items-center gap-1.5 text-[11.5px] text-text-sec">
+              <span className="truncate">{t.nom}</span>
+              <span className="text-text-faint">·</span>
+              <span className="font-semibold tabular-nums text-ok">{t.heures}h</span>
+            </div>
+          ))
+        )}
+      </div>
+      {canEdit ? (
+        <div className="flex justify-end">
+          {s.estTermine ? (
+            <RowActionButton onClick={() => rouvrir.mutate({ id: s.id })} disabled={isPending}>
+              Rouvrir
+            </RowActionButton>
+          ) : (
+            <RowActionButton
+              emphasis="primary"
+              onClick={() => terminer.mutate({ id: s.id })}
+              disabled={isPending}
+              icon={<CheckIcon size={12} color="currentColor" />}
+            >
+              Terminer
+            </RowActionButton>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -136,9 +206,21 @@ export default function ClasseFichePage() {
   const etudiantsQuery = useClasseEtudiantsQuery(id);
   const suiviQuery = useClasseSuiviQuery(id);
 
+  const { state } = useAuth();
+  const isRP = state.status === 'authenticated' && state.user.role === 'RESPONSABLE_PROGRAMME';
+
   const classe = classeQuery.data;
   const etudiants = etudiantsQuery.data ?? [];
-  const suivi = suiviQuery.data ?? [];
+  const suivi = useMemo(() => suiviQuery.data ?? [], [suiviQuery.data]);
+
+  // Stats pédagogiques dérivées du suivi (heures + avancement global).
+  const suiviStats = useMemo(() => {
+    const prevues = suivi.reduce((a, s) => a + s.heuresPrevues, 0);
+    const faites = suivi.reduce((a, s) => a + s.heuresFaites, 0);
+    const termines = suivi.filter((s) => s.estTermine).length;
+    const avancement = prevues > 0 ? Math.round((faites / prevues) * 100) : 0;
+    return { prevues, faites, termines, avancement };
+  }, [suivi]);
 
   return (
     <Shell
@@ -191,13 +273,24 @@ export default function ClasseFichePage() {
           {/* KPIs */}
           <div className="mb-6 flex flex-wrap gap-3">
             <StatTile
-              label="Places"
+              label="Étudiants"
               value={`${classe.places.inscrits}/${classe.places.capaciteMax}`}
               sub="inscrits / capacité"
             />
-            <StatTile label="Étudiants" value={etudiants.length} />
-            <StatTile label="Modules" value={suivi.length} />
-            <StatTile label="Capacité" value={classe.capaciteMax} />
+            <StatTile
+              label="Modules"
+              value={suivi.length}
+              sub={
+                suiviStats.termines > 0
+                  ? `${suiviStats.termines} terminé${suiviStats.termines > 1 ? 's' : ''}`
+                  : 'aucun terminé'
+              }
+            />
+            <StatTile
+              label="Avancement"
+              value={`${suiviStats.avancement}%`}
+              sub={`${suiviStats.faites}h / ${suiviStats.prevues}h`}
+            />
           </div>
 
           {/* Onglets */}
@@ -230,7 +323,7 @@ export default function ClasseFichePage() {
 
           {/* Contenu onglet */}
           {tab === 'suivi' ? (
-            <SuiviTab suivi={suivi} isLoading={suiviQuery.isLoading} />
+            <SuiviTab suivi={suivi} isLoading={suiviQuery.isLoading} canEdit={isRP} />
           ) : (
             <div className="overflow-hidden rounded-xl border border-border-soft bg-surface">
               <div className="flex items-center justify-between border-b border-border-soft bg-bg px-4 py-2.5">
@@ -265,7 +358,7 @@ export default function ClasseFichePage() {
                     </div>
                     <span className="truncate text-[12px] text-text-sec">{s.email}</span>
                     <span className="font-mono text-[11px] text-text-muted">
-                      {s.matricule ?? '—'}
+                      {s.matricule ?? ''}
                     </span>
                   </div>
                 ))
