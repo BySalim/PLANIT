@@ -26,6 +26,14 @@ jobs:
             staging|hotfix/*)
               echo "✅ PR source '$HEAD_REF' autorisée vers main."
               ;;
+            release-please--branches--main--*)
+              # PR de release automatisée (googleapis/release-please-action) :
+              # agrège les Conventional Commits, bump version + CHANGELOG, et au
+              # merge crée le tag vX.Y.Z. Sa branche ne suit pas le flux humain
+              # staging/hotfix mais cible main par design (cf. release-please.yml).
+              # Glob étroit : seules les branches release-please ciblant main passent.
+              echo "✅ PR de release automatisée (release-please) autorisée vers main."
+              ;;
             *)
               echo "❌ Les PR vers main doivent venir de 'staging' ou 'hotfix/*', pas de '$HEAD_REF'."
               echo "Stratégie : feat/* → develop → staging → main (+ hotfix/* → main)"
