@@ -123,12 +123,26 @@ const NAV_AC: NavGroup[] = [
   },
 ];
 
+// ── Menu Admin système (V05 LOT 1.6 / V5-D9) — espace cross-école. URLs propres
+//    /ecoles · /utilisateurs · /journal (aucun segment d'acteur dans l'URL).
+const NAV_ADMIN: NavGroup[] = [
+  {
+    group: 'SYSTÈME',
+    items: [
+      { id: 'ecoles', label: 'Écoles', href: '/ecoles', icon: GraduationCapIcon },
+      { id: 'utilisateurs', label: 'Utilisateurs', href: '/utilisateurs', icon: UsersIcon },
+      { id: 'journal', label: "Journal d'audit", href: '/journal', icon: BarChartIcon },
+    ],
+  },
+];
+
 function navForRole(role: UserRole | null): NavGroup[] {
-  // Seuls RP et AC consomment cette sidebar (les rôles consult ont leur propre
-  // layout `(consult)`). On retombe sur NAV_RP par défaut — c'est le comportement
-  // legacy de cette sidebar, le RBAC réel (route groups + guards serveur) coupe
-  // l'accès aux pages que ces items pointeraient.
-  return role === 'ASSISTANT_PROGRAMME' ? NAV_AC : NAV_RP;
+  // `navForRole` = point d'évolution unique du menu par rôle (LOT 6). RP/AC +
+  // Admin (V05) ont leur menu dédié ; les rôles consult ont leur propre layout
+  // `(consult)`. Le RBAC réel (route groups + guards serveur) reste l'autorité.
+  if (role === 'ASSISTANT_PROGRAMME') return NAV_AC;
+  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return NAV_ADMIN;
+  return NAV_RP;
 }
 
 function computeInitials(fullName: string): string {
@@ -162,6 +176,7 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
     'MES CLASSES': true,
     RÉFÉRENTIELS: true,
     CONSULTATION: true,
+    SYSTÈME: true,
   });
   const toggleGroup = (group: string) =>
     setOpenGroups((prev) => ({ ...prev, [group]: !prev[group] }));
