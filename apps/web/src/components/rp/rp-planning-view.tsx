@@ -11,7 +11,7 @@ import { PlanningToolbar } from '@/components/planning/planning-toolbar';
 import { SessionDetailDrawer } from '@/components/planning/session-detail-drawer';
 import { ViewScopeToggle, type ViewScope } from '@/components/planning/view-scope-toggle';
 import type { ViewMode } from '@/components/planning/view-mode-tabs';
-import { useIsAc } from '@/hooks/use-role';
+import { useIsAc, useIsDirection } from '@/hooks/use-role';
 import { useGlobalShortcut } from '@/lib/keyboard';
 import { useCreateSessionV2Mutation, useDeleteSessionV2Mutation } from '@/lib/mutations-v2';
 import { useV2WeekSessionsQuery } from '@/lib/queries-v2';
@@ -38,11 +38,15 @@ interface CreateInit {
  *
  * LOT 6 G.3 — Mode AC : tout en lecture seule (pas de drag/resize/create/publish/
  * undo/redo). Le breadcrumb passe à « Mon espace » au lieu de « Espace RP ».
+ *
+ * V05 LOT 3 — La Direction consomme la même vue en lecture seule : planning de
+ * toute son école (requête sans `classeId` → scopée école côté serveur).
  */
 export function RpPlanningView() {
   const flash = useFlash();
   const isAc = useIsAc();
-  const readOnly = isAc;
+  const isDirection = useIsDirection();
+  const readOnly = isAc || isDirection;
   const [weekStart, setWeekStart] = useState<Date>(() => getCurrentWeekStart());
   const [createOpen, setCreateOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
