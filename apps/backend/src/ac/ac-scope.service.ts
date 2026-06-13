@@ -1,5 +1,11 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { AcScopeDto, Role } from '@planit/contracts';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
 
 /**
@@ -121,5 +127,62 @@ export class AcScopeService {
     await this.assertManages(rpUserId, acId);
 
     await this.prisma.assistantClasse.deleteMany({ where: { acId, classeId } });
+  }
+
+  // ── Assignation par la Direction (V05 LOT 6 / ADR-0022 §7) ─────────────
+
+  /**
+   * La Direction gère les assignations AC↔classe à l'échelle de **son école**
+   * (sans la contrainte `managerRpId` qui borne l'assignation par un RP). L'AC
+   * doit appartenir à l'école de la Direction.
+   */
+  private async assertAcInEcole(ecoleId: string | null, acId: string): Promise<void> {
+    const ac = await this.prisma.user.findFirst({
+      where: {
+        id: acId,
+        role: 'ASSISTANT_PROGRAMME',
+        ecoleId: ecoleId ?? '__none__',
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!ac) throw new NotFoundException(`AC ${acId} introuvable`);
+  }
+
+  /** Classes actuellement assignées à un AC (pré-cochage du sélecteur Direction). */
+  async listClasseIdsByDirection(user: CurrentUserPayload, acId: string): Promise<string[]> {
+    await this.assertAcInEcole(user.ecoleId, acId);
+    return this.getAssignedClasseIds(acId);
+  }
+
+  /**
+   * Définit (remplace) l'ensemble des classes assignées à un AC. Toutes les
+   * classes doivent appartenir à l'école de la Direction. Sémantique « set ».
+   */
+  async setClassesByDirection(
+    user: CurrentUserPayload,
+    acId: string,
+    classeIds: string[],
+  ): Promise<void> {
+    await this.assertAcInEcole(user.ecoleId, acId);
+    const unique = [...new Set(classeIds)];
+    if (unique.length > 0) {
+      const inEcole = await this.prisma.classe.count({
+        where: {
+          id: { in: unique },
+          OR: [
+            { formation: { filiere: { ecoleId: user.ecoleId ?? '__none__' } } },
+            { filiere: { ecoleId: user.ecoleId ?? '__none__' } },
+          ],
+        },
+      });
+      if (inEcole !== unique.length) {
+        throw new BadRequestException('Une ou plusieurs classes sont hors de votre école');
+      }
+    }
+    await this.prisma.$transaction([
+      this.prisma.assistantClasse.deleteMany({ where: { acId } }),
+      ...unique.map((classeId) => this.prisma.assistantClasse.create({ data: { acId, classeId } })),
+    ]);
   }
 }

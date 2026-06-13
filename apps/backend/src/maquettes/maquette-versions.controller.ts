@@ -35,7 +35,7 @@ export class MaquetteVersionsController {
     @Param('vid') vid: string,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<MaquetteVersionDto> {
-    return this.maquettes.getVersion(vid, user.ecoleId);
+    return this.maquettes.getVersion(vid, user);
   }
 
   @Get(':vid/export')
@@ -47,7 +47,7 @@ export class MaquetteVersionsController {
     @Param('vid') vid: string,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<MaquetteExportDto> {
-    return this.maquettes.exportVersion(vid, user.ecoleId);
+    return this.maquettes.exportVersion(vid, user);
   }
 
   @Post(':vid/modules')
@@ -60,7 +60,8 @@ export class MaquetteVersionsController {
   addModule(
     @Param('vid') vid: string,
     @Body(new ZodValidationPipe(createMaquetteModuleSchema)) dto: CreateMaquetteModuleDto,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<MaquetteModuleDto> {
-    return this.maquettes.addModule(vid, dto);
+    return this.maquettes.addModule(vid, dto, user);
   }
 }

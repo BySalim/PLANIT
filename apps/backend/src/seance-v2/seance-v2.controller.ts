@@ -15,8 +15,10 @@ import { SeanceV2Service } from './seance-v2.service';
 const weekQuerySchema = z.object({
   weekStart: z.string().date(),
   classeId: z.string().min(1).optional(),
-  teacherId: z.string().min(1).optional(),
+  teacherId: z.string().min(1).optional(), // référentiel Enseignant (Enseignant.id V02)
   studentId: z.string().min(1).optional(),
+  // V05 LOT 6 (ADR-0022 §4) — référentiel Salle (occupation école + masquage).
+  salleId: z.string().min(1).optional(),
   take: z.coerce.number().int().min(1).max(500).default(100),
   skip: z.coerce.number().int().min(0).default(0),
 });
@@ -52,7 +54,7 @@ export class SeanceV2Controller {
     @Query(new ZodValidationPipe(weekQuerySchema)) query: WeekQueryDto,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<SessionV2Dto[]> {
-    return this.seances.findWeek(query as WeekV2Query, user.ecoleId);
+    return this.seances.findWeek(query as WeekV2Query, user);
   }
 
   /** B.5 — stats par type V02 + sous-type. */
@@ -64,7 +66,7 @@ export class SeanceV2Controller {
     @Query(new ZodValidationPipe(weekQuerySchema)) query: WeekQueryDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.seances.stats(query as WeekV2Query, user.ecoleId);
+    return this.seances.stats(query as WeekV2Query, user);
   }
 
   /** B.4 — détail. */
@@ -73,7 +75,7 @@ export class SeanceV2Controller {
   @ApiResponse({ status: 200, description: 'Séance trouvée' })
   @ApiResponse({ status: 404, description: 'Séance introuvable' })
   findOne(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload): Promise<SessionV2Dto> {
-    return this.seances.findOne(id, user.ecoleId);
+    return this.seances.findOne(id, user);
   }
 
   /** B.1 — création (discriminated union sur `type`). */

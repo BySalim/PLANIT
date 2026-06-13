@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { assignAcClasseSchema } from '@planit/contracts';
-import type { AcScopeDto, AssignAcClasseDto } from '@planit/contracts';
+import { assignAcClasseSchema, setAcClassesSchema } from '@planit/contracts';
+import type { AcScopeDto, AssignAcClasseDto, SetAcClassesDto } from '@planit/contracts';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -61,5 +61,36 @@ export class AcController {
     @Param('classeId') classeId: string,
   ): Promise<void> {
     await this.acScope.unassignClasse(user.id, acId, classeId);
+  }
+
+  // ── Direction (V05 LOT 6 / ADR-0022 §7) — assignation école-large ──────
+
+  @Get(':acId/classes')
+  @Roles('DIRECTION')
+  @ApiOperation({ summary: "Classes assignées d'un AC de mon école (Direction)" })
+  @ApiResponse({ status: 200, description: 'Ids des classes assignées' })
+  @ApiResponse({ status: 404, description: 'AC introuvable / hors école' })
+  async listClasses(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('acId') acId: string,
+  ): Promise<{ classeIds: string[] }> {
+    const classeIds = await this.acScope.listClasseIdsByDirection(user, acId);
+    return { classeIds };
+  }
+
+  @Put(':acId/classes')
+  @Roles('DIRECTION')
+  @HttpCode(204)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({ summary: "Définir les classes assignées d'un AC (Direction, école-large)" })
+  @ApiResponse({ status: 204, description: 'Assignations mises à jour' })
+  @ApiResponse({ status: 400, description: 'Classe hors de votre école' })
+  @ApiResponse({ status: 404, description: 'AC introuvable / hors école' })
+  async setClasses(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('acId') acId: string,
+    @Body(new ZodValidationPipe(setAcClassesSchema)) dto: SetAcClassesDto,
+  ): Promise<void> {
+    await this.acScope.setClassesByDirection(user, acId, dto.classeIds);
   }
 }

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AcModule } from '../ac/ac.module';
 import { SettingsModule } from '../settings/settings.module';
 import { WsModule } from '../ws/ws.module';
 import { SeanceV2Controller } from './seance-v2.controller';
@@ -12,7 +13,7 @@ import { SeanceV2Service } from './seance-v2.service';
  * des colonnes legacy sont planifiés en LOT 3 (TD-029, TD-030).
  */
 @Module({
-  imports: [SettingsModule, WsModule],
+  imports: [SettingsModule, WsModule, AcModule],
   controllers: [SeanceV2Controller],
   providers: [SeanceV2Service],
 })

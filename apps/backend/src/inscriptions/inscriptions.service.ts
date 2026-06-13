@@ -8,6 +8,7 @@ import type { InscriptionDto, InscriptionRequestDto } from '@planit/contracts';
 import { isDoubleDiplomeInscription } from '@planit/utils';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
+import { isRp } from '../common/rp-scope';
 import { AcScopeService } from '../ac/ac-scope.service';
 
 /**
@@ -50,6 +51,10 @@ export class InscriptionsService {
       include: { formation: { include: { filiere: true } } },
     });
     if (!classe) throw new NotFoundException(`Classe ${classeId} introuvable`);
+    // V05 LOT 6 (ADR-0022) — un RP n'inscrit que dans SES classes.
+    if (isRp(user.role) && classe.ownerRpId !== user.id) {
+      throw new NotFoundException(`Classe ${classeId} introuvable`);
+    }
     if (!classe.formation) {
       throw new BadRequestException(
         "Cette classe n'est rattachée à aucune formation — inscription impossible",
@@ -110,11 +115,18 @@ export class InscriptionsService {
   }
 
   async remove(user: CurrentUserPayload, id: string): Promise<void> {
-    const inscription = await this.prisma.inscription.findUnique({ where: { id } });
+    const inscription = await this.prisma.inscription.findUnique({
+      where: { id },
+      include: { classe: { select: { ownerRpId: true } } },
+    });
     if (!inscription) throw new NotFoundException(`Inscription ${id} introuvable`);
 
     if (this.acScope.isAc(user.role)) {
+      // L'AC retire un étudiant d'une de SES classes assignées (V05 LOT 6).
       await this.acScope.assertCanAccessClasse(user.id, inscription.classeId);
+    } else if (isRp(user.role) && inscription.classe.ownerRpId !== user.id) {
+      // Un RP ne retire un étudiant que dans SES classes (ADR-0022).
+      throw new NotFoundException(`Inscription ${id} introuvable`);
     }
 
     await this.prisma.$transaction(async (tx) => {

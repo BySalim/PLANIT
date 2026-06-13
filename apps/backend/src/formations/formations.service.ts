@@ -7,7 +7,9 @@ import {
 import type { Prisma } from '@prisma/client';
 import type { CreateFormationDto, FormationDto } from '@planit/contracts';
 import { formationCode } from '@planit/utils';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
+import { isRp } from '../common/rp-scope';
 import { AnneesService } from '../annees/annees.service';
 import { MaquettesService } from '../maquettes/maquettes.service';
 
@@ -51,9 +53,12 @@ export class FormationsService {
    * l'école** de l'acteur via la filière (V05 / ADR-0019 §3). `ecoleId === null`
    * (ADMIN) ⇒ liste vide.
    */
-  async list(query: ListQuery, ecoleId: string | null): Promise<FormationDto[]> {
-    if (!ecoleId) return [];
-    const where: Prisma.FormationWhereInput = { filiere: { ecoleId } };
+  async list(query: ListQuery, user: CurrentUserPayload): Promise<FormationDto[]> {
+    if (!user.ecoleId) return [];
+    // Scope école + (RP) espace de travail via la filière (ADR-0022).
+    const where: Prisma.FormationWhereInput = {
+      filiere: { ecoleId: user.ecoleId, ...(isRp(user.role) ? { ownerRpId: user.id } : {}) },
+    };
 
     if (query.anneeId) {
       where.anneeAcademiqueId = query.anneeId;
@@ -61,7 +66,7 @@ export class FormationsService {
       // Défaut : année courante de l'école. Si aucune n'est en cours, on ne
       // filtre pas par année (liste vide plutôt qu'erreur — la page reste
       // affichable).
-      const current = await this.annees.findCurrentEntity(ecoleId);
+      const current = await this.annees.findCurrentEntity(user.ecoleId);
       if (current) where.anneeAcademiqueId = current.id;
     }
     if (query.filiereId) where.filiereId = query.filiereId;
@@ -125,6 +130,8 @@ export class FormationsService {
           niveau: dto.niveau,
           sigle: filiere.sigle,
           currentYearId: currentYear.id,
+          // V05 LOT 6 (ADR-0022) — la maquette hérite du propriétaire de la filière.
+          ownerRpId: filiere.ownerRpId,
         });
         return tx.formation.create({
           data: {

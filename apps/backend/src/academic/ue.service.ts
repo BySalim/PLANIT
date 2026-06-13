@@ -1,11 +1,34 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { CreateUEDto, ModuleV2Dto, UEDto, UpdateUEDto } from '@planit/contracts';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
+import { isRp } from '../common/rp-scope';
 
 @Injectable()
 export class UeService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * V05 LOT 6 (ADR-0022 §2) — fragment `where` du périmètre UE : un RP ne voit
+   * que SES UE (`ownerRpId = self`) dans son école. Endpoints UE = RP only, mais
+   * on garde le pattern composable pour une éventuelle lecture Direction future.
+   */
+  private ownerWhere(user: CurrentUserPayload): Prisma.UEWhereInput {
+    return {
+      ...(user.ecoleId ? { ecoleId: user.ecoleId } : {}),
+      ...(isRp(user.role) ? { ownerRpId: user.id } : {}),
+    };
+  }
+
+  /** Lève 404 si l'UE n'est pas dans le périmètre de l'acteur (ne pas divulguer). */
+  private async assertUeOwned(id: string, user: CurrentUserPayload): Promise<void> {
+    const found = await this.prisma.uE.findFirst({
+      where: { id, ...this.ownerWhere(user) },
+      select: { id: true },
+    });
+    if (!found) throw new NotFoundException(`UE ${id} introuvable`);
+  }
 
   /**
    * B.7 — liste des UE.
@@ -17,24 +40,27 @@ export class UeService {
    *    V1. Utilisé par le formulaire de séance qui a besoin de la liste
    *    aplatie des modules pour le select Module.
    */
-  async list(opts?: { withModules?: boolean }): Promise<UEDto[]> {
+  async list(user: CurrentUserPayload, opts?: { withModules?: boolean }): Promise<UEDto[]> {
+    const where = this.ownerWhere(user);
     if (opts?.withModules === true) {
       const rows = await this.prisma.uE.findMany({
+        where,
         orderBy: { code: 'asc' },
         include: { modules: { orderBy: { code: 'asc' } } },
       });
       return rows.map(toDto);
     }
     const rows = await this.prisma.uE.findMany({
+      where,
       orderBy: { code: 'asc' },
       include: { _count: { select: { modules: true } } },
     });
     return rows.map(toLiteDto);
   }
 
-  async findOne(id: string): Promise<UEDto> {
-    const row = await this.prisma.uE.findUnique({
-      where: { id },
+  async findOne(id: string, user: CurrentUserPayload): Promise<UEDto> {
+    const row = await this.prisma.uE.findFirst({
+      where: { id, ...this.ownerWhere(user) },
       include: { modules: { orderBy: { code: 'asc' } } },
     });
     if (!row) throw new NotFoundException(`UE ${id} introuvable`);
@@ -43,11 +69,10 @@ export class UeService {
 
   /**
    * Modules d'une UE, triés par code. Utilisé par `GET /ues/:ueId/modules`
-   * pour le lazy load côté front. Retourne 404 si l'UE n'existe pas.
+   * pour le lazy load côté front. Retourne 404 si l'UE n'existe pas / hors scope.
    */
-  async findModulesForUe(ueId: string): Promise<ModuleV2Dto[]> {
-    const ue = await this.prisma.uE.findUnique({ where: { id: ueId } });
-    if (!ue) throw new NotFoundException(`UE ${ueId} introuvable`);
+  async findModulesForUe(ueId: string, user: CurrentUserPayload): Promise<ModuleV2Dto[]> {
+    await this.assertUeOwned(ueId, user);
     const rows = await this.prisma.module.findMany({
       where: { ueId },
       orderBy: { code: 'asc' },
@@ -63,10 +88,17 @@ export class UeService {
     );
   }
 
-  async create(dto: CreateUEDto): Promise<UEDto> {
+  async create(dto: CreateUEDto, user: CurrentUserPayload): Promise<UEDto> {
     try {
       const row = await this.prisma.uE.create({
-        data: { code: dto.code, libelle: dto.libelle, color: dto.color },
+        data: {
+          code: dto.code,
+          libelle: dto.libelle,
+          color: dto.color,
+          // V05 LOT 6 (ADR-0022) — UE personnelle au RP créateur, dans son école.
+          ecoleId: user.ecoleId,
+          ownerRpId: isRp(user.role) ? user.id : null,
+        },
         include: { modules: true },
       });
       return toDto(row);
@@ -78,9 +110,8 @@ export class UeService {
     }
   }
 
-  async update(id: string, dto: UpdateUEDto): Promise<UEDto> {
-    const exists = await this.prisma.uE.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException(`UE ${id} introuvable`);
+  async update(id: string, dto: UpdateUEDto, user: CurrentUserPayload): Promise<UEDto> {
+    await this.assertUeOwned(id, user);
 
     const data: Prisma.UEUpdateInput = {};
     if (dto.code !== undefined) data.code = dto.code;
@@ -103,9 +134,8 @@ export class UeService {
   }
 
   /** B.7 — refus 409 si l'UE contient des modules (V2-D14). */
-  async remove(id: string): Promise<void> {
-    const exists = await this.prisma.uE.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException(`UE ${id} introuvable`);
+  async remove(id: string, user: CurrentUserPayload): Promise<void> {
+    await this.assertUeOwned(id, user);
 
     const modulesCount = await this.prisma.module.count({ where: { ueId: id } });
     if (modulesCount > 0) {

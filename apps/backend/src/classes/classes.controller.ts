@@ -78,9 +78,10 @@ export class ClassesController {
   @ApiResponse({ status: 400, description: 'Formation invalide / hors année courante' })
   @ApiResponse({ status: 409, description: 'Code de classe déjà utilisé' })
   create(
+    @CurrentUser() user: CurrentUserPayload,
     @Body(new ZodValidationPipe(createClasseV3Schema)) dto: CreateClasseV3Dto,
   ): Promise<ClasseV3Dto> {
-    return this.classes.create(dto);
+    return this.classes.create(dto, user);
   }
 
   @Put(':id')
@@ -91,9 +92,10 @@ export class ClassesController {
   @ApiResponse({ status: 404, description: 'Classe introuvable' })
   @ApiResponse({ status: 409, description: 'Code de classe déjà utilisé' })
   update(
+    @CurrentUser() user: CurrentUserPayload,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateClasseV3Schema)) dto: UpdateClasseV3Dto,
   ): Promise<ClasseV3Dto> {
-    return this.classes.update(id, dto);
+    return this.classes.update(id, dto, user);
   }
 }

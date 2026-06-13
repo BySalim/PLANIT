@@ -3,6 +3,8 @@ import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { Throttle } from '@nestjs/throttler';
 import { updateMaquetteModuleSchema } from '@planit/contracts';
 import type { MaquetteModuleDto, UpdateMaquetteModuleDto } from '@planit/contracts';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { MaquettesService } from './maquettes.service';
@@ -25,8 +27,9 @@ export class MaquetteModulesController {
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateMaquetteModuleSchema)) dto: UpdateMaquetteModuleDto,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<MaquetteModuleDto> {
-    return this.maquettes.updateModule(id, dto);
+    return this.maquettes.updateModule(id, dto, user);
   }
 
   @Delete(':id')
@@ -34,7 +37,7 @@ export class MaquetteModulesController {
   @ApiOperation({ summary: 'Composer : retirer un module de la version' })
   @ApiResponse({ status: 204, description: 'Module retiré' })
   @ApiResponse({ status: 404, description: 'Module de maquette introuvable' })
-  async remove(@Param('id') id: string): Promise<void> {
-    await this.maquettes.removeModule(id);
+  async remove(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload): Promise<void> {
+    await this.maquettes.removeModule(id, user);
   }
 }

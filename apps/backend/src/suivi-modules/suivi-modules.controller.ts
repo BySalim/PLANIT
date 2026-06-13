@@ -29,10 +29,16 @@ export class SuiviModulesController {
   constructor(private readonly suivi: SuiviModulesService) {}
 
   @Get()
-  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME', 'ETUDIANT', 'RESPONSABLE_CLASSE')
+  // V05 LOT 6 — la Direction lit le suivi de toute son école (lecture seule).
+  @Roles(
+    'RESPONSABLE_PROGRAMME',
+    'ASSISTANT_PROGRAMME',
+    'DIRECTION',
+    'ETUDIANT',
+    'RESPONSABLE_CLASSE',
+  )
   @ApiOperation({
-    summary:
-      'Suivi des modules (RP/AC scopé classes ; ETUDIANT self-scope via Inscription année courante)',
+    summary: 'Suivi des modules (RP espace de travail ; AC/Direction scopé ; ETUDIANT self-scope)',
   })
   @ApiQuery({ name: 'classeId', required: false })
   @ApiQuery({ name: 'semestre', required: false })
@@ -59,6 +65,7 @@ export class SuiviModulesController {
   }
 
   @Get(':id/seances')
+  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME', 'DIRECTION')
   @ApiOperation({ summary: 'Séances COURS du module suivi (« Voir les séances »)' })
   @ApiResponse({ status: 200, description: 'Séances du module' })
   @ApiResponse({ status: 403, description: 'Hors périmètre AC' })
@@ -77,8 +84,11 @@ export class SuiviModulesController {
   @ApiOperation({ summary: 'Marquer un module terminé (RP only)' })
   @ApiResponse({ status: 200, description: 'Module marqué terminé' })
   @ApiResponse({ status: 404, description: 'Suivi introuvable' })
-  terminer(@Param('id') id: string): Promise<SuiviModuleDto> {
-    return this.suivi.terminer(id);
+  terminer(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<SuiviModuleDto> {
+    return this.suivi.terminer(id, user);
   }
 
   @Patch(':id/rouvrir')
@@ -88,7 +98,10 @@ export class SuiviModulesController {
   @ApiOperation({ summary: 'Rouvrir un module terminé (RP only)' })
   @ApiResponse({ status: 200, description: 'Module rouvert' })
   @ApiResponse({ status: 404, description: 'Suivi introuvable' })
-  rouvrir(@Param('id') id: string): Promise<SuiviModuleDto> {
-    return this.suivi.rouvrir(id);
+  rouvrir(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<SuiviModuleDto> {
+    return this.suivi.rouvrir(id, user);
   }
 }

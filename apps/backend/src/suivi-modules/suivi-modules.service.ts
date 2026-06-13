@@ -10,6 +10,7 @@ import type {
 import { computeVHE } from '@planit/utils';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
+import { isRp } from '../common/rp-scope';
 import { AcScopeService } from '../ac/ac-scope.service';
 import { seanceV2Include, toSessionV2Dto } from '../seance-v2/seance-v2.mapper';
 
@@ -171,6 +172,9 @@ export class SuiviModulesService {
 
     if (this.acScope.isAc(user.role)) {
       await this.acScope.assertCanAccessClasse(user.id, suivi.classeId);
+    } else {
+      // V05 LOT 6 — RP/Direction : la classe du suivi doit être dans le périmètre.
+      await this.assertClasseInScope(user, suivi.classeId);
     }
 
     const seances = await this.prisma.seance.findMany({
@@ -188,13 +192,13 @@ export class SuiviModulesService {
   }
 
   /** Terminer (RP) — marque le suivi terminé puis renvoie le DTO recalculé. */
-  async terminer(suiviId: string): Promise<SuiviModuleDto> {
-    return this.setTermine(suiviId, true);
+  async terminer(suiviId: string, user: CurrentUserPayload): Promise<SuiviModuleDto> {
+    return this.setTermine(suiviId, true, user);
   }
 
   /** Rouvrir (RP). */
-  async rouvrir(suiviId: string): Promise<SuiviModuleDto> {
-    return this.setTermine(suiviId, false);
+  async rouvrir(suiviId: string, user: CurrentUserPayload): Promise<SuiviModuleDto> {
+    return this.setTermine(suiviId, false, user);
   }
 
   /**
@@ -394,9 +398,15 @@ export class SuiviModulesService {
 
   // ── internes ─────────────────────────────────────────────────────────
 
-  private async setTermine(suiviId: string, estTermine: boolean): Promise<SuiviModuleDto> {
+  private async setTermine(
+    suiviId: string,
+    estTermine: boolean,
+    user: CurrentUserPayload,
+  ): Promise<SuiviModuleDto> {
     const exists = await this.prisma.suiviModule.findUnique({ where: { id: suiviId } });
     if (!exists) throw new NotFoundException(`Suivi ${suiviId} introuvable`);
+    // V05 LOT 6 — un RP ne (rÉ)ouvre/termine que le suivi de SES classes.
+    await this.assertClasseInScope(user, exists.classeId);
 
     await this.prisma.suiviModule.update({
       where: { id: suiviId },
@@ -492,6 +502,10 @@ export class SuiviModulesService {
         if (!own.includes(classeId)) {
           throw new ForbiddenException('Classe hors de votre périmètre');
         }
+      } else {
+        // V05 LOT 6 — RP/Direction : la classe doit être dans le périmètre
+        // (école pour la Direction ; espace de travail pour le RP).
+        await this.assertClasseInScope(user, classeId);
       }
       return [classeId];
     }
@@ -501,11 +515,41 @@ export class SuiviModulesService {
     if (isStudent) {
       return this.resolveEtudiantClasseIds(user.id);
     }
+    // V05 LOT 6 (ADR-0022) — RP : ses classes ; Direction : toute son école.
+    // (Corrige aussi l'angle mort scope année/école — anciennement toutes écoles.)
+    if (!user.ecoleId) return [];
     const rows = await this.prisma.classe.findMany({
-      where: { formationId: { not: null } },
+      where: {
+        formationId: { not: null },
+        ...this.ecoleClasseWhere(user.ecoleId),
+        ...(isRp(user.role) ? { ownerRpId: user.id } : {}),
+      },
       select: { id: true },
     });
     return rows.map((r) => r.id);
+  }
+
+  /** Filtre « classe rattachée à l'école » (via formation OU FK filière legacy). */
+  private ecoleClasseWhere(ecoleId: string): Prisma.ClasseWhereInput {
+    return {
+      OR: [{ formation: { filiere: { ecoleId } } }, { filiere: { ecoleId } }],
+    };
+  }
+
+  /**
+   * V05 LOT 6 — durcissement quand `?classeId=` explicite : la classe doit être
+   * dans l'école de l'acteur et, pour un RP, dans son espace de travail. 403 sinon.
+   */
+  private async assertClasseInScope(user: CurrentUserPayload, classeId: string): Promise<void> {
+    const found = await this.prisma.classe.findFirst({
+      where: {
+        id: classeId,
+        ...this.ecoleClasseWhere(user.ecoleId ?? '__none__'),
+        ...(isRp(user.role) ? { ownerRpId: user.id } : {}),
+      },
+      select: { id: true },
+    });
+    if (!found) throw new ForbiddenException('Classe hors de votre périmètre');
   }
 
   /** Crée les lignes SuiviModule manquantes puis renvoie la map par clé. */

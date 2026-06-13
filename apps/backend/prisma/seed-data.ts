@@ -734,6 +734,55 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
   });
 
   await seedEcoleB(prisma, passwordHash);
+
+  // ── V05 LOT 6 — Salle subjective de démo (ADR-0022 §5) ────────────────
+  // Privée à seed-rp : visible de lui seul dans la liste des salles.
+  await prisma.salle.upsert({
+    where: { id: 'seed-salle-subj-rp' },
+    update: {
+      name: 'Salle projet (hypothétique)',
+      type: 'Salle de cours',
+      capacity: 20,
+      ecoleId: ECOLE_A_ID,
+      isSubjective: true,
+      ownerRpId: 'seed-rp',
+    },
+    create: {
+      id: 'seed-salle-subj-rp',
+      name: 'Salle projet (hypothétique)',
+      type: 'Salle de cours',
+      capacity: 20,
+      ecoleId: ECOLE_A_ID,
+      isSubjective: true,
+      ownerRpId: 'seed-rp',
+    },
+  });
+
+  await backfillOwnership(prisma);
+}
+
+// ── V05 LOT 6 — Backfill ownerRpId (ADR-0022) ──────────────────────────────
+// L'espace de travail d'un RP = ce qu'il a créé. Pour la démo, tout le
+// référentiel de l'école A est attribué à `seed-rp` et celui de l'école B à
+// `seed-rp-b`. L'isolation ENTRE deux RP d'une même école (seed-rp vs seed-rp2)
+// est prouvée par les tests d'intégration et démontrable en live (créer en tant
+// que seed-rp2 → visible de lui + Direction, invisible de seed-rp). SQL brut :
+// updateMany ne supporte pas les filtres relationnels.
+async function backfillOwnership(prisma: PrismaClient): Promise<void> {
+  // Filières par école.
+  await prisma.$executeRaw`UPDATE "filieres" SET "ownerRpId" = 'seed-rp' WHERE "ecoleId" = ${ECOLE_A_ID}`;
+  await prisma.$executeRaw`UPDATE "filieres" SET "ownerRpId" = 'seed-rp-b' WHERE "ecoleId" = ${ECOLE_B_ID}`;
+  // Classes via la filière (filiereId legacy synchronisé au seed), fallback formation.
+  await prisma.$executeRaw`UPDATE "classes" c SET "ownerRpId" = f."ownerRpId" FROM "filieres" f WHERE c."filiereId" = f."id"`;
+  await prisma.$executeRaw`UPDATE "classes" c SET "ownerRpId" = f."ownerRpId" FROM "formations" fo JOIN "filieres" f ON fo."filiereId" = f."id" WHERE c."formationId" = fo."id" AND c."ownerRpId" IS NULL`;
+  // Maquettes via la filière.
+  await prisma.$executeRaw`UPDATE "maquettes" m SET "ownerRpId" = f."ownerRpId" FROM "filieres" f WHERE m."filiereId" = f."id"`;
+  // Séances via la classe.
+  await prisma.$executeRaw`UPDATE "seances" s SET "ownerRpId" = c."ownerRpId" FROM "classes" c WHERE s."classeId" = c."id"`;
+  // UE + modules (catalogue de base = école A → seed-rp).
+  await prisma.$executeRaw`UPDATE "ues" SET "ecoleId" = ${ECOLE_A_ID}, "ownerRpId" = 'seed-rp' WHERE "ownerRpId" IS NULL`;
+  await prisma.$executeRaw`UPDATE "modules" m SET "ownerRpId" = u."ownerRpId" FROM "ues" u WHERE m."ueId" = u."id" AND m."ownerRpId" IS NULL`;
+  await prisma.$executeRaw`UPDATE "modules" SET "ownerRpId" = 'seed-rp' WHERE "ownerRpId" IS NULL`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

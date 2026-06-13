@@ -7,6 +7,9 @@ export const seanceV2Include = {
   salle: true,
   enseignant: true,
   seanceClasses: { include: { classe: true } },
+  // V05 LOT 6 (ADR-0022) — RP créateur, pour exposer `ownerRpId`/`ownerRpName`
+  // et piloter le masquage en vue Salle.
+  ownerRp: { select: { id: true, fullName: true } },
 } satisfies Prisma.SeanceInclude;
 
 export type SeanceV2WithRelations = Prisma.SeanceGetPayload<{
@@ -77,6 +80,49 @@ export function toSessionV2Dto(seance: SeanceV2WithRelations): SessionV2Dto {
       : null,
     salle: seance.salle ? { id: seance.salle.id, name: seance.salle.name } : null,
     classes,
+
+    // V05 LOT 6 (ADR-0022) — propriété ; non masquée par défaut.
+    ownerRpId: seance.ownerRpId,
+    ownerRpName: seance.ownerRp ? seance.ownerRp.fullName : null,
+    masked: false,
+  };
+}
+
+/**
+ * V05 LOT 6 (ADR-0022 §4) — variante **masquée** d'une séance vue dans le
+ * référentiel Salle quand elle appartient à un AUTRE RP. Seuls le créneau, la
+ * salle (le référentiel consulté) et le nom du RP propriétaire sont réels ;
+ * tout détail identifiant le contenu (module, classes, enseignant, libellé,
+ * description, sous-type, état dirty) est neutralisé **ici, côté serveur** —
+ * ces champs ne quittent jamais le backend.
+ */
+export function toMaskedSessionV2Dto(seance: SeanceV2WithRelations): SessionV2Dto {
+  if (!seance.typeV2) {
+    throw new Error(`Seance ${seance.id} has typeV2=null — cannot mask.`);
+  }
+  return {
+    id: seance.id,
+    libelle: '',
+    type: seance.typeV2 as SessionTypeV2,
+    sousType: null,
+    startAt: seance.startAt.toISOString(),
+    endAt: seance.endAt.toISOString(),
+    intervenantNom: null,
+    description: null,
+
+    hasUnpublishedChanges: false,
+    isPublished: seance.isPublished,
+    lastModifiedAt: seance.lastModifiedAt.toISOString(),
+    lastPublishedAt: null,
+
+    module: null,
+    enseignant: null,
+    salle: seance.salle ? { id: seance.salle.id, name: seance.salle.name } : null,
+    classes: [],
+
+    ownerRpId: seance.ownerRpId,
+    ownerRpName: seance.ownerRp ? seance.ownerRp.fullName : null,
+    masked: true,
   };
 }
 

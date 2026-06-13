@@ -129,6 +129,8 @@ model Ecole {
   salles           Salle[]
   enseignants      Enseignant[]
   anneesAcademiques AnneeAcademique[]
+  // V05 LOT 6 — UE rattachées à l'école (ADR-0022).
+  ues              UE[]
 
   @@map("ecoles")
 }
@@ -203,6 +205,16 @@ model User {
   // V05 — filières dont ce RP est le Responsable (V5-D5 / ADR-0020).
   responsableFilieres Filiere[] @relation("FiliereResponsable")
 
+  // V05 LOT 6 — espace de travail RP : entités créées par ce RP (ownerRpId,
+  // ADR-0022). Immuable (onDelete: SetNull). Distinct de « Responsable ».
+  ownedFilieres  Filiere[]   @relation("FiliereOwner")
+  ownedUes       UE[]        @relation("UeOwner")
+  ownedModules   Module[]    @relation("ModuleOwner")
+  ownedMaquettes Maquette[]  @relation("MaquetteOwner")
+  ownedClasses   Classe[]    @relation("ClasseOwner")
+  ownedSeances   Seance[]    @relation("SeanceOwner")
+  ownedSalles    Salle[]     @relation("SalleOwner")
+
   // V05 — actions tracées au journal d'audit (ADR-0020).
   auditLogs AuditLog[] @relation("AuditActor")
 
@@ -237,7 +249,9 @@ model RefreshToken {
 
 model Filiere {
   id              String       @id @default(cuid())
-  sigle           String       @unique
+  // V05 LOT 6 — sigle unique PAR école (plus global) : 2 écoles peuvent avoir
+  // « GLRS ». Cf. @@unique([ecoleId, sigle]) ci-dessous.
+  sigle           String
   libelle         String
   isDoubleDiplome Boolean      @default(false)
   grade           FiliereGrade
@@ -254,18 +268,26 @@ model Filiere {
   responsableRpId String?
   responsableRp   User?   @relation("FiliereResponsable", fields: [responsableRpId], references: [id], onDelete: SetNull)
 
+  // V05 LOT 6 — RP créateur = clé du périmètre de travail (ADR-0022). Immuable,
+  // distinct de responsableRpId. Nullable (data legacy backfillée au reseed).
+  ownerRpId String?
+  ownerRp   User?   @relation("FiliereOwner", fields: [ownerRpId], references: [id], onDelete: SetNull)
+
   // V03 — plans d'études et formations de cette filière (ADR-0010 / V3-D4).
   maquettes  Maquette[]
   formations Formation[]
 
+  @@unique([ecoleId, sigle])
   @@index([ecoleId])
   @@index([responsableRpId])
+  @@index([ownerRpId])
   @@map("filieres")
 }
 
 model Classe {
   id        String   @id @default(cuid())
-  code      String   @unique
+  // V05 LOT 6 — code unique PAR propriétaire (ADR-0022), plus global.
+  code      String
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -291,30 +313,48 @@ model Classe {
   seances     Seance[] // V01 — direct FK on Seance.classeId
   seanceLinks SeanceClasse[] // V02 — N-N join, used by LOT 2 onwards
 
+  // V05 LOT 6 — RP créateur = clé du périmètre de travail (ADR-0022).
+  ownerRpId String?
+  ownerRp   User?   @relation("ClasseOwner", fields: [ownerRpId], references: [id], onDelete: SetNull)
+
   // V03
   inscriptions    Inscription[]
   assistants      AssistantClasse[]
   suiviModules    SuiviModule[]
 
+  @@unique([ownerRpId, code])
   @@index([formationId])
+  @@index([ownerRpId])
   @@map("classes")
 }
 
 model UE {
   id        String   @id @default(cuid())
-  code      String   @unique
+  // V05 LOT 6 — code unique PAR propriétaire (ADR-0022), plus global.
+  code      String
   libelle   String
   color     String
   modules   Module[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // V05 LOT 6 — école + RP créateur (ADR-0022). Nullable (data legacy
+  // backfillée au reseed) ; école dérivable mais stockée pour le scope.
+  ecoleId String?
+  ecole   Ecole?  @relation(fields: [ecoleId], references: [id])
+  ownerRpId String?
+  ownerRp   User?  @relation("UeOwner", fields: [ownerRpId], references: [id], onDelete: SetNull)
+
+  @@unique([ownerRpId, code])
+  @@index([ecoleId])
+  @@index([ownerRpId])
   @@map("ues")
 }
 
 model Module {
   id   String @id @default(cuid())
-  code String @unique
+  // V05 LOT 6 — code unique PAR propriétaire (ADR-0022), plus global.
+  code String
 
   // V01 column kept ; V02 introduces `libelle` + `color` + `ueId`. The
   // V01 mapper still reads `name`; LOT 2 migrates consumers to `libelle`
@@ -333,11 +373,17 @@ model Module {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // V05 LOT 6 — RP créateur = clé du périmètre (ADR-0022). École dérivable via UE.
+  ownerRpId String?
+  ownerRp   User?   @relation("ModuleOwner", fields: [ownerRpId], references: [id], onDelete: SetNull)
+
   // V03 — présence du module dans des versions de maquette + suivis (ADR-0010/0012).
   maquetteModules MaquetteModule[]
   suiviModules    SuiviModule[]
 
+  @@unique([ownerRpId, code])
   @@index([ueId])
+  @@index([ownerRpId])
   @@map("modules")
 }
 
@@ -360,10 +406,17 @@ model Salle {
   rpResponsableId String?
   rpResponsable   User?   @relation("SalleResponsable", fields: [rpResponsableId], references: [id], onDelete: SetNull)
 
+  // V05 LOT 6 — salle « subjective » (ADR-0022 §5) : salle privée hypothétique
+  // créée par un RP, visible de lui seul dans la liste. ownerRpId = créateur.
+  isSubjective Boolean @default(false)
+  ownerRpId    String?
+  ownerRp      User?   @relation("SalleOwner", fields: [ownerRpId], references: [id], onDelete: SetNull)
+
   // V05 — nom unique PAR école (plus global) : deux écoles peuvent avoir une « Salle 101 ».
   @@unique([ecoleId, name])
   @@index([rpResponsableId])
   @@index([ecoleId])
+  @@index([ownerRpId])
   @@map("salles")
 }
 
@@ -463,11 +516,17 @@ model Seance {
   // V02 — N-N classes (peuplé en LOT 2, vide en LOT 0).
   seanceClasses SeanceClasse[]
 
+  // V05 LOT 6 — RP créateur = clé du périmètre (ADR-0022). Pilote le masquage
+  // planning des séances en salle tierce/commune (vue Salle).
+  ownerRpId String?
+  ownerRp   User?   @relation("SeanceOwner", fields: [ownerRpId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([classeId, startAt])
   @@index([teacherId, startAt])
+  @@index([ownerRpId, startAt])
   // V01 — accélère le scan déclenché par POST /api/sessions/publish.
   @@index([isPublished, classeId])
   // V02 — accélère le calcul hasUnpublishedChanges.
@@ -539,10 +598,15 @@ model Maquette {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // V05 LOT 6 — RP créateur = filière.ownerRpId, stocké pour filtrage direct (ADR-0022).
+  ownerRpId String?
+  ownerRp   User?   @relation("MaquetteOwner", fields: [ownerRpId], references: [id], onDelete: SetNull)
+
   // ADR-0018 : une seule maquette par (filière, niveau). Le `nom` est dérivé
   // (« Maquette {niveau} {sigle} ») — il n'entre plus dans la clé d'unicité.
   @@unique([filiereId, niveau])
   @@index([filiereId])
+  @@index([ownerRpId])
   @@map("maquettes")
 }
 

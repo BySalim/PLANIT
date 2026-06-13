@@ -1,17 +1,23 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { CreateFiliereDto, FiliereDto, UpdateFiliereDto } from '@planit/contracts';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
+import { isRp } from '../common/rp-scope';
 
 @Injectable()
 export class FilieresService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Liste scopée à l'école (V05 / ADR-0019 §3). */
-  async list(ecoleId: string | null): Promise<FiliereDto[]> {
-    if (!ecoleId) return [];
+  /**
+   * Liste scopée à l'école (V05 / ADR-0019 §3) et, pour un RP, à son **espace
+   * de travail** (V05 LOT 6 / ADR-0022 : `ownerRpId = self`). La Direction voit
+   * toute son école.
+   */
+  async list(user: CurrentUserPayload): Promise<FiliereDto[]> {
+    if (!user.ecoleId) return [];
     const rows = await this.prisma.filiere.findMany({
-      where: { ecoleId },
+      where: { ecoleId: user.ecoleId, ...(isRp(user.role) ? { ownerRpId: user.id } : {}) },
       orderBy: { sigle: 'asc' },
     });
     return rows.map(toDto);
@@ -24,7 +30,8 @@ export class FilieresService {
   }
 
   /** Création rattachée à l'école de l'acteur (V05 / ADR-0019). */
-  async create(dto: CreateFiliereDto, ecoleId: string): Promise<FiliereDto> {
+  async create(dto: CreateFiliereDto, user: CurrentUserPayload): Promise<FiliereDto> {
+    const ecoleId = user.ecoleId as string; // contrôleur RP-only → ecoleId requis
     try {
       const row = await this.prisma.filiere.create({
         data: {
@@ -36,6 +43,8 @@ export class FilieresService {
           // V5-D5 — RP responsable optionnel. La validation « le RP appartient
           // à la même école » relève du durcissement scope (LOT 2).
           responsableRpId: dto.responsableRpId ?? null,
+          // V05 LOT 6 (ADR-0022) — RP créateur = propriétaire de l'espace.
+          ownerRpId: isRp(user.role) ? user.id : null,
         },
       });
       return toDto(row);
