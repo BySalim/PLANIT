@@ -1,9 +1,11 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { ActorHomeView } from '@/components/consult/actor-home-view';
 import { RpPlanningView } from '@/components/rp/rp-planning-view';
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth, ROLE_HOME } from '@/contexts/auth-context';
 
 /**
  * Home role-agnostique — URL `/`. Remplace l'ancien résolveur `app/page.tsx` et
@@ -24,11 +26,24 @@ export default function HomePage() {
 
 function HomeByRole() {
   const { state } = useAuth();
+  const router = useRouter();
+  const role = state.status === 'authenticated' ? state.user.role : null;
+
+  // V05 — un compte Admin système n'a pas de vue planning : on le renvoie vers
+  // son espace cross-école (ROLE_HOME). Effet plutôt que redirect au rendu pour
+  // rester compatible client/Suspense (pattern login page).
+  useEffect(() => {
+    if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
+      router.replace(ROLE_HOME[role]);
+    }
+  }, [role, router]);
+
   // RequireAuth garantit l'état authentifié au rendu des enfants ; filet typé.
   if (state.status !== 'authenticated') return null;
-  const { role } = state.user;
   if (role === 'RESPONSABLE_PROGRAMME' || role === 'ASSISTANT_PROGRAMME') {
     return <RpPlanningView />;
   }
+  // Admin : redirection en cours (effet ci-dessus) → ne rien rendre.
+  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return null;
   return <ActorHomeView />;
 }

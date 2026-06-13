@@ -13,13 +13,20 @@ const SEED_EMAIL: Record<SupportedRole, string> = {
   ASSISTANT_PROGRAMME: 'awa.toure@planit.test',
   ENSEIGNANT: 'oumar.ndiaye@planit.test',
   ETUDIANT: 'ibrahima.sow@planit.test',
+  // V05 — comptes système + Direction (seed v5 lot 0.6).
+  SUPER_ADMIN: 'superadmin@planit.test',
+  ADMIN: 'admin@planit.test',
+  DIRECTION: 'direction.ingenieurs@planit.test',
 };
 
 export type SupportedRole =
   | 'RESPONSABLE_PROGRAMME'
   | 'ASSISTANT_PROGRAMME'
   | 'ENSEIGNANT'
-  | 'ETUDIANT';
+  | 'ETUDIANT'
+  | 'SUPER_ADMIN'
+  | 'ADMIN'
+  | 'DIRECTION';
 
 /** Email du 2ᵉ RP (Cheikh Diop) — responsable du Labo, hors périmètre AC. */
 export const RP2_EMAIL = 'cheikh.diop@planit.test';
