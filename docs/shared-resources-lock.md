@@ -5,10 +5,9 @@
 
 ## Ressources sous lock actif
 
-| Ressource                           | Membre | Depuis     | Motif                                                    |
-| ----------------------------------- | ------ | ---------- | -------------------------------------------------------- |
-| `apps/backend/prisma/schema.prisma` | Salim  | 2026-06-13 | V05 LOT 6 — ownerRpId + salles subjectives (ADR-0022)    |
-| `packages/contracts/`               | Salim  | 2026-06-13 | V05 LOT 6 — DTO ownership / référentiel / séance masquée |
+| Ressource            | Membre | Depuis | Motif |
+| -------------------- | ------ | ------ | ----- |
+| _(aucun lock actif)_ |        |        |       |
 
 ## Ressources partagées sensibles
 

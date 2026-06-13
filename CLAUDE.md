@@ -288,6 +288,21 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 
 ---
 
+## Patterns émergés Vague 05 — LOT 6 (espaces de travail RP isolés)
+
+> Capitalisation du LOT 6 (**ADR-0022**, 2026-06-13). Acquis : remettre en cause = nouvel ADR.
+
+- **Ownership RP = champ `ownerRpId` immuable** sur `Filiere`, `UE`, `Module`, `Maquette`, `Classe`, `Seance`, `Salle` (créateur, `onDelete: SetNull`). **Distinct** de `Filiere.responsableRpId` (V5-D5, « Responsable » assignable par la Direction). Un RP ne voit que ce qu'il a **créé** ; la Direction voit toute son école ; l'AC ses classes assignées. UE/Module deviennent **personnels au RP** (+ `ecoleId` sur UE) : unicité `code` → `@@unique([ownerRpId, code])` (deux RP peuvent avoir un module « Maths » distinct). Filière : `sigle @unique` → `@@unique([ecoleId, sigle])`.
+- **Helper pur `common/rp-scope.ts`** (`isRp(role)`, `rpOwnerWhere(user)`) — **fonctions stateless**, pas un service injectable (contrairement à `AcScopeService` qui consulte la BD). Chaque `list`/`findOne` compose `...(isRp(user.role) ? { ownerRpId: user.id } : {})` en AND avec son scope école/AC. Les services prennent désormais `user: CurrentUserPayload` (plus `ecoleId`) pour décider du scope. **Pattern à répliquer** sur tout nouveau référentiel créé par un RP.
+- **Mutations posent `ownerRpId = user.id` à la création** (filière, UE, module, classe, séance, salle subjective ; maquette = `filiere.ownerRpId` via `ensureMaquetteAndVersion`). Le durcissement « `?classeId=` explicite » (LOT 9) s'étend au RP : vérifier `ownerRpId === user.id` avant de renvoyer (404 sinon, ne pas divulguer).
+- **Planning par référentiel** ([referentiel-value-picker.tsx](apps/web/src/components/planning/referentiel-value-picker.tsx) + `view-mode-tabs`) : « Mon espace » (défaut, isolation RP) / Classe / Enseignant / **Salle**. La vue **Salle est la seule exception à l'isolation** : occupation école complète visible, mais les séances d'un **autre RP** sont renvoyées **masquées** (`toMaskedSessionV2Dto`) — créneau + `ownerRpName` réels, tout détail (module/classes/enseignant/libellé) **neutralisé côté serveur** (jamais sérialisé). Carte assombrie/hachurée non interactive ([session-card.tsx](apps/web/src/components/planning/session-card.tsx) branche `session.masked`). Test d'assertion **négative** obligatoire (aucune fuite).
+- **Salles subjectives** (`Salle.isSubjective` + `ownerRpId`) : salle privée hypothétique créée par un RP, visible de **lui seul** dans la liste (`where.OR = [{isSubjective:false},{isSubjective:true,ownerRpId:self}]`) ; la Direction ne les liste jamais ; le RP créateur les édite/supprime (`PUT`/`DELETE /salles/:id` gardés par owner). Le nom apparaît au niveau d'une séance qui l'utilise (inchangé). Pas de détection de conflit cross-RP (privées par conception).
+- **Assignation AC ↔ classes par la Direction** (école-large, hors contrainte `managerRpId` du RP) : `GET`/`PUT /api/ac/:acId/classes` (`setClassesByDirection`, sémantique « set »). UI = [assign-ac-modal.tsx](apps/web/src/components/direction/assign-ac-modal.tsx) depuis la liste Classes. Le `PUT` renvoie **200 `{classeIds}`** (pas 204) car le helper `request()` front fait toujours `.json()`.
+- **Suivi Direction** : `GET /api/suivi-modules` autorise `DIRECTION` (lecture seule — actions `Terminer/Rouvrir/bulk` gated `isRP` dans `RpSuiviView`). La page role-aware route `DIRECTION` vers la vue gestion (avant : chute dans la vue Étudiant → crash). Pattern : une vue de gestion lecture seule pour la Direction se fait par **gating des actions**, pas par une vue dupliquée.
+- **`EtudiantDto.inscriptionId?`** : peuplé uniquement par le roster d'une classe (`classes.listEtudiants`), absent de la liste globale Étudiants — permet le retrait d'un étudiant (RP/AC scopé) sans nouvel endpoint.
+
+---
+
 ## Sécurité — règles dès jour 1
 
 - Aucun secret en dur — `.env.example` documenté, `.env` gitignored, gitleaks actif
