@@ -2,7 +2,7 @@
 
 import { ChevronDownIcon, DownloadIcon, LayersIcon, PlusIcon } from '@planit/ui';
 import { cn } from '@/lib/utils';
-import { ExportMenu } from '@/components/ui/export-menu';
+import { ExportMenu, type ExportFormat } from '@/components/ui/export-menu';
 import { ViewModeTabs, type ViewMode } from './view-mode-tabs';
 import { WeekNavigator } from './week-navigator';
 
@@ -19,7 +19,7 @@ interface PlanningToolbarProps {
   onUndo?: (() => void) | undefined;
   onRedo?: (() => void) | undefined;
   // LOT 7 (X.2) — export planning
-  onExport?: ((format: 'png' | 'pdf') => void) | undefined;
+  onExport?: ((format: ExportFormat) => void) | undefined;
   isExporting?: boolean | undefined;
   /**
    * LOT 6 G.3 — mode lecture seule (acteur AC). Masque le cluster
