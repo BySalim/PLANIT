@@ -46,8 +46,11 @@ export class SeanceV2Service {
 
   // ── Reads ──────────────────────────────────────────────────────────
 
-  async findWeek(query: WeekV2Query): Promise<SessionV2Dto[]> {
-    const where = await this.buildWeekWhere(query);
+  async findWeek(query: WeekV2Query, ecoleId: string | null): Promise<SessionV2Dto[]> {
+    // Scope multi-école (V05) : un ADMIN/SUPER_ADMIN (`ecoleId` null) ne consulte
+    // pas le planning scopé → liste vide (aligné sur `classes.service`).
+    if (ecoleId === null) return [];
+    const where = await this.buildWeekWhere(query, ecoleId);
     const rows = await this.prisma.seance.findMany({
       where,
       include: seanceV2Include,
@@ -58,14 +61,27 @@ export class SeanceV2Service {
     return rows.filter(hasV2Shape).map(toSessionV2Dto);
   }
 
-  async stats(query: WeekV2Query): Promise<{
+  async stats(
+    query: WeekV2Query,
+    ecoleId: string | null,
+  ): Promise<{
     total: number;
     published: number;
     pending: number;
     byType: Record<SessionTypeV2, number>;
     bySousType: Record<string, number>;
   }> {
-    const where = await this.buildWeekWhere(query);
+    // Scope multi-école (V05) : ADMIN (`ecoleId` null) → compteurs à zéro.
+    if (ecoleId === null) {
+      return {
+        total: 0,
+        published: 0,
+        pending: 0,
+        byType: { COURS: 0, EVALUATION: 0, EVENEMENT: 0 },
+        bySousType: { CM: 0, TD: 0, TP: 0, EXAMEN: 0, RATTRAPAGE: 0, DEVOIR: 0 },
+      };
+    }
+    const where = await this.buildWeekWhere(query, ecoleId);
     const rows = await this.prisma.seance.findMany({
       where,
       select: { typeV2: true, sousType: true, isPublished: true },
@@ -98,11 +114,20 @@ export class SeanceV2Service {
     };
   }
 
-  async findOne(id: string): Promise<SessionV2Dto> {
-    const row = await this.prisma.seance.findUnique({
-      where: { id },
-      include: seanceV2Include,
-    });
+  /**
+   * Détail d'une séance V02. `ecoleId` est fourni par le contrôleur pour durcir
+   * le scope (pattern LOT 9) : la séance doit appartenir à l'école de l'acteur,
+   * sinon 404 (on ne divulgue pas l'existence d'une séance hors périmètre).
+   * Les appels internes (post-création/maj) l'omettent → aucun contrôle de scope.
+   */
+  async findOne(id: string, ecoleId?: string | null): Promise<SessionV2Dto> {
+    const where: Prisma.SeanceWhereInput = { id };
+    if (ecoleId !== undefined) {
+      // ADMIN (`ecoleId` null) → aucune séance ne lui appartient.
+      if (ecoleId === null) throw new NotFoundException(`Séance ${id} introuvable`);
+      where.seanceClasses = { some: this.ecoleClasseFilter(ecoleId) };
+    }
+    const row = await this.prisma.seance.findFirst({ where, include: seanceV2Include });
     if (!row) throw new NotFoundException(`Séance ${id} introuvable`);
     if (!row.typeV2) {
       throw new NotFoundException(
@@ -434,7 +459,10 @@ export class SeanceV2Service {
     }
   }
 
-  private async buildWeekWhere(query: WeekV2Query): Promise<Prisma.SeanceWhereInput> {
+  private async buildWeekWhere(
+    query: WeekV2Query,
+    ecoleId: string,
+  ): Promise<Prisma.SeanceWhereInput> {
     const weekStart = new Date(`${query.weekStart}T00:00:00.000Z`);
     const weekEnd = new Date(weekStart);
     weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
@@ -444,22 +472,40 @@ export class SeanceV2Service {
       typeV2: { not: null }, // V02 endpoints only expose V02-shaped rows
     };
 
+    // Scope multi-école (V05) : une séance n'est visible que si l'une de ses
+    // classes appartient à l'école de l'acteur. On compose ce filtre AND avec
+    // les filtres `classeId`/`studentId` existants sur la **même** jointure
+    // `SeanceClasse` (la classe doit satisfaire les deux).
+    const classeFilter = this.ecoleClasseFilter(ecoleId);
     if (query.classeId) {
-      where.seanceClasses = { some: { classeId: query.classeId } };
-    }
-    if (query.teacherId) {
-      where.enseignantId = query.teacherId;
-    }
-    if (query.studentId) {
+      classeFilter.classeId = query.classeId;
+    } else if (query.studentId) {
       const student = await this.prisma.user.findUnique({
         where: { id: query.studentId },
         select: { classeId: true },
       });
-      where.seanceClasses = {
-        some: { classeId: student?.classeId ?? NO_CLASSE },
-      };
+      classeFilter.classeId = student?.classeId ?? NO_CLASSE;
+    }
+    where.seanceClasses = { some: classeFilter };
+
+    if (query.teacherId) {
+      where.enseignantId = query.teacherId;
     }
     return where;
+  }
+
+  /**
+   * Filtre de jointure `SeanceClasse` restreignant aux classes d'une école.
+   * Une classe est rattachée à l'école via sa **formation** (V03) ou via la FK
+   * **filière** directe (legacy V01) — d'où le `OR`. Réutilisé par
+   * `buildWeekWhere` (liste/stats) et `findOne` (détail).
+   */
+  private ecoleClasseFilter(ecoleId: string): Prisma.SeanceClasseWhereInput {
+    return {
+      classe: {
+        OR: [{ formation: { filiere: { ecoleId } } }, { filiere: { ecoleId } }],
+      },
+    };
   }
 
   /**

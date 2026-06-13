@@ -8,6 +8,8 @@ import type {
   MaquetteModuleDto,
   MaquetteVersionDto,
 } from '@planit/contracts';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { MaquettesService } from './maquettes.service';
@@ -22,20 +24,30 @@ import { MaquettesService } from './maquettes.service';
 export class MaquetteVersionsController {
   constructor(private readonly maquettes: MaquettesService) {}
 
+  // V05 LOT 2 — Direction lit le détail d'une maquette de son école (scope
+  // serveur via la filière). Le `@Roles` méthode override le `@Roles` classe.
   @Get(':vid')
+  @Roles('RESPONSABLE_PROGRAMME', 'DIRECTION')
   @ApiOperation({ summary: 'Détail version (modules + VHE/VHT + classes la suivant)' })
   @ApiResponse({ status: 200, description: 'Version trouvée' })
-  @ApiResponse({ status: 404, description: 'Version introuvable' })
-  getVersion(@Param('vid') vid: string): Promise<MaquetteVersionDto> {
-    return this.maquettes.getVersion(vid);
+  @ApiResponse({ status: 404, description: 'Version introuvable ou hors périmètre' })
+  getVersion(
+    @Param('vid') vid: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<MaquetteVersionDto> {
+    return this.maquettes.getVersion(vid, user.ecoleId);
   }
 
   @Get(':vid/export')
+  @Roles('RESPONSABLE_PROGRAMME', 'DIRECTION')
   @ApiOperation({ summary: 'Données structurées pour export image/PDF (semestres + totaux)' })
   @ApiResponse({ status: 200, description: 'Structure exportable' })
-  @ApiResponse({ status: 404, description: 'Version introuvable' })
-  exportVersion(@Param('vid') vid: string): Promise<MaquetteExportDto> {
-    return this.maquettes.exportVersion(vid);
+  @ApiResponse({ status: 404, description: 'Version introuvable ou hors périmètre' })
+  exportVersion(
+    @Param('vid') vid: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<MaquetteExportDto> {
+    return this.maquettes.exportVersion(vid, user.ecoleId);
   }
 
   @Post(':vid/modules')

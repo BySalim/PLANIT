@@ -142,15 +142,17 @@ export class MaquettesService {
   }
 
   /** Détail d'une version : modules (VHE/VHT dérivés) + classes la suivant (M.6). */
-  async getVersion(vid: string): Promise<MaquetteVersionDto> {
+  async getVersion(vid: string, ecoleId: string | null): Promise<MaquetteVersionDto> {
     const version = await this.prisma.maquetteVersion.findUnique({
       where: { id: vid },
       include: {
         anneeAcademique: true,
+        maquette: { include: { filiere: { select: { ecoleId: true } } } },
         modules: { include: moduleInclude, orderBy: [{ semestre: 'asc' }] },
       },
     });
     if (!version) throw new NotFoundException(`Version de maquette ${vid} introuvable`);
+    this.assertVersionInEcole(version.maquette.filiere.ecoleId, ecoleId, vid);
 
     const classes = await this.classesFollowingVersion(vid);
 
@@ -230,7 +232,7 @@ export class MaquettesService {
   // ── Export (A.5) ─────────────────────────────────────────────────────
 
   /** Structure complète d'une version + totaux dérivés (rendu image/PDF, LOT 7). */
-  async exportVersion(vid: string): Promise<MaquetteExportDto> {
+  async exportVersion(vid: string, ecoleId: string | null): Promise<MaquetteExportDto> {
     const version = await this.prisma.maquetteVersion.findUnique({
       where: { id: vid },
       include: {
@@ -240,6 +242,7 @@ export class MaquettesService {
       },
     });
     if (!version) throw new NotFoundException(`Version de maquette ${vid} introuvable`);
+    this.assertVersionInEcole(version.maquette.filiere.ecoleId, ecoleId, vid);
 
     const modules = version.modules.map(toModuleDto);
     const classes = await this.classesFollowingVersion(vid);
@@ -279,6 +282,18 @@ export class MaquettesService {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────
+
+  /**
+   * Scope multi-école (V05 / ADR-0019 §3) : une version est accessible si la
+   * filière de sa maquette appartient à l'école de l'acteur. ADMIN (`ecoleId`
+   * null) n'opère pas sur le référentiel scopé. On lève **404** (pas 403) pour
+   * ne pas divulguer l'existence d'une version hors périmètre.
+   */
+  private assertVersionInEcole(versionEcoleId: string, ecoleId: string | null, vid: string): void {
+    if (ecoleId === null || versionEcoleId !== ecoleId) {
+      throw new NotFoundException(`Version de maquette ${vid} introuvable`);
+    }
+  }
 
   /** Classes suivant une version (via leur formation). 2ᵉ colonne page Maquettes. */
   private async classesFollowingVersion(

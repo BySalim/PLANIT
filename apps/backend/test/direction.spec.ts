@@ -44,6 +44,49 @@ async function directionB() {
   return loginByEmail(app, DIRECTION_B_EMAIL);
 }
 
+/** Lundi de la semaine courante (YYYY-MM-DD) — les séances seed y sont ancrées. */
+function currentMonday(): string {
+  const today = new Date();
+  const dow = today.getUTCDay();
+  const offset = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + offset),
+  );
+  return monday.toISOString().slice(0, 10);
+}
+
+const monday = currentMonday();
+
+/**
+ * Crée une séance V2 rattachée à l'**école B** (le seed n'en place aucune) pour
+ * prouver l'isolation du planning. Le module est un placeholder de l'école A :
+ * le scope se calcule via la classe → filière → école, jamais via le module.
+ * Retourne l'id de la séance créée.
+ */
+async function createEcoleBSeance(): Promise<string> {
+  const startAt = new Date(`${monday}T10:00:00.000Z`);
+  const endAt = new Date(`${monday}T12:00:00.000Z`);
+  const seance = await prisma.seance.create({
+    data: {
+      libelle: 'Cours École B',
+      type: 'CM',
+      status: 'PUBLIE',
+      typeV2: 'COURS',
+      sousType: 'CM',
+      isPublished: true,
+      hasUnpublishedChanges: false,
+      startAt,
+      endAt,
+      lastModifiedAt: startAt,
+      lastPublishedAt: startAt,
+      moduleId: 'seed-module-algo',
+      classeId: 'seed-classe-b',
+      seanceClasses: { create: [{ classeId: 'seed-classe-b' }] },
+    },
+  });
+  return seance.id;
+}
+
 // ── Isolation cross-école ────────────────────────────────────────────────────
 
 describe('Isolation cross-école (Direction A ↔ B)', () => {
@@ -463,5 +506,135 @@ describe('Salles (scope école + CRUD)', () => {
     // PUT nécessite DIRECTION → 200 si même école, 403 si autre école.
     // sessionB est bien DIRECTION mais school B ≠ school A.
     expect(res.status).toBe(403);
+  });
+});
+
+// ── Planning V2 — isolation école (correctif 3.3 / sécurité) ──────────────────
+
+describe('GET /api/v2/sessions — scope école', () => {
+  /**
+   * Fuite préexistante : `buildWeekWhere` n'avait aucun filtre école → tout
+   * acteur lisait le planning de toutes les écoles. On vérifie que chaque
+   * acteur ne voit QUE les séances de son école (Direction A/B + RP A).
+   */
+  it("Direction A voit le planning de son école, jamais celui de l'école B", async () => {
+    const ecoleBSeanceId = await createEcoleBSeance();
+    const session = await directionA();
+    const res = await api()
+      .get(`/api/v2/sessions?weekStart=${monday}`)
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    const ids = (res.body as { id: string }[]).map((s) => s.id);
+    expect(ids).toContain('seed-seance-01'); // séance école A (seed)
+    expect(ids).not.toContain(ecoleBSeanceId); // école B exclue
+  });
+
+  it("Direction B voit la séance de son école, jamais celles de l'école A", async () => {
+    const ecoleBSeanceId = await createEcoleBSeance();
+    const session = await directionB();
+    const res = await api()
+      .get(`/api/v2/sessions?weekStart=${monday}`)
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    const ids = (res.body as { id: string }[]).map((s) => s.id);
+    expect(ids).toContain(ecoleBSeanceId); // sa séance école B
+    expect(ids).not.toContain('seed-seance-01'); // école A exclue
+  });
+
+  it("RP de l'école A ne voit PAS le planning de l'école B (non-régression fuite)", async () => {
+    const ecoleBSeanceId = await createEcoleBSeance();
+    const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
+    const res = await api()
+      .get(`/api/v2/sessions?weekStart=${monday}`)
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    const ids = (res.body as { id: string }[]).map((s) => s.id);
+    expect(ids).not.toContain(ecoleBSeanceId); // école B invisible pour RP A
+    expect(ids).toContain('seed-seance-01'); // ses séances école A restent visibles
+  });
+
+  it("GET /:id — Direction A ne peut pas ouvrir une séance de l'école B (404)", async () => {
+    const ecoleBSeanceId = await createEcoleBSeance();
+    const session = await directionA();
+    const res = await api()
+      .get(`/api/v2/sessions/${ecoleBSeanceId}`)
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(404);
+  });
+});
+
+// ── Détail maquette — accès Direction + scope école (correctif 3.4) ───────────
+
+describe('GET /api/maquette-versions/:vid — Direction + scope école', () => {
+  // Version GLRS L3 2025 = école A (filière GLRS, École d'Ingénieurs).
+  const ECOLE_A_VERSION = 'seed-maqv-glrs-l3-2025';
+  // Version MGT L1 2025 = école B (seedEcoleB).
+  const ECOLE_B_VERSION = 'seed-maqv-b-2025';
+
+  it('Direction A lit une version de maquette de son école (200)', async () => {
+    const session = await directionA();
+    const res = await api()
+      .get(`/api/maquette-versions/${ECOLE_A_VERSION}`)
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(ECOLE_A_VERSION);
+  });
+
+  it("Direction A ne peut pas lire une version d'une autre école (404)", async () => {
+    const session = await directionA();
+    const res = await api()
+      .get(`/api/maquette-versions/${ECOLE_B_VERSION}`)
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(404);
+  });
+
+  it('Direction B lit la version de maquette de son école (200)', async () => {
+    const session = await directionB();
+    const res = await api()
+      .get(`/api/maquette-versions/${ECOLE_B_VERSION}`)
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(ECOLE_B_VERSION);
+  });
+
+  it("export — Direction A ne peut pas exporter une version d'une autre école (404)", async () => {
+    const session = await directionA();
+    const res = await api()
+      .get(`/api/maquette-versions/${ECOLE_B_VERSION}/export`)
+      .set('Cookie', session.cookieHeader);
+    expect(res.status).toBe(404);
+  });
+
+  it('RP A lit une version de son école (200) mais pas une autre (404)', async () => {
+    const session = await loginAs(app, 'RESPONSABLE_PROGRAMME');
+    const ok = await api()
+      .get(`/api/maquette-versions/${ECOLE_A_VERSION}`)
+      .set('Cookie', session.cookieHeader);
+    expect(ok.status).toBe(200);
+    const ko = await api()
+      .get(`/api/maquette-versions/${ECOLE_B_VERSION}`)
+      .set('Cookie', session.cookieHeader);
+    expect(ko.status).toBe(404);
+  });
+});
+
+// ── Étudiants — accès Direction + scope école (correctif 3.5) ─────────────────
+
+describe('GET /api/etudiants — Direction scope école', () => {
+  it('Direction A et B voient des étudiants distincts (isolation)', async () => {
+    const [sessionA, sessionB] = await Promise.all([directionA(), directionB()]);
+    const [resA, resB] = await Promise.all([
+      api().get('/api/etudiants').set('Cookie', sessionA.cookieHeader),
+      api().get('/api/etudiants').set('Cookie', sessionB.cookieHeader),
+    ]);
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+    const idsA = new Set((resA.body as { id: string }[]).map((e) => e.id));
+    const idsB = new Set((resB.body as { id: string }[]).map((e) => e.id));
+    for (const id of idsB) {
+      expect(idsA.has(id)).toBe(false);
+    }
+    // L'école A a des étudiants seedés (V03).
+    expect(idsA.size).toBeGreaterThan(0);
   });
 });
