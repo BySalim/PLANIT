@@ -85,7 +85,7 @@ interface BlockProps {
 }
 
 function PlanningSessionBlock({ session, top, height, now, variant, onTap }: BlockProps) {
-  const palette = paletteForSession(session.module.id, session.type);
+  const palette = paletteForSession(session.module.color, session.type);
   const start = new Date(session.startAt);
   const end = new Date(session.endAt);
   const status = slotStatus(start, end, now);

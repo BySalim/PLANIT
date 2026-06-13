@@ -52,7 +52,7 @@ export function SessionCard({
   onDragStart,
   hasConflict = false,
 }: SessionCardProps) {
-  const palette = paletteForSessionV2(session.module?.id ?? null, session.type);
+  const palette = paletteForSessionV2(session.module?.color ?? null, session.type);
   const unpublished = session.hasUnpublishedChanges;
   const start = new Date(session.startAt);
   const end = new Date(session.endAt);

@@ -39,7 +39,7 @@ function buildSession(overrides: Partial<SessionV2Dto> = {}): SessionV2Dto {
     isPublished: true,
     lastModifiedAt: '2026-05-25T10:00:00.000Z',
     lastPublishedAt: '2026-05-25T10:00:00.000Z',
-    module: { id: 'module-1', code: 'ALGO', name: 'Algorithmique' },
+    module: { id: 'module-1', code: 'ALGO', name: 'Algorithmique', color: '#2563EB' },
     enseignant: { id: 'teacher-1', nomComplet: 'M. Oumar Ndiaye' },
     salle: { id: 'salle-1', name: 'Amphi A' },
     classes: [{ id: 'classe-1', code: 'GL3-A', name: 'GL3-A' }],

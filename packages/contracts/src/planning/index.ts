@@ -18,6 +18,8 @@ export const moduleRefSchema = z.object({
   id: z.string(),
   code: z.string(),
   name: z.string(),
+  // Couleur réelle du module (hex) — héritée par les cartes de séance de cours.
+  color: z.string(),
 });
 
 export const salleRefSchema = z.object({

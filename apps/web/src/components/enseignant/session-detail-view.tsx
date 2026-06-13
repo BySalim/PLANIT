@@ -77,7 +77,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export function SessionDetailView({ session }: SessionDetailViewProps) {
-  const palette = paletteForSession(session.module.id, session.type);
+  const palette = paletteForSession(session.module.color, session.type);
   const start = new Date(session.startAt);
   const end = new Date(session.endAt);
   const statusMeta = STATUS_META[session.status];

@@ -69,6 +69,7 @@ export function toSessionV2Dto(seance: SeanceV2WithRelations): SessionV2Dto {
           id: seance.module.id,
           code: seance.module.code,
           name: seance.module.libelle || seance.module.name,
+          color: seance.module.color,
         }
       : null,
     enseignant: seance.enseignant

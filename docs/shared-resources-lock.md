@@ -5,9 +5,9 @@
 
 ## Ressources sous lock actif
 
-| Ressource            | Membre | Depuis | Motif |
-| -------------------- | ------ | ------ | ----- |
-| _(aucun lock actif)_ |        |        |       |
+| Ressource                               | Membre | Depuis     | Motif                                                |
+| --------------------------------------- | ------ | ---------- | ---------------------------------------------------- |
+| `packages/contracts/` (moduleRefSchema) | Salim  | 2026-06-13 | Ajout `color` au module ref (couleur réelle séances) |
 
 ## Ressources partagées sensibles
 

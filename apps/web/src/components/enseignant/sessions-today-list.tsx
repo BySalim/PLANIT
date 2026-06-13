@@ -83,7 +83,7 @@ export function SessionsTodayList({
 
       <ul className="flex flex-col gap-2">
         {sorted.map((session) => {
-          const palette = paletteForSession(session.module.id, session.type);
+          const palette = paletteForSession(session.module.color, session.type);
           const status = statusFor(session, now);
           const start = new Date(session.startAt);
           const end = new Date(session.endAt);
