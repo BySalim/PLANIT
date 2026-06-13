@@ -123,6 +123,43 @@ const NAV_AC: NavGroup[] = [
   },
 ];
 
+// ── Menu Direction (V05 LOT 3) — pilotage école (personnel, années, salles,
+//    référentiels, offre de formation en lecture). RBAC réel = gardes serveur.
+const NAV_DIRECTION: NavGroup[] = [
+  {
+    group: 'PRINCIPAL',
+    items: [
+      { id: 'dashboard', label: 'Tableau de bord', href: '/tableau-de-bord', icon: HomeIcon },
+      { id: 'planning', label: 'Planning', href: '/', icon: CalendarIcon },
+      { id: 'suivi', label: 'Suivi des modules', href: '/suivi-modules', icon: CheckSquareIcon },
+    ],
+  },
+  {
+    group: 'MON ÉCOLE',
+    items: [
+      { id: 'personnel', label: 'Personnel', href: '/personnel', icon: UserIcon },
+      { id: 'annees', label: 'Année académique', href: '/annees', icon: CalendarIcon },
+      { id: 'rooms', label: 'Salles', href: '/salles', icon: DoorIcon },
+    ],
+  },
+  {
+    group: 'RÉFÉRENTIELS',
+    items: [
+      { id: 'teachers', label: 'Enseignants', href: '/enseignants', icon: UserCogIcon },
+      { id: 'students', label: 'Étudiants', href: '/etudiants', icon: UsersIcon },
+      { id: 'classes', label: 'Classes', href: '/classes', icon: LayersIcon },
+    ],
+  },
+  {
+    group: 'OFFRE DE FORMATION',
+    items: [
+      { id: 'filieres', label: 'Filières', href: '/filieres', icon: GraduationCapIcon },
+      { id: 'formations', label: 'Formations', href: '/formations', icon: BookStackIcon },
+      { id: 'maquettes', label: 'Maquettes', href: '/maquettes', icon: BookOpenIcon },
+    ],
+  },
+];
+
 // ── Menu Admin système (V05 LOT 1.6 / V5-D9) — espace cross-école. URLs propres
 //    /ecoles · /utilisateurs · /journal (aucun segment d'acteur dans l'URL).
 const NAV_ADMIN: NavGroup[] = [
@@ -138,10 +175,12 @@ const NAV_ADMIN: NavGroup[] = [
 
 function navForRole(role: UserRole | null): NavGroup[] {
   // `navForRole` = point d'évolution unique du menu par rôle (LOT 6). RP/AC +
-  // Admin (V05) ont leur menu dédié ; les rôles consult ont leur propre layout
-  // `(consult)`. Le RBAC réel (route groups + guards serveur) reste l'autorité.
+  // Admin (V05 LOT 1) + Direction (V05 LOT 3) ont leur menu dédié ; les rôles
+  // consult ont leur propre layout `(consult)`. Le RBAC réel (route groups +
+  // guards serveur) reste l'autorité.
   if (role === 'ASSISTANT_PROGRAMME') return NAV_AC;
   if (role === 'ADMIN' || role === 'SUPER_ADMIN') return NAV_ADMIN;
+  if (role === 'DIRECTION') return NAV_DIRECTION;
   return NAV_RP;
 }
 
@@ -174,6 +213,7 @@ export function Sidebar({ activeId = 'planning' }: { activeId?: string | undefin
     PRINCIPAL: true,
     'OFFRE DE FORMATION': true,
     'MES CLASSES': true,
+    'MON ÉCOLE': true,
     RÉFÉRENTIELS: true,
     CONSULTATION: true,
     SYSTÈME: true,
