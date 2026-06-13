@@ -31,13 +31,23 @@ const EVENEMENT_PALETTE: ModulePaletteEntry = {
 const FALLBACK_COLOR = '#64748B';
 
 /**
- * Dérive une palette à partir de la couleur réelle (hex) d'un module — même
- * principe que les chips maquette/suivi : barre pleine, fond très clair (alpha),
- * texte à la couleur du module. On n'attribue jamais de couleur arbitraire.
+ * Dérive une palette à partir de la couleur réelle (hex) d'un module : barre
+ * pleine, fond clair **opaque**, texte à la couleur du module. Le fond est
+ * mélangé au blanc (et non un alpha) — une carte de séance est posée sur la
+ * grille, un fond translucide laisserait les lignes d'heures transparaître.
  */
+function mixWithWhite(hex: string, ratio: number): string {
+  const h = (hex || FALLBACK_COLOR).replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const mix = (ch: number) => Math.round(ch * ratio + 255 * (1 - ratio));
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+}
+
 export function paletteFromHex(hex: string): ModulePaletteEntry {
   const c = hex || FALLBACK_COLOR;
-  return { bar: c, bg: `${c}14`, border: `${c}33`, text: c };
+  return { bar: c, bg: mixWithWhite(c, 0.1), border: mixWithWhite(c, 0.32), text: c };
 }
 
 export type SessionCategory = 'cours' | 'evaluation' | 'evenement';
