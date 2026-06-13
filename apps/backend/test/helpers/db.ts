@@ -40,7 +40,8 @@ export async function resetDb(prisma: PrismaClient): Promise<void> {
   await prisma.maquette.deleteMany();
   await prisma.enseignant.deleteMany();
   await prisma.refreshToken.deleteMany();
-  // V05 — AuditLog référence User (actorId) : doit être purgé avant User.
+  // V05 — AuditLog.actorId → User (Restrict) : purger avant les users sinon
+  // `user.deleteMany()` viole la contrainte dès qu'une action a été tracée.
   await prisma.auditLog.deleteMany();
   await prisma.user.deleteMany();
   await prisma.classe.deleteMany();
@@ -50,5 +51,8 @@ export async function resetDb(prisma: PrismaClient): Promise<void> {
   await prisma.filiere.deleteMany();
   await prisma.salle.deleteMany();
   await prisma.settings.deleteMany();
+  // V05 — `Ecole` en dernier (toutes les tables à `ecoleId` viennent d'être
+  // purgées) ; isole les écoles créées par un test du suivant.
+  await prisma.ecole.deleteMany();
   await seedDatabase(prisma);
 }

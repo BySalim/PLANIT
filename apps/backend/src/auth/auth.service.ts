@@ -61,12 +61,15 @@ export class AuthService {
       throw new UnauthorizedException('Identifiants invalides');
     }
 
-    // V05 LOT 2 — garde statut : un compte suspendu ne peut plus se connecter
-    // (ADR-0020 §6). Le message reste générique pour ne pas révéler l'état du
-    // compte à un attaquant.
-    if (user.statut === 'SUSPENDU') {
-      this.logger.warn({ userId: user.id }, '[auth] login failed: account suspended');
-      throw new UnauthorizedException('Identifiants invalides');
+    // V05 — compte suspendu ou archivé : login refusé même avec un mot de passe
+    // valide (V5-D7 / ADR-0020). À la suspension les sessions actives sont
+    // révoquées ; ce verrou empêche d'en ouvrir une nouvelle.
+    if (user.deletedAt !== null || user.statut === 'SUSPENDU') {
+      this.logger.warn(
+        { userId: user.id, statut: user.statut },
+        '[auth] login refused: account suspended/archived',
+      );
+      throw new UnauthorizedException('Compte suspendu ou archivé. Contactez un administrateur.');
     }
 
     const familyId = randomUUID();
@@ -228,6 +231,22 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
     this.logger.warn({ revoked: count }, '[auth] ALL sessions revoked (admin CLI)');
+    return { revoked: count };
+  }
+
+  /**
+   * Révoque les sessions actives d'**un** utilisateur (V05 LOT 1.3). Appelé à la
+   * suspension/archivage d'un compte : les refresh tokens non révoqués sont
+   * invalidés → plus aucun renouvellement possible. L'access JWT en cours
+   * (stateless) expire sous son TTL ; combiné au verrou `statut` dans `login()`,
+   * le compte ne peut plus rouvrir de session (ADR-0020 §7).
+   */
+  async revokeUserSessions(userId: string): Promise<{ revoked: number }> {
+    const { count } = await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    this.logger.warn({ userId, revoked: count }, '[auth] user sessions revoked');
     return { revoked: count };
   }
 

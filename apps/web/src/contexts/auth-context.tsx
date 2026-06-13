@@ -1,24 +1,14 @@
 'use client';
 
 import { createContext, useContext, useEffect, useReducer, type ReactNode } from 'react';
-import { z } from '@planit/contracts';
+import { authMeSchema, type AuthMeDto } from '@planit/contracts';
 import { API_BASE } from '@/lib/api';
 
-const authMeSchema = z.object({
-  id: z.string(),
-  email: z.string().email(),
-  role: z.enum([
-    'RESPONSABLE_PROGRAMME',
-    'ENSEIGNANT',
-    'ETUDIANT',
-    'ASSISTANT_PROGRAMME',
-    'RESPONSABLE_CLASSE',
-  ]),
-  fullName: z.string(),
-});
-
-// Schéma local en attente de @planit/contracts v2 (Salim, 0.4)
-export type AuthMe = z.infer<typeof authMeSchema>;
+// V05 — source de vérité unique : `authMeSchema` de @planit/contracts (9 rôles
+// dont ADMIN/SUPER_ADMIN/DIRECTION + ecoleId + matricule). Remplace le schéma
+// local 5-rôles, qui faisait échouer le parse d'un compte admin → login muet
+// (état figé en `loading`). Anticipé par le commentaire « en attente de 0.4 ».
+export type AuthMe = AuthMeDto;
 export type UserRole = AuthMe['role'];
 
 type AuthState =
@@ -158,9 +148,15 @@ export function useAuth(): AuthContextValue {
 // (plutôt qu'une constante) pour rester un point d'extension si une home par rôle
 // devait diverger à nouveau.
 export const ROLE_HOME: Record<UserRole, string> = {
+  // V05 — l'Admin système atterrit sur son espace cross-école (pas de planning).
+  SUPER_ADMIN: '/ecoles',
+  ADMIN: '/ecoles',
+  // Direction : vue scopée rendue sur `/` (LOT 3). RP/AC/consult : home unique `/`.
+  DIRECTION: '/',
   RESPONSABLE_PROGRAMME: '/',
   ASSISTANT_PROGRAMME: '/',
   ENSEIGNANT: '/',
   ETUDIANT: '/',
   RESPONSABLE_CLASSE: '/',
+  PARTENAIRE: '/',
 };

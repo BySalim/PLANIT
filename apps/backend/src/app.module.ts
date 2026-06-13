@@ -3,6 +3,9 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AcademicModule } from './academic/academic.module';
 import { AcModule } from './ac/ac.module';
+import { AuditModule } from './audit/audit.module';
+import { EcolesModule } from './ecoles/ecoles.module';
+import { UtilisateursModule } from './utilisateurs/utilisateurs.module';
 import { AnneesModule } from './annees/annees.module';
 import { AuthModule } from './auth/auth.module';
 import { DirectionModule } from './direction/direction.module';
@@ -66,6 +69,10 @@ const DEFAULT_LIMIT = isTest ? 10_000 : 100;
     EtudiantsModule,
     InscriptionsModule,
     SuiviModulesModule,
+    // V05 LOT 1 — Admin système (cross-école) : journal d'audit, écoles, comptes
+    AuditModule,
+    EcolesModule,
+    UtilisateursModule,
     // V05 LOT 2 — Direction scope école : personnel, audit, transitions année, salles
     DirectionModule,
   ],
