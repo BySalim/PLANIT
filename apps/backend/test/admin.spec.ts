@@ -265,29 +265,23 @@ describe('Utilisateurs (1.3)', () => {
 describe('RBAC ADMIN vs SUPER_ADMIN (1.5)', () => {
   it('un ADMIN ne peut pas créer un compte ADMIN → 403', async () => {
     const admin = await loginAs(app, 'ADMIN');
-    const res = await api()
-      .post('/api/utilisateurs')
-      .set('Cookie', admin.cookieHeader)
-      .send({
-        email: 'mini.admin@planit.test',
-        fullName: 'Mini',
-        role: 'ADMIN',
-        password: 'AdminPwd123456',
-      });
+    const res = await api().post('/api/utilisateurs').set('Cookie', admin.cookieHeader).send({
+      email: 'mini.admin@planit.test',
+      fullName: 'Mini',
+      role: 'ADMIN',
+      password: 'AdminPwd123456',
+    });
     expect(res.status).toBe(403);
   });
 
   it('un SUPER_ADMIN crée un compte ADMIN (ecoleId null) → 201', async () => {
     const superAdmin = await loginAs(app, 'SUPER_ADMIN');
-    const res = await api()
-      .post('/api/utilisateurs')
-      .set('Cookie', superAdmin.cookieHeader)
-      .send({
-        email: 'second.admin@planit.test',
-        fullName: 'Second Admin',
-        role: 'ADMIN',
-        password: 'AdminPwd123456',
-      });
+    const res = await api().post('/api/utilisateurs').set('Cookie', superAdmin.cookieHeader).send({
+      email: 'second.admin@planit.test',
+      fullName: 'Second Admin',
+      role: 'ADMIN',
+      password: 'AdminPwd123456',
+    });
     expect(res.status).toBe(201);
     expect(res.body.role).toBe('ADMIN');
     expect(res.body.ecoleId).toBeNull();

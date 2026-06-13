@@ -81,6 +81,47 @@ export const resetPasswordResultSchema = z.object({
 });
 export type ResetPasswordResultDto = z.infer<typeof resetPasswordResultSchema>;
 
+// ── Personnel d'école (LOT 2 / V5-D2) ──────────────────────────────
+// RP + AC créés par la Direction dans le périmètre de son école.
+// Le role est restreint à RESPONSABLE_PROGRAMME | ASSISTANT_PROGRAMME
+// (un acteur DIRECTION ne crée pas d'autres DIRECTION).
+
+export const personnelRoleSchema = z.enum(['RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME']);
+export type PersonnelRole = z.infer<typeof personnelRoleSchema>;
+
+export const personnelSchema = z.object({
+  id: cuid,
+  email: z.string().email(),
+  fullName: z.string().min(1),
+  role: personnelRoleSchema,
+  statut: userStatutSchema,
+  ecoleId: cuid,
+  matricule: z.string().nullable(),
+  createdAt: isoDate,
+});
+
+/** Création d'un RP ou AC par la Direction. */
+export const createPersonnelSchema = z.object({
+  email: z.string().email(),
+  fullName: z.string().min(1).max(120),
+  role: personnelRoleSchema,
+  password: z.string().min(12).max(72),
+  matricule: z.string().max(40).optional(),
+});
+
+/** Modification nom ou email d'un personnel (Direction). */
+export const updatePersonnelSchema = z
+  .object({
+    fullName: z.string().min(1).max(120),
+    email: z.string().email(),
+  })
+  .partial()
+  .refine((d) => Object.keys(d).length > 0, { message: 'Au moins un champ requis' });
+
+export type PersonnelDto = z.infer<typeof personnelSchema>;
+export type CreatePersonnelDto = z.infer<typeof createPersonnelSchema>;
+export type UpdatePersonnelDto = z.infer<typeof updatePersonnelSchema>;
+
 // ── Journal d'audit (V5-D8) ──────────────────────────────────────────
 
 export const auditActorSchema = z.object({ id: cuid, fullName: z.string() });

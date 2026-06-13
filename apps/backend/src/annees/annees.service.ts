@@ -100,6 +100,51 @@ export class AnneesService {
     }
   }
 
+  /**
+   * Transition PLANIFIEE → EN_COURS (LOT 2 / V5-D2). 409 si une année est
+   * déjà EN_COURS dans la même école (unicité applicative + index partiel BD).
+   */
+  async debuter(id: string, ecoleId: string): Promise<AnneeAcademiqueDto> {
+    const annee = await this.prisma.anneeAcademique.findUnique({ where: { id } });
+    if (!annee) throw new NotFoundException(`Année ${id} introuvable`);
+    if (annee.ecoleId !== ecoleId) {
+      throw new NotFoundException(`Année ${id} introuvable`);
+    }
+    if (annee.etat === 'EN_COURS') {
+      return toDto(annee);
+    }
+    await this.assertNoOtherEnCours(ecoleId, id);
+
+    const updated = await this.prisma.anneeAcademique.update({
+      where: { id },
+      data: { etat: 'EN_COURS' },
+    });
+    return toDto(updated);
+  }
+
+  /**
+   * Transition EN_COURS → CLOTUREE (LOT 2 / V5-D2). 409 si l'année n'est
+   * pas EN_COURS (impossible de clôturer une année PLANIFIEE ou CLOTUREE).
+   */
+  async cloturer(id: string, ecoleId: string): Promise<AnneeAcademiqueDto> {
+    const annee = await this.prisma.anneeAcademique.findUnique({ where: { id } });
+    if (!annee) throw new NotFoundException(`Année ${id} introuvable`);
+    if (annee.ecoleId !== ecoleId) {
+      throw new NotFoundException(`Année ${id} introuvable`);
+    }
+    if (annee.etat !== 'EN_COURS') {
+      throw new ConflictException(
+        `L'année "${annee.libelle}" n'est pas EN_COURS — impossible de la clôturer`,
+      );
+    }
+
+    const updated = await this.prisma.anneeAcademique.update({
+      where: { id },
+      data: { etat: 'CLOTUREE' },
+    });
+    return toDto(updated);
+  }
+
   async update(id: string, dto: UpdateAnneeAcademiqueDto): Promise<AnneeAcademiqueDto> {
     const exists = await this.prisma.anneeAcademique.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException(`Année ${id} introuvable`);

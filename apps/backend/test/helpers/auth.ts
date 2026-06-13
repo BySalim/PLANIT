@@ -7,6 +7,7 @@ import type { INestApplication } from '@nestjs/common';
  * `RESPONSABLE_PROGRAMME` = Aminata Diallo (RP1), manager de l'AC seedé et
  * responsable des salles Amphi/201/202. `ASSISTANT_PROGRAMME` = Awa Touré (AC),
  * rattachée à RP1 et assignée à la classe GL3-A (cf. seed v3 / V3-D9).
+ * `DIRECTION` = Direction École d'Ingénieurs (école A, `ecole_ism`).
  */
 const SEED_EMAIL: Record<SupportedRole, string> = {
   RESPONSABLE_PROGRAMME: 'aminata.diallo@planit.test',
@@ -30,6 +31,9 @@ export type SupportedRole =
 
 /** Email du 2ᵉ RP (Cheikh Diop) — responsable du Labo, hors périmètre AC. */
 export const RP2_EMAIL = 'cheikh.diop@planit.test';
+
+/** Email de la Direction de l'école B (`seed-ecole-b`) — isolée de l'école A. */
+export const DIRECTION_B_EMAIL = 'direction.ecoleb@planit.test';
 
 export interface LoggedInSession {
   /** Valeurs brutes des cookies (à passer en `Cookie:` header). */

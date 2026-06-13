@@ -37,8 +37,9 @@ export class EnseignantsController {
    * `@Roles` méthode override le `@Roles` classe (RP-only) → les writes
    * ci-dessous restent réservés au RP. */
   @Get()
-  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME')
-  @ApiOperation({ summary: 'Liste des enseignants (RP + AC lecture)' })
+  // V05 LOT 2 — Direction lit les enseignants de son école.
+  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME', 'DIRECTION')
+  @ApiOperation({ summary: 'Liste des enseignants (RP + AC + Direction lecture)' })
   @ApiResponse({ status: 200, description: 'Liste paginée' })
   @ApiResponse({ status: 403, description: 'Rôle insuffisant' })
   list(
@@ -57,7 +58,7 @@ export class EnseignantsController {
   }
 
   @Get(':id')
-  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME')
+  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME', 'DIRECTION')
   @ApiOperation({ summary: 'Détail enseignant (RP + AC lecture)' })
   @ApiResponse({ status: 200, description: 'Enseignant trouvé' })
   @ApiResponse({ status: 404, description: 'Enseignant introuvable' })
