@@ -3,7 +3,12 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type CreateEcoleDto, type EcoleDto, createEcoleSchema } from '@planit/contracts';
+import {
+  type CreateEcoleDto,
+  type EcoleDto,
+  createEcoleSchema,
+  updateEcoleSchema,
+} from '@planit/contracts';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
@@ -18,6 +23,11 @@ interface EcoleModalProps {
   initial?: EcoleDto | undefined;
 }
 
+const EMPTY: CreateEcoleDto = {
+  nom: '',
+  direction: { email: '', fullName: '', password: '' },
+};
+
 export function EcoleModal({ isOpen, onClose, mode, initial }: EcoleModalProps) {
   const toast = useToast();
   const createMutation = useCreateEcoleMutation();
@@ -30,13 +40,13 @@ export function EcoleModal({ isOpen, onClose, mode, initial }: EcoleModalProps) 
     reset,
     formState: { errors, isSubmitting },
   } = useForm<CreateEcoleDto>({
-    resolver: zodResolver(createEcoleSchema),
-    defaultValues: { nom: '' },
+    resolver: isEdit ? zodResolver(updateEcoleSchema) : zodResolver(createEcoleSchema),
+    defaultValues: EMPTY,
   });
 
   useEffect(() => {
     if (!isOpen) return;
-    reset({ nom: isEdit && initial !== undefined ? initial.nom : '' });
+    reset(isEdit && initial !== undefined ? { ...EMPTY, nom: initial.nom } : EMPTY);
   }, [isOpen, isEdit, initial, reset]);
 
   const mutationError = isEdit ? updateMutation.error : createMutation.error;
@@ -44,11 +54,11 @@ export function EcoleModal({ isOpen, onClose, mode, initial }: EcoleModalProps) 
   async function onSubmit(values: CreateEcoleDto) {
     try {
       if (isEdit && initial !== undefined) {
-        await updateMutation.mutateAsync({ id: initial.id, body: values });
+        await updateMutation.mutateAsync({ id: initial.id, body: { nom: values.nom } });
         toast.show('École modifiée.', { variant: 'success' });
       } else {
         await createMutation.mutateAsync(values);
-        toast.show('École créée.', { variant: 'success' });
+        toast.show('École et Direction créées.', { variant: 'success' });
       }
       onClose();
     } catch {
@@ -61,7 +71,7 @@ export function EcoleModal({ isOpen, onClose, mode, initial }: EcoleModalProps) 
       isOpen={isOpen}
       onClose={onClose}
       title={isEdit ? "Modifier l'école" : 'Créer une école'}
-      size="sm"
+      size="md"
       footer={
         <>
           <Button variant="secondary" size="sm" onClick={onClose} disabled={isSubmitting}>
@@ -74,7 +84,7 @@ export function EcoleModal({ isOpen, onClose, mode, initial }: EcoleModalProps) 
             form="ecole-form"
             disabled={isSubmitting}
           >
-            {isEdit ? 'Enregistrer' : 'Créer'}
+            {isEdit ? 'Enregistrer' : "Créer l'école"}
           </Button>
         </>
       }
@@ -96,6 +106,58 @@ export function EcoleModal({ isOpen, onClose, mode, initial }: EcoleModalProps) 
             />
           )}
         </FormField>
+
+        {!isEdit ? (
+          <fieldset className="flex flex-col gap-4 rounded-xl border border-border-soft bg-bg p-4">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-text-sec">
+              Compte Direction
+            </legend>
+            <p className="text-sm text-text-muted">
+              Chaque école a une Direction. Le compte est créé maintenant ; communiquez le mot de
+              passe hors-bande.
+            </p>
+
+            <FormField label="Nom complet" required error={errors.direction?.fullName?.message}>
+              {({ id, 'aria-describedby': describedBy }) => (
+                <Input
+                  id={id}
+                  aria-describedby={describedBy}
+                  invalid={!!errors.direction?.fullName}
+                  {...register('direction.fullName')}
+                />
+              )}
+            </FormField>
+
+            <FormField label="Adresse e-mail" required error={errors.direction?.email?.message}>
+              {({ id, 'aria-describedby': describedBy }) => (
+                <Input
+                  id={id}
+                  type="email"
+                  aria-describedby={describedBy}
+                  invalid={!!errors.direction?.email}
+                  {...register('direction.email')}
+                />
+              )}
+            </FormField>
+
+            <FormField
+              label="Mot de passe"
+              required
+              hint="12 caractères minimum."
+              error={errors.direction?.password?.message}
+            >
+              {({ id, 'aria-describedby': describedBy }) => (
+                <Input
+                  id={id}
+                  type="password"
+                  aria-describedby={describedBy}
+                  invalid={!!errors.direction?.password}
+                  {...register('direction.password')}
+                />
+              )}
+            </FormField>
+          </fieldset>
+        ) : null}
 
         {mutationError != null ? (
           <div className="rounded-lg bg-err-100 px-4 py-2 text-sm text-err">

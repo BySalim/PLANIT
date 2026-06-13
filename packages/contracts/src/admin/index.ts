@@ -16,18 +16,42 @@ const isoDate = z.string();
 export const ecoleStatutSchema = z.enum(['ACTIVE', 'ARCHIVEE']);
 export type EcoleStatut = z.infer<typeof ecoleStatutSchema>;
 
+// Compte Direction d'une école. Une école et sa Direction sont indissociables
+// (créées ensemble, cf. ADR-0020) : `direction` est donc toujours présent en
+// pratique. `nullable()` est défensif (école héritée sans Direction).
+export const directionSummarySchema = z.object({
+  id: cuid,
+  email: z.string().email(),
+  fullName: z.string(),
+  statut: userStatutSchema,
+});
+export type DirectionSummaryDto = z.infer<typeof directionSummarySchema>;
+
+// Champs du compte Direction saisis à la création de l'école.
+export const createDirectionSchema = z.object({
+  email: z.string().email(),
+  fullName: z.string().min(1).max(120),
+  password: z.string().min(12).max(72),
+});
+export type CreateDirectionDto = z.infer<typeof createDirectionSchema>;
+
 export const ecoleSchema = z.object({
   id: cuid,
   nom: z.string().min(1).max(160),
   statut: ecoleStatutSchema,
   archivedAt: isoDate.nullable(),
+  direction: directionSummarySchema.nullable(),
 });
 
+// Créer une école crée obligatoirement sa Direction (seul point d'entrée pour
+// un compte DIRECTION). Le bloc `direction` est requis.
 export const createEcoleSchema = z.object({
   nom: z.string().min(1).max(160),
+  direction: createDirectionSchema,
 });
 
-export const updateEcoleSchema = createEcoleSchema.partial();
+// Une mise à jour ne touche que le nom : la Direction se gère via son compte.
+export const updateEcoleSchema = z.object({ nom: z.string().min(1).max(160) }).partial();
 
 export type EcoleDto = z.infer<typeof ecoleSchema>;
 export type CreateEcoleDto = z.infer<typeof createEcoleSchema>;

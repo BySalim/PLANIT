@@ -134,6 +134,7 @@ export class UtilisateursService {
   // ── Mutations ─────────────────────────────────────────────────────────────
   async create(actor: CurrentUserPayload, dto: CreateUserAdminDto): Promise<UserAdminDto> {
     this.assertCanManageRoles(actor, dto.role);
+    this.assertNotDirection(dto.role);
     const ecoleId = dto.ecoleId ?? null;
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -167,6 +168,10 @@ export class UtilisateursService {
     const target = await this.findActiveOrThrow(id);
     // Gestion d'un compte admin (existant OU cible) = SUPER_ADMIN uniquement.
     this.assertCanManageRoles(actor, target.role, ...(dto.role ? [dto.role] : []));
+
+    // Bascule vers DIRECTION interdite ici : une Direction se crée avec son
+    // école. Renommer/déplacer une Direction existante reste permis.
+    if (dto.role === 'DIRECTION' && target.role !== 'DIRECTION') this.assertNotDirection(dto.role);
 
     const nextRole = dto.role ?? target.role;
     const nextEcoleId = dto.ecoleId !== undefined ? dto.ecoleId : target.ecoleId;
@@ -315,6 +320,15 @@ export class UtilisateursService {
     const touchesAdmin = roles.some((r) => ADMIN_ROLES.has(r));
     if (touchesAdmin && actor.role !== 'SUPER_ADMIN') {
       throw new ForbiddenException('Seul un SUPER_ADMIN peut gérer un compte ADMIN ou SUPER_ADMIN');
+    }
+  }
+
+  /** Une Direction se crée uniquement à la création d'une école (ADR-0020). */
+  private assertNotDirection(role: Role): void {
+    if (role === 'DIRECTION') {
+      throw new BadRequestException(
+        "Un compte Direction se crée à la création d'une école, pas ici",
+      );
     }
   }
 

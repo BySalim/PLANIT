@@ -45,6 +45,20 @@ async function rawLogin(email: string, password: string) {
   return api().post('/api/auth/login').send({ email, password });
 }
 
+/** Payload de création d'école : nom + Direction (indissociables, ADR-0020). */
+function ecolePayload(nom: string, overrides: Record<string, unknown> = {}) {
+  const suffix = Math.random().toString(36).slice(2, 9);
+  return {
+    nom,
+    direction: {
+      email: `dir.${suffix}@planit.test`,
+      fullName: `Direction ${nom}`,
+      password: 'DirPwd12345678',
+    },
+    ...overrides,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1.1 — Écoles
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,15 +77,17 @@ describe('Écoles (1.1)', () => {
     expect(res.status).toBe(403);
   });
 
-  it('POST crée une école et trace l’audit', async () => {
+  it('POST crée une école + sa Direction et trace l’audit', async () => {
     const admin = await loginAs(app, 'ADMIN');
     const res = await api()
       .post('/api/ecoles')
       .set('Cookie', admin.cookieHeader)
-      .send({ nom: 'École de Test V05' });
+      .send(ecolePayload('École de Test V05'));
     expect(res.status).toBe(201);
     expect(res.body.nom).toBe('École de Test V05');
     expect(res.body.statut).toBe('ACTIVE');
+    expect(res.body.direction).not.toBeNull();
+    expect(res.body.direction.email).toContain('@planit.test');
 
     const audit = await prisma.auditLog.findFirst({
       where: { action: 'ecole.create', targetId: res.body.id },
@@ -79,13 +95,22 @@ describe('Écoles (1.1)', () => {
     expect(audit).not.toBeNull();
   });
 
-  it('refuse 409 sur un nom d’école déjà pris', async () => {
+  it('refuse 400 si le bloc Direction manque', async () => {
     const admin = await loginAs(app, 'ADMIN');
-    await api().post('/api/ecoles').set('Cookie', admin.cookieHeader).send({ nom: 'Doublon' });
     const res = await api()
       .post('/api/ecoles')
       .set('Cookie', admin.cookieHeader)
-      .send({ nom: 'Doublon' });
+      .send({ nom: 'Sans Direction' });
+    expect(res.status).toBe(400);
+  });
+
+  it('refuse 409 sur un nom d’école déjà pris', async () => {
+    const admin = await loginAs(app, 'ADMIN');
+    await api().post('/api/ecoles').set('Cookie', admin.cookieHeader).send(ecolePayload('Doublon'));
+    const res = await api()
+      .post('/api/ecoles')
+      .set('Cookie', admin.cookieHeader)
+      .send(ecolePayload('Doublon'));
     expect(res.status).toBe(409);
   });
 
@@ -94,7 +119,7 @@ describe('Écoles (1.1)', () => {
     const created = await api()
       .post('/api/ecoles')
       .set('Cookie', admin.cookieHeader)
-      .send({ nom: 'À Archiver' });
+      .send(ecolePayload('À Archiver'));
     const archive = await api()
       .patch(`/api/ecoles/${created.body.id}/archive`)
       .set('Cookie', admin.cookieHeader);
@@ -112,38 +137,58 @@ describe('Écoles (1.1)', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1.2 — Créer la Direction
+// 1.2 — Direction créée avec l'école (indissociables, ADR-0020)
 // ─────────────────────────────────────────────────────────────────────────────
-describe('Créer Direction (1.2)', () => {
-  it('POST /api/ecoles/:id/direction crée un compte DIRECTION connectable + audit', async () => {
+describe('Direction créée avec l’école (1.2)', () => {
+  it('crée un compte DIRECTION connectable + audit dédié', async () => {
     const admin = await loginAs(app, 'ADMIN');
-    const res = await api()
-      .post(`/api/ecoles/${ECOLE_A_ID}/direction`)
-      .set('Cookie', admin.cookieHeader)
-      .send({
-        email: 'dir.test@planit.test',
-        fullName: 'Direction Test',
-        password: 'DirPwd12345678',
-      });
+    const payload = ecolePayload('École Avec Direction');
+    const res = await api().post('/api/ecoles').set('Cookie', admin.cookieHeader).send(payload);
     expect(res.status).toBe(201);
-    expect(res.body.role).toBe('DIRECTION');
-    expect(res.body.ecoleId).toBe(ECOLE_A_ID);
+    expect(res.body.direction.statut).toBe('ACTIF');
 
-    // Le compte créé peut se connecter.
-    const login = await rawLogin('dir.test@planit.test', 'DirPwd12345678');
+    // Le compte Direction peut se connecter.
+    const login = await rawLogin(payload.direction.email, payload.direction.password);
     expect(login.status).toBe(200);
 
     const audit = await prisma.auditLog.findFirst({ where: { action: 'ecole.direction.create' } });
     expect(audit).not.toBeNull();
   });
 
-  it('refuse 404 sur une école inconnue', async () => {
+  it('rollback complet si l’email Direction est déjà pris (409, pas d’école orpheline)', async () => {
     const admin = await loginAs(app, 'ADMIN');
+    const dup = {
+      email: 'direction.ingenieurs@planit.test',
+      fullName: 'X',
+      password: 'Password12345',
+    };
     const res = await api()
-      .post('/api/ecoles/ecole-fantome/direction')
+      .post('/api/ecoles')
       .set('Cookie', admin.cookieHeader)
-      .send({ email: 'x@planit.test', fullName: 'X', password: 'Password12345' });
-    expect(res.status).toBe(404);
+      .send({ nom: 'École Email Doublon', direction: dup });
+    expect(res.status).toBe(409);
+
+    const orpheline = await prisma.ecole.findUnique({ where: { nom: 'École Email Doublon' } });
+    expect(orpheline).toBeNull();
+  });
+
+  it('GET /api/ecoles expose la Direction de chaque école', async () => {
+    const admin = await loginAs(app, 'ADMIN');
+    const res = await api().get('/api/ecoles').set('Cookie', admin.cookieHeader);
+    expect(res.status).toBe(200);
+    expect(res.body.every((e: { direction: unknown }) => e.direction !== null)).toBe(true);
+  });
+
+  it('refuse 400 de créer un compte DIRECTION via /api/utilisateurs', async () => {
+    const admin = await loginAs(app, 'ADMIN');
+    const res = await api().post('/api/utilisateurs').set('Cookie', admin.cookieHeader).send({
+      email: 'dir.interdit@planit.test',
+      fullName: 'Dir Interdit',
+      role: 'DIRECTION',
+      password: 'DirPwd12345678',
+      ecoleId: ECOLE_A_ID,
+    });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -265,29 +310,23 @@ describe('Utilisateurs (1.3)', () => {
 describe('RBAC ADMIN vs SUPER_ADMIN (1.5)', () => {
   it('un ADMIN ne peut pas créer un compte ADMIN → 403', async () => {
     const admin = await loginAs(app, 'ADMIN');
-    const res = await api()
-      .post('/api/utilisateurs')
-      .set('Cookie', admin.cookieHeader)
-      .send({
-        email: 'mini.admin@planit.test',
-        fullName: 'Mini',
-        role: 'ADMIN',
-        password: 'AdminPwd123456',
-      });
+    const res = await api().post('/api/utilisateurs').set('Cookie', admin.cookieHeader).send({
+      email: 'mini.admin@planit.test',
+      fullName: 'Mini',
+      role: 'ADMIN',
+      password: 'AdminPwd123456',
+    });
     expect(res.status).toBe(403);
   });
 
   it('un SUPER_ADMIN crée un compte ADMIN (ecoleId null) → 201', async () => {
     const superAdmin = await loginAs(app, 'SUPER_ADMIN');
-    const res = await api()
-      .post('/api/utilisateurs')
-      .set('Cookie', superAdmin.cookieHeader)
-      .send({
-        email: 'second.admin@planit.test',
-        fullName: 'Second Admin',
-        role: 'ADMIN',
-        password: 'AdminPwd123456',
-      });
+    const res = await api().post('/api/utilisateurs').set('Cookie', superAdmin.cookieHeader).send({
+      email: 'second.admin@planit.test',
+      fullName: 'Second Admin',
+      role: 'ADMIN',
+      password: 'AdminPwd123456',
+    });
     expect(res.status).toBe(201);
     expect(res.body.role).toBe('ADMIN');
     expect(res.body.ecoleId).toBeNull();
@@ -312,7 +351,10 @@ describe('RBAC ADMIN vs SUPER_ADMIN (1.5)', () => {
 describe("Journal d'audit (1.4)", () => {
   it('GET /api/journal liste les actions tracées, filtrable par action', async () => {
     const admin = await loginAs(app, 'ADMIN');
-    await api().post('/api/ecoles').set('Cookie', admin.cookieHeader).send({ nom: 'Pour Journal' });
+    await api()
+      .post('/api/ecoles')
+      .set('Cookie', admin.cookieHeader)
+      .send(ecolePayload('Pour Journal'));
 
     const res = await api()
       .get('/api/journal?action=ecole.create')
