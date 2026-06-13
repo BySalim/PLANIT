@@ -198,8 +198,10 @@ export class UtilisateursService {
   /** Suspend un compte : `statut=SUSPENDU` + révocation des sessions actives. */
   async suspend(actor: CurrentUserPayload, id: string): Promise<UserAdminDto> {
     const target = await this.findActiveOrThrow(id);
-    this.assertCanManageRoles(actor, target.role);
+    // Garde anti-self d'abord (règle indépendante du rôle) : un admin qui se
+    // suspend lui-même → 400, pas 403 (il est lui-même un compte admin).
     this.assertNotSelf(actor, id, 'suspendre');
+    this.assertCanManageRoles(actor, target.role);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const u = await tx.user.update({
@@ -248,8 +250,8 @@ export class UtilisateursService {
   /** Archive (soft-delete) : `deletedAt` posé + sessions révoquées. Sort des listes. */
   async archive(actor: CurrentUserPayload, id: string): Promise<UserAdminDto> {
     const target = await this.findActiveOrThrow(id);
-    this.assertCanManageRoles(actor, target.role);
     this.assertNotSelf(actor, id, 'archiver');
+    this.assertCanManageRoles(actor, target.role);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const u = await tx.user.update({

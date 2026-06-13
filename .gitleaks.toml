@@ -11,4 +11,9 @@ paths = [
   '''\.example$''',
   '''^docs/''',
   '''\.md$''',
+  # Tests backend : mots de passe de fixtures synthétiques (≥12 car. pour les
+  # schémas Zod), jamais de vrais secrets. La règle générique gitleaks les flague
+  # dès qu'ils dépassent le seuil d'entropie (V05 LOT 1). Exemption scoped au
+  # répertoire de tests uniquement.
+  '''^apps/backend/test/''',
 ]
