@@ -11,6 +11,7 @@ import { useFilieresQuery } from '@/lib/queries';
 import { useAnneesQuery, useClassesV3Query } from '@/lib/queries-v3';
 import { ClasseModal } from '@/components/rp/classes/classe-modal';
 import { ClassesTableSkeleton } from '@/components/rp/classes/classes-table-skeleton';
+import { ResponsableCell } from '@/components/shared/responsable-cell';
 
 // ── Icône inline ──────────────────────────────────────────────────────
 function PencilIcon() {
@@ -76,7 +77,7 @@ type ModalState =
   | { open: true; mode: 'create' }
   | { open: true; mode: 'edit'; initial: ClasseV3Dto };
 
-const COLS = 'grid grid-cols-[1.7fr_120px_110px_190px_auto] items-center gap-3';
+const COLS = 'grid grid-cols-[1.7fr_120px_110px_180px_190px_auto] items-center gap-3';
 
 // ── Page (inner — useSearchParams nécessite un Suspense en Next 15) ────
 function ClassesPageInner() {
@@ -216,6 +217,9 @@ function ClassesPageInner() {
               Année
             </span>
             <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              Responsable
+            </span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Places
             </span>
             <span className="w-[90px]" />
@@ -254,6 +258,9 @@ function ClassesPageInner() {
               <span className="text-[13px] tabular-nums text-text-sec">
                 {c.anneeLibelle ?? '—'}
               </span>
+
+              {/* Responsable (V05 LOT 4.3) */}
+              <ResponsableCell responsable={c.responsable ?? null} />
 
               {/* Places */}
               <PlacesBar inscrits={c.places.inscrits} capaciteMax={c.places.capaciteMax} />

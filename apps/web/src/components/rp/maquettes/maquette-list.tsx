@@ -62,6 +62,15 @@ function MaquetteItem({ maquette, selected, lastAnnee, onClick }: MaquetteItemPr
             <path d="M6 12v5c3 3 9 3 12 0v-5" />
           </svg>
           {maquette.filiere?.sigle ?? ''}
+          {/* V05 LOT 4.3 — Responsable (V5-D5) */}
+          {maquette.responsable ? (
+            <span
+              className="ml-1 truncate"
+              title={`Responsable : ${maquette.responsable.fullName}`}
+            >
+              · {maquette.responsable.fullName}
+            </span>
+          ) : null}
         </span>
         {meta !== null && lastAnnee !== null ? (
           <span

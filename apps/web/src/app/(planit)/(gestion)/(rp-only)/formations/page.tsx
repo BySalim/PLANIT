@@ -9,6 +9,7 @@ import { useFilieresQuery } from '@/lib/queries';
 import { useAnneesQuery, useFormationsQuery } from '@/lib/queries-v3';
 import { FormationModal } from '@/components/rp/formations/formation-modal';
 import { FormationsTableSkeleton } from '@/components/rp/formations/formations-table-skeleton';
+import { ResponsableCell } from '@/components/shared/responsable-cell';
 
 function NiveauBadge({ niveau }: { niveau: string }) {
   return (
@@ -26,7 +27,7 @@ function SigleBadge({ sigle }: { sigle: string }) {
   );
 }
 
-const COLS = 'grid grid-cols-[150px_70px_1fr_120px_auto] items-center gap-3';
+const COLS = 'grid grid-cols-[150px_70px_1fr_120px_180px_auto] items-center gap-3';
 
 // ── Page ──────────────────────────────────────────────────────────────
 export default function FormationsPage() {
@@ -135,6 +136,9 @@ export default function FormationsPage() {
             <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Année
             </span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              Responsable
+            </span>
             <span className="w-[290px]" />
           </div>
 
@@ -157,6 +161,9 @@ export default function FormationsPage() {
               <span className="text-[13px] tabular-nums text-text-sec">
                 {f.anneeLibelle ?? '—'}
               </span>
+
+              {/* Responsable (V05 LOT 4.3) */}
+              <ResponsableCell responsable={f.responsable ?? null} />
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-1.5">
