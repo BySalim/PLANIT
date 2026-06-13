@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { responsableRefSchema } from '../entities';
 
 // ─────────────────────────────────────────────────────────────────────
 // V03 — Référentiel académique (cf. ADR-0010 / 0011 / 0012, LOT 0.5)
@@ -101,6 +102,8 @@ export const maquetteSchema = z.object({
   createdAt: isoDatetime,
   updatedAt: isoDatetime,
   versionCount: z.number().int().min(0).optional(),
+  // V05 LOT 4.3 — V5-D5 : RP responsable hérité de la filière.
+  responsable: responsableRefSchema.nullable().optional(),
 });
 
 // ADR-0018 : la maquette n'est plus créée ni renommée/renouvelée directement.
@@ -208,6 +211,8 @@ export const formationSchema = z.object({
   anneeLibelle: z.string().optional(),
   maquetteVersionId: cuid,
   classeCount: z.number().int().min(0).optional(),
+  // V05 LOT 4.3 — V5-D5 : RP responsable hérité de la filière.
+  responsable: responsableRefSchema.nullable().optional(),
 });
 
 /**
@@ -249,6 +254,8 @@ export const classeV3Schema = z.object({
   isDoubleDiplome: z.boolean(),
   capaciteMax: z.number().int().min(0),
   places: placesSchema,
+  // V05 LOT 4.3 — V5-D5 : RP responsable hérité de la formation.filière.
+  responsable: responsableRefSchema.nullable().optional(),
 });
 
 export const createClasseV3Schema = z.object({
@@ -355,6 +362,10 @@ export const suiviEnseignantSchema = z.object({
 });
 export type SuiviEnseignantDto = z.infer<typeof suiviEnseignantSchema>;
 
+// V5-D10 — statut dérivé (`estTermine` + `heuresFaites > 0`)
+export const suiviStatutSchema = z.enum(['a_planifier', 'en_cours', 'termine']);
+export type SuiviStatut = z.infer<typeof suiviStatutSchema>;
+
 export const suiviModuleSchema = z.object({
   id: cuid,
   classeId: cuid,
@@ -370,6 +381,10 @@ export const suiviModuleSchema = z.object({
   progression: z.number().min(0).max(100),
   enseignants: z.array(suiviEnseignantSchema),
   estTermine: z.boolean(),
+  // V05 LOT 4.1 — V5-D10 : statut dérivé pour pill colorée + filtre.
+  statut: suiviStatutSchema,
+  // V05 LOT 4.3 — V5-D5 : RP responsable hérité de classe.formation.filiere.
+  responsable: responsableRefSchema.nullable(),
 });
 export type SuiviModuleDto = z.infer<typeof suiviModuleSchema>;
 
@@ -441,6 +456,9 @@ export const updateSalleSchema = z.object({
 export type SalleDto = z.infer<typeof salleSchema>;
 export type CreateSalleDto = z.infer<typeof createSalleSchema>;
 export type UpdateSalleDto = z.infer<typeof updateSalleSchema>;
+
+// V05 LOT 4.4 — liste des salles enrichie (responsable + commune dérivée).
+export const salleListSchema = z.array(salleSchema);
 
 // ─────────────────────────────────────────────────────────────────────
 // Scope AC (V3-D9 / ADR-0010) — périmètre d'un Attaché de Classe
