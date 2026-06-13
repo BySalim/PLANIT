@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/toast-provider';
 import { useIsRp } from '@/hooks/use-role';
 import { useEnseignantsQuery } from '@/lib/queries';
 import { useDeleteEnseignantMutation } from '@/lib/mutations';
+import { EnseignantDetailDrawer } from '@/components/rp/enseignants/enseignant-detail-drawer';
 import { EnseignantModal } from '@/components/rp/enseignants/enseignant-modal';
 import { EnseignantsTableSkeleton } from '@/components/rp/enseignants/enseignants-table-skeleton';
 
@@ -61,6 +62,8 @@ export default function EnseignantsPage() {
   const [statut, setStatut] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EnseignantDto | undefined>(undefined);
+  // V05 LOT 4.2 — overlay de vue (V5-D11).
+  const [detailTarget, setDetailTarget] = useState<EnseignantDto | null>(null);
 
   const { data, isLoading, isError } = useEnseignantsQuery(
     page,
@@ -233,7 +236,7 @@ export default function EnseignantsPage() {
                             ) : null}
                             <button
                               type="button"
-                              onClick={() => openEdit(enseignant)}
+                              onClick={() => setDetailTarget(enseignant)}
                               className="ml-1 flex h-8 items-center gap-1 rounded-lg border border-border px-3 text-[12px] font-medium text-text-muted transition-colors hover:border-accent hover:text-accent"
                             >
                               Voir
@@ -290,6 +293,15 @@ export default function EnseignantsPage() {
         onClose={() => setModalOpen(false)}
         mode={editTarget !== undefined ? 'edit' : 'create'}
         initial={editTarget}
+      />
+
+      <EnseignantDetailDrawer
+        enseignant={detailTarget}
+        onClose={() => setDetailTarget(null)}
+        onEdit={(ens) => {
+          setDetailTarget(null);
+          openEdit(ens);
+        }}
       />
     </Shell>
   );

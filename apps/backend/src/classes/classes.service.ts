@@ -17,8 +17,14 @@ import { AnneesService } from '../annees/annees.service';
 import { AcScopeService } from '../ac/ac-scope.service';
 
 const classeInclude = {
-  filiere: true,
-  formation: { include: { filiere: true, anneeAcademique: true } },
+  // V05 LOT 4.3 — inclut le RP responsable des 2 filières (héritée + legacy fallback).
+  filiere: { include: { responsableRp: { select: { id: true, fullName: true } } } },
+  formation: {
+    include: {
+      filiere: { include: { responsableRp: { select: { id: true, fullName: true } } } },
+      anneeAcademique: true,
+    },
+  },
   _count: { select: { inscriptions: true } },
 } satisfies Prisma.ClasseInclude;
 
@@ -200,6 +206,8 @@ function toDto(row: ClasseRow): ClasseV3Dto {
   // Filière + niveau + année héritées de la formation (V3-D5) ; fallback sur la
   // FK filière legacy si la classe n'a pas encore de formation (transition).
   const filiere = row.formation?.filiere ?? row.filiere;
+  // V05 LOT 4.3 — V5-D5 : surface le RP responsable (héritée formation.filiere, sinon legacy).
+  const rp = filiere?.responsableRp ?? null;
   return {
     id: row.id,
     code: row.code,
@@ -212,6 +220,7 @@ function toDto(row: ClasseRow): ClasseV3Dto {
     isDoubleDiplome: (row.formation?.filiere ?? row.filiere)?.isDoubleDiplome ?? false,
     capaciteMax: row.capaciteMax,
     places: { inscrits: row._count.inscriptions, capaciteMax: row.capaciteMax },
+    responsable: rp ? { id: rp.id, fullName: rp.fullName } : null,
   };
 }
 

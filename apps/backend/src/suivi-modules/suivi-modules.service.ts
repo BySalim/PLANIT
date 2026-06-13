@@ -21,6 +21,12 @@ function seanceHours(startAt: Date, endAt: Date): number {
 const versionModuleInclude = {
   formation: {
     include: {
+      // V05 LOT 4.3 — surfacer le RP responsable de la filière.
+      filiere: {
+        include: {
+          responsableRp: { select: { id: true, fullName: true } },
+        },
+      },
       maquetteVersion: {
         include: { modules: { include: { module: { include: { ue: true } } } } },
       },
@@ -31,6 +37,16 @@ const versionModuleInclude = {
 type VersionModule = Prisma.MaquetteModuleGetPayload<{
   include: { module: { include: { ue: true } } };
 }>;
+
+/** V05 LOT 4.1 — statut dérivé (`estTermine` + `heuresFaites`). */
+function deriveStatut(
+  estTermine: boolean,
+  heuresFaites: number,
+): 'termine' | 'en_cours' | 'a_planifier' {
+  if (estTermine) return 'termine';
+  if (heuresFaites > 0) return 'en_cours';
+  return 'a_planifier';
+}
 
 /** Heures faites + enseignants agrégés pour un couple (classe, module). */
 interface SeanceAgg {
@@ -77,13 +93,17 @@ export class SuiviModulesService {
       classeId: string;
       classeCode: string;
       niveau: Niveau | null;
+      responsable: { id: string; fullName: string } | null;
       mm: VersionModule;
     }[] = [];
     for (const classe of classes) {
       const modules = classe.formation?.maquetteVersion?.modules ?? [];
       const niveau = classe.formation?.niveau ?? null;
+      // V05 LOT 4.3 — V5-D5 : Responsable hérité de classe.formation.filiere.
+      const rp = classe.formation?.filiere?.responsableRp ?? null;
+      const responsable = rp ? { id: rp.id, fullName: rp.fullName } : null;
       for (const mm of modules) {
-        expected.push({ classeId: classe.id, classeCode: classe.code, niveau, mm });
+        expected.push({ classeId: classe.id, classeCode: classe.code, niveau, responsable, mm });
       }
     }
     if (expected.length === 0) return [];
@@ -94,46 +114,52 @@ export class SuiviModulesService {
     const moduleIds = [...new Set(expected.map((e) => e.mm.moduleId))];
     const agg = await this.aggregateSeances(classeIds, moduleIds);
 
-    const items: SuiviModuleDto[] = expected.map(({ classeId, classeCode, niveau, mm }) => {
-      const key = keyOf(classeId, mm.moduleId);
-      const suivi = suiviByKey.get(key);
-      const heuresPrevues = computeVHE(mm);
-      const a = agg.get(key);
-      const heuresFaites = a?.heures ?? 0;
-      const progression =
-        heuresPrevues > 0 ? Math.min(100, Math.round((heuresFaites / heuresPrevues) * 100)) : 0;
-      const enseignants = a
-        ? [...a.enseignants.entries()].map(([id, v]) => ({ id, nom: v.nom, heures: v.heures }))
-        : [];
+    const items: SuiviModuleDto[] = expected.map(
+      ({ classeId, classeCode, niveau, responsable, mm }) => {
+        const key = keyOf(classeId, mm.moduleId);
+        const suivi = suiviByKey.get(key);
+        const heuresPrevues = computeVHE(mm);
+        const a = agg.get(key);
+        const heuresFaites = a?.heures ?? 0;
+        const progression =
+          heuresPrevues > 0 ? Math.min(100, Math.round((heuresFaites / heuresPrevues) * 100)) : 0;
+        const enseignants = a
+          ? [...a.enseignants.entries()].map(([id, v]) => ({ id, nom: v.nom, heures: v.heures }))
+          : [];
+        const estTermine = suivi?.estTermine ?? false;
 
-      return {
-        id: suivi?.id ?? '',
-        classeId,
-        classeCode,
-        niveau,
-        moduleId: mm.moduleId,
-        module: {
-          id: mm.module.id,
-          code: mm.module.code,
-          libelle: mm.module.libelle,
-          color: mm.module.color,
-          ue: mm.module.ue
-            ? {
-                id: mm.module.ue.id,
-                code: mm.module.ue.code,
-                libelle: mm.module.ue.libelle,
-                color: mm.module.ue.color,
-              }
-            : null,
-        },
-        semestre: mm.semestre,
-        heuresPrevues,
-        heuresFaites,
-        progression,
-        enseignants,
-        estTermine: suivi?.estTermine ?? false,
-      };
-    });
+        return {
+          id: suivi?.id ?? '',
+          classeId,
+          classeCode,
+          niveau,
+          moduleId: mm.moduleId,
+          module: {
+            id: mm.module.id,
+            code: mm.module.code,
+            libelle: mm.module.libelle,
+            color: mm.module.color,
+            ue: mm.module.ue
+              ? {
+                  id: mm.module.ue.id,
+                  code: mm.module.ue.code,
+                  libelle: mm.module.ue.libelle,
+                  color: mm.module.ue.color,
+                }
+              : null,
+          },
+          semestre: mm.semestre,
+          heuresPrevues,
+          heuresFaites,
+          progression,
+          enseignants,
+          estTermine,
+          // V05 LOT 4.1 — dérivés exposés au client.
+          statut: deriveStatut(estTermine, heuresFaites),
+          responsable,
+        };
+      },
+    );
 
     return this.applyFilters(items, query);
   }
@@ -396,6 +422,9 @@ export class SuiviModulesService {
     const a = agg.get(keyOf(classeId, moduleId));
     const heuresPrevues = computeVHE(mm);
     const heuresFaites = a?.heures ?? 0;
+    const estTermine = suivi.estTermine;
+    const rp = classe.formation?.filiere?.responsableRp ?? null;
+    const responsable = rp ? { id: rp.id, fullName: rp.fullName } : null;
 
     return {
       id: suivi.id,
@@ -425,7 +454,10 @@ export class SuiviModulesService {
       enseignants: a
         ? [...a.enseignants.entries()].map(([id, v]) => ({ id, nom: v.nom, heures: v.heures }))
         : [],
-      estTermine: suivi.estTermine,
+      estTermine,
+      // V05 LOT 4 — V5-D10 + V5-D5
+      statut: deriveStatut(estTermine, heuresFaites),
+      responsable,
     };
   }
 

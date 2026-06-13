@@ -12,7 +12,8 @@ import { AnneesService } from '../annees/annees.service';
 import { MaquettesService } from '../maquettes/maquettes.service';
 
 const formationInclude = {
-  filiere: true,
+  // V05 LOT 4.3 — RP responsable surfacé.
+  filiere: { include: { responsableRp: { select: { id: true, fullName: true } } } },
   anneeAcademique: true,
   _count: { select: { classes: true } },
 } satisfies Prisma.FormationInclude;
@@ -149,6 +150,7 @@ export class FormationsService {
 }
 
 function toDto(row: FormationRow): FormationDto {
+  const rp = row.filiere.responsableRp ?? null;
   return {
     id: row.id,
     code: row.code,
@@ -159,6 +161,8 @@ function toDto(row: FormationRow): FormationDto {
     anneeLibelle: row.anneeAcademique.libelle,
     maquetteVersionId: row.maquetteVersionId,
     classeCount: row._count.classes,
+    // V05 LOT 4.3 — V5-D5
+    responsable: rp ? { id: rp.id, fullName: rp.fullName } : null,
   };
 }
 

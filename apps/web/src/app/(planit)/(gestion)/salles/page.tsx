@@ -1,9 +1,10 @@
 'use client';
 
-// Page Salles (V05 LOT 3).
-// - Direction : liste toutes les salles de l'école + CRUD création/modification.
-// - AC : salles de son périmètre RP manager (scope).
-// - RP : placeholder (V04 différé).
+// Page Salles (V05).
+// - Direction (LOT 3) : liste toutes les salles de l'école + CRUD création/modification.
+// - RP (LOT 4.4 / V5-D6) : voit toutes les salles de son école
+//   (siennes + autres RP + communes). Badge « Commune » quand rpResponsable === null.
+// - AC : salles de son périmètre RP manager (scope V03).
 // État interactif (modal, mutations) → 'use client'.
 
 import { useState } from 'react';
@@ -17,7 +18,6 @@ import {
 } from '@planit/contracts';
 import { DoorIcon } from '@planit/ui';
 import { Shell } from '@/components/layout/shell';
-import { ComingSoonPlaceholder } from '@/components/ui/coming-soon-placeholder';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
@@ -28,8 +28,9 @@ import { useIsAc, useIsRp, useIsDirection } from '@/hooks/use-role';
 import { useAcScope } from '@/hooks/use-ac-scope';
 import { useSallesDirectionQuery, usePersonnelQuery } from '@/lib/direction-queries';
 import { useCreateSalleMutation, useUpdateSalleMutation } from '@/lib/direction-mutations';
+import { useSallesFullQuery } from '@/lib/queries-v3';
 
-// ── Vue Direction ─────────────────────────────────────────────────────────────
+// ── Vue Direction (LOT 3) ─────────────────────────────────────────────────────
 
 type SalleModalProps = {
   isOpen: boolean;
@@ -326,7 +327,112 @@ function SallesDirectionView() {
   );
 }
 
-// ── Vue AC ────────────────────────────────────────────────────────────────────
+// ── Vue RP — V05 LOT 4.4 ────────────────────────────────────────────────────
+
+function SallesRpView() {
+  const sallesQuery = useSallesFullQuery();
+  const salles = sallesQuery.data ?? [];
+
+  if (sallesQuery.isLoading) {
+    return <SallesRpTableSkeleton />;
+  }
+  if (sallesQuery.isError) {
+    return (
+      <div className="rounded-2xl border border-err bg-err-100 px-6 py-12 text-center text-sm text-err">
+        Impossible de charger les salles.
+      </div>
+    );
+  }
+  if (salles.length === 0) {
+    return (
+      <div className="rounded-2xl border border-border-soft bg-surface px-6 py-12 text-center text-sm text-text-muted">
+        Aucune salle dans cette école.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border-soft bg-surface shadow-sm">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border-soft bg-bg">
+            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              Salle
+            </th>
+            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              Type
+            </th>
+            <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              Capacité
+            </th>
+            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              Responsable
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {salles.map((salle) => (
+            <SalleRpRow key={salle.id} salle={salle} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SalleRpRow({ salle }: { salle: SalleDto }) {
+  return (
+    <tr className="border-b border-border-soft last:border-b-0 transition-colors hover:bg-bg">
+      <td className="px-4 py-3.5">
+        <div className="flex items-center gap-2.5">
+          <DoorIcon size={16} color="currentColor" />
+          <span className="text-[13.5px] font-semibold text-text">{salle.name}</span>
+        </div>
+      </td>
+      <td className="px-4 py-3.5">
+        <span className="inline-flex items-center rounded-md border border-border bg-bg px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-text-sec">
+          {salle.type}
+        </span>
+      </td>
+      <td className="px-4 py-3.5 text-right tabular-nums text-text-sec">{salle.capacity}</td>
+      <td className="px-4 py-3.5">
+        {salle.rpResponsable === null ? (
+          <span
+            className="inline-flex items-center rounded-full bg-accent-100 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-accent-800"
+            title="Salle commune accessible à tous les RP de l'école"
+          >
+            Commune
+          </span>
+        ) : (
+          <span className="text-[12.5px] text-text">{salle.rpResponsable.fullName}</span>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function SallesRpTableSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border-soft bg-surface shadow-sm">
+      <div className="border-b border-border-soft bg-bg px-5 py-2.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+          Salle
+        </span>
+      </div>
+      {Array.from({ length: 5 }, (_, i) => (
+        <div
+          key={i}
+          className={`px-5 py-3.5 ${i < 4 ? 'border-b border-border-soft' : ''}`}
+          aria-hidden
+        >
+          <div className="h-3.5 w-40 animate-pulse rounded bg-border-soft" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Vue AC (V03 LOT 6, inchangée) ────────────────────────────────────────────
 
 function SallesAcView({
   salles,
@@ -336,21 +442,7 @@ function SallesAcView({
   isLoading: boolean;
 }) {
   if (isLoading) {
-    return (
-      <div className="overflow-hidden rounded-2xl border border-border-soft bg-surface shadow-sm">
-        <div className="border-b border-border-soft bg-bg px-5 py-2.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-            Salle
-          </span>
-        </div>
-        <div className="px-5 py-3.5">
-          <span
-            className="inline-block h-3 w-48 animate-pulse rounded bg-border-soft align-middle"
-            aria-hidden
-          />
-        </div>
-      </div>
-    );
+    return <SallesRpTableSkeleton />;
   }
   if (!salles || salles.length === 0) {
     return (
@@ -383,7 +475,7 @@ function SallesAcView({
   );
 }
 
-// ── Page principale ───────────────────────────────────────────────────────────
+// ── Page principale ──────────────────────────────────────────────────────────
 
 // Next.js App Router requires default export for page
 // eslint-disable-next-line no-restricted-syntax
@@ -402,13 +494,7 @@ export default function SallesPage() {
     >
       {isDirection ? <SallesDirectionView /> : null}
       {isAc ? <SallesAcView salles={scope.data?.salles} isLoading={scope.isLoading} /> : null}
-      {isRp ? (
-        <ComingSoonPlaceholder
-          title="Salles"
-          subtitle="La gestion complète des salles arrive en V04. Pour l'instant, seules les salles assignées à un RP responsable sont visibles côté AC."
-          icon={DoorIcon}
-        />
-      ) : null}
+      {isRp ? <SallesRpView /> : null}
     </Shell>
   );
 }
