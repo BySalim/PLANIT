@@ -25,6 +25,12 @@ export function useIsAc(): boolean {
   return useRole() === 'ASSISTANT_PROGRAMME';
 }
 
+/** V05 — espace Admin système (cross-école). RBAC réel = gardes serveur. */
+export function useIsAdmin(): boolean {
+  const role = useRole();
+  return role === 'ADMIN' || role === 'SUPER_ADMIN';
+}
+
 export function useIsAuthenticated(): boolean {
   const { state } = useAuth();
   return state.status === 'authenticated';
@@ -47,5 +53,13 @@ export function roleLabel(role: UserRole): string {
       return 'Étudiant·e';
     case 'RESPONSABLE_CLASSE':
       return 'Délégué·e';
+    case 'SUPER_ADMIN':
+      return 'Super administrateur·rice';
+    case 'ADMIN':
+      return 'Administrateur·rice';
+    case 'DIRECTION':
+      return 'Direction';
+    case 'PARTENAIRE':
+      return 'Partenaire';
   }
 }

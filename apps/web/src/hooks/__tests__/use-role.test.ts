@@ -11,7 +11,7 @@ import { useRole, useIsAc, useIsRp, useIsAuthenticated, roleLabel } from '../use
 const useAuthMock = vi.mocked(useAuth);
 
 function buildUser(role: AuthMe['role']): AuthMe {
-  return { id: 'u', email: 'x@y', role, fullName: 'N' };
+  return { id: 'u', email: 'x@y', role, fullName: 'N', ecoleId: null, matricule: null };
 }
 
 describe('useRole (et useIs*)', () => {
@@ -98,6 +98,10 @@ describe('roleLabel', () => {
     expect(roleLabel('ENSEIGNANT')).toBe('Enseignant·e');
     expect(roleLabel('ETUDIANT')).toBe('Étudiant·e');
     expect(roleLabel('RESPONSABLE_CLASSE')).toBe('Délégué·e');
+    expect(roleLabel('SUPER_ADMIN')).toBe('Super administrateur·rice');
+    expect(roleLabel('ADMIN')).toBe('Administrateur·rice');
+    expect(roleLabel('DIRECTION')).toBe('Direction');
+    expect(roleLabel('PARTENAIRE')).toBe('Partenaire');
   });
 
   it('ne contient jamais « AP » (alias interdit V3-D9)', () => {

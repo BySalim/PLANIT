@@ -26,6 +26,8 @@ const RP: AuthMe = {
   email: 'rp@planit',
   role: 'RESPONSABLE_PROGRAMME',
   fullName: 'Aïssatou Diallo',
+  ecoleId: 'ecole-ism',
+  matricule: null,
 };
 
 beforeEach(() => {
