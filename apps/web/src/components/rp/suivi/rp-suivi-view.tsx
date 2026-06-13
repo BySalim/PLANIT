@@ -11,6 +11,8 @@ import { SearchInput } from '@/components/ui/search-input';
 import { Select } from '@/components/ui/select';
 import { SuiviSeancesDrawer } from '@/components/rp/suivi/suivi-seances-drawer';
 import { SuiviTableSkeleton } from '@/components/rp/suivi/suivi-skeleton';
+import { ResponsableCell } from '@/components/shared/responsable-cell';
+import { StatutPill } from '@/components/shared/statut-pill';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouvrirSuiviMutation, useTerminerSuiviMutation } from '@/lib/mutations-v3';
 import { useClassesQuery } from '@/lib/queries-v2';
@@ -248,6 +250,12 @@ function SuiviTable({
             <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Classe
             </th>
+            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              Statut
+            </th>
+            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              Responsable
+            </th>
             <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Prévu
             </th>
@@ -353,6 +361,12 @@ function SuiviRow({
         <span className="inline-flex h-5 items-center rounded bg-bg px-1.5 font-mono text-[11.5px] font-semibold text-text">
           {suivi.classeCode ?? '—'}
         </span>
+      </td>
+      <td className="px-4 py-3.5">
+        <StatutPill statut={suivi.statut} />
+      </td>
+      <td className="px-4 py-3.5">
+        <ResponsableCell responsable={suivi.responsable} />
       </td>
       <td className="px-4 py-3.5 text-right tabular-nums text-text-sec">
         {formatHours(suivi.heuresPrevues)}

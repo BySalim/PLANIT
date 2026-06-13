@@ -54,7 +54,10 @@ export class MaquettesService {
     const rows = await this.prisma.maquette.findMany({
       where: { filiere: { ecoleId } },
       orderBy: [{ niveau: 'asc' }, { nom: 'asc' }],
-      include: { filiere: true, _count: { select: { versions: true } } },
+      include: {
+        filiere: { include: { responsableRp: { select: { id: true, fullName: true } } } },
+        _count: { select: { versions: true } },
+      },
     });
     return rows.map(toMaquetteDto);
   }
@@ -62,7 +65,10 @@ export class MaquettesService {
   async findOne(id: string): Promise<MaquetteDto> {
     const row = await this.prisma.maquette.findUnique({
       where: { id },
-      include: { filiere: true, _count: { select: { versions: true } } },
+      include: {
+        filiere: { include: { responsableRp: { select: { id: true, fullName: true } } } },
+        _count: { select: { versions: true } },
+      },
     });
     if (!row) throw new NotFoundException(`Maquette ${id} introuvable`);
     return toMaquetteDto(row);
@@ -238,7 +244,12 @@ export class MaquettesService {
       include: {
         anneeAcademique: true,
         modules: { include: moduleInclude, orderBy: [{ semestre: 'asc' }] },
-        maquette: { include: { filiere: true, _count: { select: { versions: true } } } },
+        maquette: {
+          include: {
+            filiere: { include: { responsableRp: { select: { id: true, fullName: true } } } },
+            _count: { select: { versions: true } },
+          },
+        },
       },
     });
     if (!version) throw new NotFoundException(`Version de maquette ${vid} introuvable`);
@@ -310,10 +321,14 @@ export class MaquettesService {
 // ── Mappers ──────────────────────────────────────────────────────────────
 
 type MaquetteRow = Prisma.MaquetteGetPayload<{
-  include: { filiere: true; _count: { select: { versions: true } } };
+  include: {
+    filiere: { include: { responsableRp: { select: { id: true; fullName: true } } } };
+    _count: { select: { versions: true } };
+  };
 }>;
 
 function toMaquetteDto(row: MaquetteRow): MaquetteDto {
+  const rp = row.filiere.responsableRp ?? null;
   return {
     id: row.id,
     nom: row.nom,
@@ -323,6 +338,8 @@ function toMaquetteDto(row: MaquetteRow): MaquetteDto {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     versionCount: row._count.versions,
+    // V05 LOT 4.3 — V5-D5
+    responsable: rp ? { id: rp.id, fullName: rp.fullName } : null,
   };
 }
 

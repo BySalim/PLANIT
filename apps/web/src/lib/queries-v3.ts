@@ -7,6 +7,7 @@ import {
   type FormationDto,
   type MaquetteDto,
   type MaquetteVersionDto,
+  type SalleDto,
   type SessionV2Dto,
   type SuiviModuleDto,
   type SuiviModuleQueryDto,
@@ -17,6 +18,7 @@ import {
   formationSchema,
   maquetteSchema,
   maquetteVersionSchema,
+  salleListSchema,
   sessionV2Schema,
   suiviModuleSchema,
   z,
@@ -75,6 +77,8 @@ export const academicKeys = {
     [...academicKeys.all, 'suivi-modules', query] as const,
   suiviSeances: (suiviId: string) =>
     [...academicKeys.all, 'suivi-modules', suiviId, 'seances'] as const,
+  // V05 LOT 4.4 (Libasse) — salles full (SalleDto avec rpResponsable + commune dérivée).
+  salles: () => [...academicKeys.all, 'salles'] as const,
 };
 
 const maquetteListSchema = maquetteSchema.array();
@@ -399,6 +403,19 @@ export function useSuiviSeancesQuery(suiviId: string | null) {
     queryKey: academicKeys.suiviSeances(suiviId ?? ''),
     queryFn: () => apiGet(`/suivi-modules/${suiviId}/seances`, sessionV2ListSchema),
     enabled: state.status === 'authenticated' && suiviId !== null,
+    staleTime: 60 * 1000,
+  });
+}
+
+// V05 LOT 4.4 — Liste salles complète (SalleDto) avec rpResponsable. Le scope
+// école est appliqué côté serveur ([salles.service.ts:48-52]) : un RP voit
+// siennes + autres RP + communes de son école.
+export function useSallesFullQuery() {
+  const { state } = useAuth();
+  return useQuery<SalleDto[]>({
+    queryKey: academicKeys.salles(),
+    queryFn: () => apiGet('/salles', salleListSchema),
+    enabled: state.status === 'authenticated',
     staleTime: 60 * 1000,
   });
 }
