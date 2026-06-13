@@ -25,6 +25,11 @@ export function useIsAc(): boolean {
   return useRole() === 'ASSISTANT_PROGRAMME';
 }
 
+/** V05 LOT 3 — Direction d'école (périmètre école). RBAC réel = gardes serveur. */
+export function useIsDirection(): boolean {
+  return useRole() === 'DIRECTION';
+}
+
 /** V05 — espace Admin système (cross-école). RBAC réel = gardes serveur. */
 export function useIsAdmin(): boolean {
   const role = useRole();
