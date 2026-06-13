@@ -84,6 +84,42 @@ export function SessionCard({
   const barColor = hasConflict ? 'var(--color-err)' : palette.bar;
   const textColor = hasConflict ? 'var(--color-err)' : palette.text;
 
+  // V05 LOT 6 (ADR-0022 §4) — séance d'un autre RP vue dans le référentiel Salle :
+  // carte assombrie/hachurée, seuls le créneau et le RP propriétaire sont
+  // visibles. Aucune interaction (pas de détail, pas de drag).
+  if (session.masked) {
+    return (
+      <div
+        title={session.ownerRpName ? `Occupé — ${session.ownerRpName}` : 'Occupé'}
+        aria-label={`Créneau occupé de ${startLabel} à ${endLabel}${
+          session.ownerRpName ? ` par ${session.ownerRpName}` : ''
+        }`}
+        className="relative h-full w-full overflow-hidden rounded-[10px] border border-dashed border-border bg-bg text-left"
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-60"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(45deg, transparent, transparent 6px, var(--color-border-soft) 6px, var(--color-border-soft) 7px)',
+          }}
+          aria-hidden
+        />
+        <div className="relative flex h-full flex-col gap-0.5 px-2.5 py-1.5">
+          <div className="text-[12px] font-semibold text-text-sec">Occupé</div>
+          <div className="text-[11px] tabular-nums text-text-muted">
+            {startLabel}&nbsp;–&nbsp;{endLabel}
+          </div>
+          {session.ownerRpName ? (
+            <div className="mt-auto flex items-center gap-1 truncate text-[11px] text-text-muted">
+              <UserSmallIcon size={11} color="currentColor" />
+              <span className="truncate">{session.ownerRpName}</span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"

@@ -8,7 +8,11 @@ import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
 import { RowActionButton } from '@/components/ui/row-action-button';
 import { useAuth } from '@/contexts/auth-context';
-import { useRouvrirSuiviMutation, useTerminerSuiviMutation } from '@/lib/mutations-v3';
+import {
+  useDeleteInscriptionMutation,
+  useRouvrirSuiviMutation,
+  useTerminerSuiviMutation,
+} from '@/lib/mutations-v3';
 import { useClasseEtudiantsQuery, useClasseQuery, useClasseSuiviQuery } from '@/lib/queries-v3';
 import { InscriptionModal } from '@/components/inscriptions/inscription-modal';
 import {
@@ -207,7 +211,12 @@ export default function ClasseFichePage() {
   const suiviQuery = useClasseSuiviQuery(id);
 
   const { state } = useAuth();
-  const isRP = state.status === 'authenticated' && state.user.role === 'RESPONSABLE_PROGRAMME';
+  const role = state.status === 'authenticated' ? state.user.role : null;
+  const isRP = role === 'RESPONSABLE_PROGRAMME';
+  // V05 LOT 6 — l'AC gère le roster de ses classes assignées (inscrire/retirer) ;
+  // la Direction consulte sans gérer (lecture/pilotage).
+  const canManageRoster = isRP || role === 'ASSISTANT_PROGRAMME';
+  const deleteInscription = useDeleteInscriptionMutation();
 
   const classe = classeQuery.data;
   const etudiants = etudiantsQuery.data ?? [];
@@ -330,9 +339,11 @@ export default function ClasseFichePage() {
                 <span className="text-[12px] font-semibold text-text-sec">
                   {etudiants.length} étudiant{etudiants.length > 1 ? 's' : ''}
                 </span>
-                <Button variant="primary" size="sm" onClick={() => setInscriptionOpen(true)}>
-                  + Inscrire un étudiant
-                </Button>
+                {canManageRoster ? (
+                  <Button variant="primary" size="sm" onClick={() => setInscriptionOpen(true)}>
+                    + Inscrire un étudiant
+                  </Button>
+                ) : null}
               </div>
               {etudiantsQuery.isLoading ? (
                 <ClasseEtudiantsTabSkeleton />
@@ -344,7 +355,7 @@ export default function ClasseFichePage() {
                 etudiants.map((s, idx) => (
                   <div
                     key={s.id}
-                    className={`grid grid-cols-[1.4fr_1fr_140px] items-center gap-3 px-4 py-3 ${
+                    className={`grid grid-cols-[1.4fr_1fr_120px_auto] items-center gap-3 px-4 py-3 ${
                       idx < etudiants.length - 1 ? 'border-b border-border-soft' : ''
                     }`}
                   >
@@ -360,6 +371,24 @@ export default function ClasseFichePage() {
                     <span className="font-mono text-[11px] text-text-muted">
                       {s.matricule ?? ''}
                     </span>
+                    {/* V05 LOT 6 — retrait d'un étudiant (RP/AC scopé serveur). */}
+                    <div className="flex justify-end">
+                      {canManageRoster && s.inscriptionId !== undefined ? (
+                        <button
+                          type="button"
+                          title="Retirer de la classe"
+                          onClick={() => {
+                            if (window.confirm(`Retirer ${s.nomComplet} de la classe ?`)) {
+                              deleteInscription.mutate({ id: s.inscriptionId as string });
+                            }
+                          }}
+                          disabled={deleteInscription.isPending}
+                          className="flex h-8 items-center rounded-lg border border-border px-2.5 text-[12px] font-medium text-text-muted transition-colors hover:border-err hover:bg-err-100 hover:text-err disabled:opacity-50"
+                        >
+                          Retirer
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 ))
               )}

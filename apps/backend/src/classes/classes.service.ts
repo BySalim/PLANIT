@@ -141,6 +141,8 @@ export class ClassesService {
       nomComplet: i.etudiant.fullName,
       email: i.etudiant.email,
       matricule: i.etudiant.matricule,
+      // V05 LOT 6 — id d'inscription pour permettre le retrait (RP/AC scopé).
+      inscriptionId: i.id,
     }));
   }
 

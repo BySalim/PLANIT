@@ -80,17 +80,17 @@ export class AcController {
 
   @Put(':acId/classes')
   @Roles('DIRECTION')
-  @HttpCode(204)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: "Définir les classes assignées d'un AC (Direction, école-large)" })
-  @ApiResponse({ status: 204, description: 'Assignations mises à jour' })
+  @ApiResponse({ status: 200, description: 'Assignations mises à jour' })
   @ApiResponse({ status: 400, description: 'Classe hors de votre école' })
   @ApiResponse({ status: 404, description: 'AC introuvable / hors école' })
   async setClasses(
     @CurrentUser() user: CurrentUserPayload,
     @Param('acId') acId: string,
     @Body(new ZodValidationPipe(setAcClassesSchema)) dto: SetAcClassesDto,
-  ): Promise<void> {
-    await this.acScope.setClassesByDirection(user, acId, dto.classeIds);
+  ): Promise<{ classeIds: string[] }> {
+    const classeIds = await this.acScope.setClassesByDirection(user, acId, dto.classeIds);
+    return { classeIds };
   }
 }

@@ -26,6 +26,9 @@ function buildSession(overrides: Partial<SessionV2Dto> = {}): SessionV2Dto {
     enseignant: { id: 'teacher-1', nomComplet: 'M. Oumar Ndiaye' },
     salle: { id: 'salle-1', name: 'Amphi A' },
     classes: [{ id: 'classe-1', code: 'GL3-A', name: 'Génie Logiciel 3 A' }],
+    ownerRpId: 'rp-1',
+    ownerRpName: 'Mme Aminata Diallo',
+    masked: false,
     ...overrides,
   };
 }

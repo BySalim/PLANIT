@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronRightIcon } from '@planit/ui';
 import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
+import { useIsDirection } from '@/hooks/use-role';
 import { useFilieresQuery } from '@/lib/queries';
 import { useAnneesQuery, useFormationsQuery } from '@/lib/queries-v3';
 import { FormationModal } from '@/components/rp/formations/formation-modal';
@@ -32,6 +33,8 @@ const COLS = 'grid grid-cols-[150px_70px_1fr_120px_180px_auto] items-center gap-
 // ── Page ──────────────────────────────────────────────────────────────
 export default function FormationsPage() {
   const router = useRouter();
+  // V05 LOT 6 — Direction en lecture seule sur l'offre de formation (ADR-0020 §7).
+  const readOnly = useIsDirection();
 
   const [filiereFilter, setFiliereFilter] = useState('');
   const [anneeFilter, setAnneeFilter] = useState('');
@@ -101,9 +104,11 @@ export default function FormationsPage() {
             ))}
           </select>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
-          + Nouvelle formation
-        </Button>
+        {readOnly ? null : (
+          <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
+            + Nouvelle formation
+          </Button>
+        )}
       </div>
 
       {/* Content */}
@@ -116,9 +121,11 @@ export default function FormationsPage() {
       ) : !formations || formations.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16">
           <p className="text-sm text-text-muted">Aucune formation pour ce filtre.</p>
-          <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
-            Créer une formation
-          </Button>
+          {readOnly ? null : (
+            <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
+              Créer une formation
+            </Button>
+          )}
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border-soft bg-surface shadow-sm">

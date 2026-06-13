@@ -285,6 +285,10 @@ export const etudiantSchema = z.object({
   nomComplet: z.string().min(1).max(120),
   email: z.string().email(),
   matricule: z.string().max(40).nullable(),
+  // V05 LOT 6 — id de l'inscription dans la classe consultée (roster d'une classe
+  // uniquement) : permet le retrait d'un étudiant (RP/AC). Absent de la liste
+  // globale Étudiants (qui n'est pas rattachée à une classe).
+  inscriptionId: cuid.optional(),
 });
 export type EtudiantDto = z.infer<typeof etudiantSchema>;
 

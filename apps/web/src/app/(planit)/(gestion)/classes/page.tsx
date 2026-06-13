@@ -6,11 +6,12 @@ import { type ClasseV3Dto } from '@planit/contracts';
 import { ChevronRightIcon } from '@planit/ui';
 import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
-import { useIsRp } from '@/hooks/use-role';
+import { useIsDirection, useIsRp } from '@/hooks/use-role';
 import { useFilieresQuery } from '@/lib/queries';
 import { useAnneesQuery, useClassesV3Query } from '@/lib/queries-v3';
 import { ClasseModal } from '@/components/rp/classes/classe-modal';
 import { ClassesTableSkeleton } from '@/components/rp/classes/classes-table-skeleton';
+import { AssignAcModal } from '@/components/direction/assign-ac-modal';
 import { ResponsableCell } from '@/components/shared/responsable-cell';
 
 // ── Icône inline ──────────────────────────────────────────────────────
@@ -77,19 +78,22 @@ type ModalState =
   | { open: true; mode: 'create' }
   | { open: true; mode: 'edit'; initial: ClasseV3Dto };
 
-const COLS = 'grid grid-cols-[1.7fr_120px_110px_180px_190px_auto] items-center gap-3';
+// V05 LOT 6 — colonne « Année » retirée (filtre année conservé dans la toolbar).
+const COLS = 'grid grid-cols-[1.7fr_120px_180px_190px_auto] items-center gap-3';
 
 // ── Page (inner — useSearchParams nécessite un Suspense en Next 15) ────
 function ClassesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRp = useIsRp();
+  const isDirection = useIsDirection();
 
   const [searchInput, setSearchInput] = useState('');
   const [q, setQ] = useState('');
   const [filiereFilter, setFiliereFilter] = useState(searchParams.get('filiere') ?? '');
   const [anneeFilter, setAnneeFilter] = useState('');
   const [modal, setModal] = useState<ModalState>({ open: false });
+  const [assignOpen, setAssignOpen] = useState(false);
 
   // Debounce de la recherche (évite un fetch par frappe).
   useEffect(() => {
@@ -181,6 +185,12 @@ function ClassesPageInner() {
             + Nouvelle classe
           </Button>
         ) : null}
+        {/* V05 LOT 6 — la Direction assigne des classes à un AC depuis la liste. */}
+        {isDirection ? (
+          <Button variant="primary" size="sm" onClick={() => setAssignOpen(true)}>
+            Assigner à un AC
+          </Button>
+        ) : null}
       </div>
 
       {/* Content */}
@@ -212,9 +222,6 @@ function ClassesPageInner() {
             </span>
             <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Double diplôme
-            </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-              Année
             </span>
             <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Responsable
@@ -253,11 +260,6 @@ function ClassesPageInner() {
                   <span className="text-text-faint">—</span>
                 )}
               </div>
-
-              {/* Année */}
-              <span className="text-[13px] tabular-nums text-text-sec">
-                {c.anneeLibelle ?? '—'}
-              </span>
 
               {/* Responsable (V05 LOT 4.3) */}
               <ResponsableCell responsable={c.responsable ?? null} />
@@ -299,6 +301,14 @@ function ClassesPageInner() {
           onClose={() => setModal({ open: false })}
           mode={modal.open ? modal.mode : 'create'}
           initial={modal.open && modal.mode === 'edit' ? modal.initial : undefined}
+        />
+      ) : null}
+
+      {isDirection ? (
+        <AssignAcModal
+          isOpen={assignOpen}
+          onClose={() => setAssignOpen(false)}
+          classes={classes ?? []}
         />
       ) : null}
     </Shell>

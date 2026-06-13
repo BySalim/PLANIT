@@ -29,6 +29,12 @@ export const sallesDirectionKeys = {
   list: () => [...sallesDirectionKeys.all, 'list'] as const,
 };
 
+// V05 LOT 6 — classes assignées d'un AC (assignation par la Direction).
+export const acClassesKeys = {
+  all: ['ac-classes'] as const,
+  byAc: (acId: string) => [...acClassesKeys.all, acId] as const,
+};
+
 // ── Personnel ─────────────────────────────────────────────────────────────────
 
 const personnelListSchema = z.array(personnelSchema);
@@ -68,6 +74,20 @@ export function useSallesDirectionQuery() {
     queryKey: sallesDirectionKeys.list(),
     queryFn: () => apiGet('/salles', sallesListSchema),
     enabled: isDirection && state.status === 'authenticated',
+  });
+}
+
+// ── Classes assignées d'un AC (V05 LOT 6 / ADR-0022 §7) ─────────────────────────
+
+export const acClasseIdsSchema = z.object({ classeIds: z.array(z.string()) });
+
+export function useAcClassesQuery(acId: string | null) {
+  const isDirection = useIsDirection();
+  const { state } = useAuth();
+  return useQuery<{ classeIds: string[] }>({
+    queryKey: acClassesKeys.byAc(acId ?? ''),
+    queryFn: () => apiGet(`/ac/${acId ?? ''}/classes`, acClasseIdsSchema),
+    enabled: isDirection && state.status === 'authenticated' && acId !== null,
   });
 }
 

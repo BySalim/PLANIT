@@ -1,8 +1,9 @@
 'use client';
 
-import { ChevronDownIcon, DownloadIcon, LayersIcon, PlusIcon } from '@planit/ui';
+import { ChevronDownIcon, DownloadIcon, PlusIcon } from '@planit/ui';
 import { cn } from '@/lib/utils';
 import { ExportMenu, type ExportFormat } from '@/components/ui/export-menu';
+import { ReferentielValuePicker } from './referentiel-value-picker';
 import { ViewModeTabs, type ViewMode } from './view-mode-tabs';
 import { WeekNavigator } from './week-navigator';
 
@@ -12,7 +13,9 @@ interface PlanningToolbarProps {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onCreateSession: () => void;
-  selectedClassLabel?: string | undefined;
+  // V05 LOT 6 — référentiel planning (mode via ViewModeTabs + valeur contextuelle).
+  referentielId: string;
+  onReferentielChange: (id: string) => void;
   // I.6 — undo/redo wiring (V2-D11). Pile vidée au publish.
   canUndo?: boolean | undefined;
   canRedo?: boolean | undefined;
@@ -79,29 +82,6 @@ function UndoRedoButton({
   );
 }
 
-function ClassSelector({ label = 'M1 IA' }: { label?: string | undefined }) {
-  return (
-    <button
-      type="button"
-      disabled
-      title="Sélecteur de classe (V2)"
-      aria-label="Sélectionner une classe"
-      className="inline-flex h-8 flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border-soft bg-surface px-2.5 text-[12.5px] font-semibold text-text"
-    >
-      <span className="text-[10px] font-medium uppercase tracking-wider text-text-muted">
-        Classe
-      </span>
-      <span className="text-text-muted">
-        <LayersIcon size={13} color="currentColor" />
-      </span>
-      <span>{label}</span>
-      <span className="text-text-muted">
-        <ChevronDownIcon size={12} color="currentColor" />
-      </span>
-    </button>
-  );
-}
-
 // LOT 7 (X.2) — fallback désactivé quand l'export n'est pas encore prêt
 // (onExport absent / données en chargement). Le menu actif est délégué au
 // composant réutilisable `ExportMenu` (portail, échappe au clipping toolbar).
@@ -144,7 +124,8 @@ export function PlanningToolbar({
   viewMode,
   onViewModeChange,
   onCreateSession,
-  selectedClassLabel,
+  referentielId,
+  onReferentielChange,
   canUndo = false,
   canRedo = false,
   onUndo,
@@ -155,7 +136,7 @@ export function PlanningToolbar({
 }: PlanningToolbarProps) {
   return (
     <div className="flex h-[52px] flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-border-soft bg-surface px-3">
-      {/* Left : undo/redo + week nav + class selector */}
+      {/* Left : undo/redo + week nav + sélecteur de référentiel (RP) */}
       {readOnly ? null : (
         <>
           <div className="flex flex-shrink-0 items-center gap-1">
@@ -166,14 +147,23 @@ export function PlanningToolbar({
         </>
       )}
       <WeekNavigator weekStart={weekStart} onChange={onWeekChange} />
-      <ToolbarSeparator />
-      <ClassSelector label={selectedClassLabel} />
+      {/* V05 LOT 6 — référentiel (Mon espace / Classe / Salle / Enseignant) : RP. */}
+      {readOnly ? null : (
+        <>
+          <ToolbarSeparator />
+          <ViewModeTabs active={viewMode} onChange={onViewModeChange} />
+          <ReferentielValuePicker
+            mode={viewMode}
+            value={referentielId}
+            onChange={onReferentielChange}
+          />
+        </>
+      )}
 
       {/* Spacer pushes the right cluster to the edge */}
       <div className="min-w-2 flex-1" />
 
-      {/* Right : view modes + export + (new session si RP) */}
-      <ViewModeTabs active={viewMode} onChange={onViewModeChange} />
+      {/* Right : export + (new session si RP) */}
       {onExport === undefined ? (
         <ExportDisabled />
       ) : (

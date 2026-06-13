@@ -163,7 +163,7 @@ export class AcScopeService {
     user: CurrentUserPayload,
     acId: string,
     classeIds: string[],
-  ): Promise<void> {
+  ): Promise<string[]> {
     await this.assertAcInEcole(user.ecoleId, acId);
     const unique = [...new Set(classeIds)];
     if (unique.length > 0) {
@@ -184,5 +184,6 @@ export class AcScopeService {
       this.prisma.assistantClasse.deleteMany({ where: { acId } }),
       ...unique.map((classeId) => this.prisma.assistantClasse.create({ data: { acId, classeId } })),
     ]);
+    return unique;
   }
 }

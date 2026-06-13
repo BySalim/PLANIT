@@ -233,7 +233,7 @@ describe('Assignation AC par la Direction (ADR-0022 §7)', () => {
       .put(`/api/ac/${ac.userId}/classes`)
       .set('Cookie', direction.cookieHeader)
       .send({ classeIds: [classeId] })
-      .expect(204);
+      .expect(200);
 
     const got = await api()
       .get(`/api/ac/${ac.userId}/classes`)

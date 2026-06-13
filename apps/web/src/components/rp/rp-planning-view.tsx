@@ -58,8 +58,26 @@ export function RpPlanningView() {
 
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('classique');
+  // V05 LOT 6 — valeur du référentiel choisi (classe/salle/enseignant). Vidée
+  // quand le mode change.
+  const [referentielId, setReferentielId] = useState('');
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    setReferentielId('');
+  }, []);
   const [scope, setScope] = useState<ViewScope>('week');
-  const sessionsQuery = useV2WeekSessionsQuery(weekStart);
+
+  // Mappe (mode, valeur) → filtre de requête. « Mon espace » = aucun filtre
+  // (isolation RP côté serveur). Salle = occupation école masquée (ADR-0022 §4).
+  const referentielOptions = useMemo(() => {
+    if (referentielId === '') return undefined;
+    if (viewMode === 'classe') return { classeId: referentielId };
+    if (viewMode === 'salle') return { salleId: referentielId };
+    if (viewMode === 'prof') return { teacherId: referentielId };
+    return undefined;
+  }, [viewMode, referentielId]);
+
+  const sessionsQuery = useV2WeekSessionsQuery(weekStart, referentielOptions);
   const sessions = useMemo(() => sessionsQuery.data ?? [], [sessionsQuery.data]);
 
   const handleExport = useCallback(
@@ -143,7 +161,9 @@ export function RpPlanningView() {
           weekStart={weekStart}
           onWeekChange={setWeekStart}
           viewMode={viewMode}
-          onViewModeChange={setViewMode}
+          onViewModeChange={handleViewModeChange}
+          referentielId={referentielId}
+          onReferentielChange={setReferentielId}
           onCreateSession={() => setCreateOpen(true)}
           canUndo={undoStack.canUndo}
           canRedo={undoStack.canRedo}
