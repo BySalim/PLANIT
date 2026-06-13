@@ -132,6 +132,7 @@ describe('academic — salle nullable rpResponsable', () => {
       type: 'Amphi',
       capacity: 120,
       rpResponsable: null,
+      isSubjective: false,
     });
     expect(parsed.rpResponsable).toBeNull();
   });
