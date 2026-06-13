@@ -21,6 +21,8 @@ export class FormationsController {
   constructor(private readonly formations: FormationsService) {}
 
   @Get()
+  // V05 LOT 2 — Direction lit les formations de son école.
+  @Roles('RESPONSABLE_PROGRAMME', 'DIRECTION')
   @ApiOperation({ summary: 'Liste des formations (défaut : année courante)' })
   @ApiQuery({ name: 'anneeId', required: false })
   @ApiQuery({ name: 'filiereId', required: false })
@@ -40,6 +42,7 @@ export class FormationsController {
   }
 
   @Get(':id')
+  @Roles('RESPONSABLE_PROGRAMME', 'DIRECTION')
   @ApiOperation({ summary: 'Détail formation (filière, année, version, compteur de classes)' })
   @ApiResponse({ status: 200, description: 'Formation trouvée' })
   @ApiResponse({ status: 404, description: 'Formation introuvable' })

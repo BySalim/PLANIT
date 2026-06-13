@@ -17,6 +17,8 @@ export class FilieresController {
   constructor(private readonly filieres: FilieresService) {}
 
   @Get()
+  // V05 LOT 2 — Direction lit le référentiel de son école (scopé via ecoleId JWT).
+  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME', 'DIRECTION')
   @ApiOperation({ summary: 'Liste des filières de son école' })
   @ApiResponse({ status: 200, description: 'Liste filières' })
   list(@CurrentUser() user: CurrentUserPayload): Promise<FiliereDto[]> {
@@ -24,6 +26,7 @@ export class FilieresController {
   }
 
   @Get(':id')
+  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME', 'DIRECTION')
   @ApiOperation({ summary: 'Détail filière' })
   @ApiResponse({ status: 200, description: 'Filière trouvée' })
   @ApiResponse({ status: 404, description: 'Filière introuvable' })

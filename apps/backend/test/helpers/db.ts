@@ -40,6 +40,8 @@ export async function resetDb(prisma: PrismaClient): Promise<void> {
   await prisma.maquette.deleteMany();
   await prisma.enseignant.deleteMany();
   await prisma.refreshToken.deleteMany();
+  // V05 — AuditLog référence User (actorId) : doit être purgé avant User.
+  await prisma.auditLog.deleteMany();
   await prisma.user.deleteMany();
   await prisma.classe.deleteMany();
   await prisma.module.deleteMany();

@@ -61,6 +61,14 @@ export class AuthService {
       throw new UnauthorizedException('Identifiants invalides');
     }
 
+    // V05 LOT 2 — garde statut : un compte suspendu ne peut plus se connecter
+    // (ADR-0020 §6). Le message reste générique pour ne pas révéler l'état du
+    // compte à un attaquant.
+    if (user.statut === 'SUSPENDU') {
+      this.logger.warn({ userId: user.id }, '[auth] login failed: account suspended');
+      throw new UnauthorizedException('Identifiants invalides');
+    }
+
     const familyId = randomUUID();
     const tokens = await this.issueTokens(
       { id: user.id, email: user.email, role: user.role, ecoleId: user.ecoleId },

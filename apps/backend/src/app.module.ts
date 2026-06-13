@@ -5,6 +5,7 @@ import { AcademicModule } from './academic/academic.module';
 import { AcModule } from './ac/ac.module';
 import { AnneesModule } from './annees/annees.module';
 import { AuthModule } from './auth/auth.module';
+import { DirectionModule } from './direction/direction.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { ClassesModule } from './classes/classes.module';
@@ -65,6 +66,8 @@ const DEFAULT_LIMIT = isTest ? 10_000 : 100;
     EtudiantsModule,
     InscriptionsModule,
     SuiviModulesModule,
+    // V05 LOT 2 — Direction scope école : personnel, audit, transitions année, salles
+    DirectionModule,
   ],
   providers: [
     // Ordre important : throttler → auth → RBAC.
