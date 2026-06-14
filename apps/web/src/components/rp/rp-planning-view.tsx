@@ -112,7 +112,12 @@ export function RpPlanningView() {
   // Colonnes des vues by-X selon la dimension de l'onglet.
   const byEntityColumns = useMemo<ByEntityColumn[]>(() => {
     if (viewMode === 'classe') {
-      return (classesQuery.data ?? []).map((c) => ({ id: c.id, label: c.code, sub: c.name }));
+      return (classesQuery.data ?? []).map((c) => ({
+        id: c.id,
+        label: c.code,
+        sub: c.name,
+        ...(c.niveau ? { badge: c.niveau } : {}),
+      }));
     }
     if (viewMode === 'salle') {
       return (sallesQuery.data ?? []).map((s) => ({ id: s.id, label: s.name }));

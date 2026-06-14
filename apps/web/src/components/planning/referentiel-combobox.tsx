@@ -17,6 +17,8 @@ interface Option {
   id: string;
   label: string;
   sub?: string;
+  // V05 LOT 7.1 — niveau de la classe (L1…M2), affiché en badge.
+  badge?: string;
 }
 
 const DIM_LABEL: Record<ReferentielDim, string> = {
@@ -61,7 +63,12 @@ export function ReferentielCombobox({ dim, value, onChange }: ReferentielCombobo
 
   const optionsByDim = useMemo<Record<ReferentielDim, Option[]>>(
     () => ({
-      classe: (classesQuery.data ?? []).map((c) => ({ id: c.id, label: c.code, sub: c.name })),
+      classe: (classesQuery.data ?? []).map((c) => ({
+        id: c.id,
+        label: c.code,
+        sub: c.name,
+        ...(c.niveau ? { badge: c.niveau } : {}),
+      })),
       salle: (sallesQuery.data ?? []).map((s) => ({ id: s.id, label: s.name })),
       prof: (enseignantsQuery.data ?? []).map((t) => ({
         id: t.id,
@@ -103,6 +110,11 @@ export function ReferentielCombobox({ dim, value, onChange }: ReferentielCombobo
           {DIM_LABEL[dim]}
         </span>
         <span className="flex-1 text-left">{buttonValue}</span>
+        {current?.badge ? (
+          <span className="rounded bg-bg px-1.5 py-0.5 text-[9.5px] font-bold text-text-sec">
+            {current.badge}
+          </span>
+        ) : null}
         <ChevronDownIcon size={12} color="currentColor" />
       </button>
 
@@ -157,6 +169,11 @@ export function ReferentielCombobox({ dim, value, onChange }: ReferentielCombobo
                       isActive && 'bg-primary-50',
                     )}
                   >
+                    {o.badge ? (
+                      <span className="flex h-[18px] w-7 flex-shrink-0 items-center justify-center rounded bg-bg-warm text-[9px] font-extrabold text-text-sec">
+                        {o.badge}
+                      </span>
+                    ) : null}
                     <span className="text-[13px] font-semibold text-text">{o.label}</span>
                     {o.sub ? (
                       <span className="truncate text-[11.5px] text-text-muted">{o.sub}</span>

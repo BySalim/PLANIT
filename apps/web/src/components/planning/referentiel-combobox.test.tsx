@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { ReferentielCombobox } from './referentiel-combobox';
 
 vi.mock('@/lib/queries-v2', () => ({
-  useClassesQuery: () => ({ data: [{ id: 'c1', code: 'M1 IA', name: 'Master 1 IA' }] }),
+  useClassesQuery: () => ({
+    data: [{ id: 'c1', code: 'M1 IA', name: 'Master 1 IA', niveau: 'M1' }],
+  }),
   useSallesQuery: () => ({ data: [{ id: 's1', name: 'Amphi A' }] }),
   useEnseignantsQuery: () => ({ data: [{ id: 'e1', nomComplet: 'Dr Sow', specialite: 'IA' }] }),
 }));
@@ -13,6 +15,8 @@ describe('ReferentielCombobox', () => {
     render(<ReferentielCombobox dim="classe" value="c1" onChange={() => {}} />);
     expect(screen.getByText('Classe')).toBeInTheDocument();
     expect(screen.getByText('M1 IA')).toBeInTheDocument();
+    // V05 LOT 7.1 — badge niveau (L1…M2) affiché à côté de la valeur.
+    expect(screen.getByText('M1')).toBeInTheDocument();
     // Popover fermé : pas de recherche.
     expect(screen.queryByPlaceholderText('Rechercher…')).not.toBeInTheDocument();
   });

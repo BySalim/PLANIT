@@ -21,6 +21,8 @@ export interface ByEntityColumn {
   id: string;
   label: string;
   sub?: string | undefined;
+  // V05 LOT 7.1 — badge (niveau de classe L1…M2), affiché dans l'en-tête.
+  badge?: string | undefined;
 }
 
 interface PlanningGridByEntityProps {
@@ -219,8 +221,13 @@ export function PlanningGridByEntity({
             key={col.id}
             className="sticky top-0 z-20 flex h-[42px] flex-col justify-center border-b border-r border-border-soft bg-surface px-2.5 text-center"
           >
-            <span className="truncate text-[11px] font-semibold leading-tight text-text">
-              {col.label}
+            <span className="flex items-center justify-center gap-1 leading-tight">
+              {col.badge ? (
+                <span className="flex-shrink-0 rounded bg-bg-warm px-1 py-px text-[8.5px] font-extrabold text-text-sec">
+                  {col.badge}
+                </span>
+              ) : null}
+              <span className="truncate text-[11px] font-semibold text-text">{col.label}</span>
             </span>
             {col.sub ? (
               <span className="truncate text-[10px] leading-tight text-text-muted">{col.sub}</span>

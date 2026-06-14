@@ -155,12 +155,12 @@ export function PlanningToolbar({
         </>
       )}
       <WeekNavigator weekStart={weekStart} onChange={onWeekChange} />
-      {/* V05 LOT 7 — onglets référentiel + sélecteur contextuel (RP).
-          Classique → combobox (classe/salle/prof) ; by-X → sélecteur de jour. */}
+      {/* V05 LOT 7.1 (réf. PLANIT-IA) — sélecteur de référentiel À GAUCHE (juste
+          après la nav semaine). Classique → combobox (classe/salle/prof) ;
+          by-X → sélecteur de jour. */}
       {readOnly ? null : (
         <>
           <ToolbarSeparator />
-          <ViewModeTabs active={viewMode} onChange={onViewModeChange} />
           {viewMode === 'classique' ? (
             <ReferentielCombobox dim={classicDim} value={classicId} onChange={onClassicChange} />
           ) : (
@@ -172,7 +172,8 @@ export function PlanningToolbar({
       {/* Spacer pushes the right cluster to the edge */}
       <div className="min-w-2 flex-1" />
 
-      {/* Right : export + (new session si RP) */}
+      {/* Right : switcher de type de vue (avant Export) + export + (new session si RP) */}
+      {readOnly ? null : <ViewModeTabs active={viewMode} onChange={onViewModeChange} />}
       {onExport === undefined ? (
         <ExportDisabled />
       ) : (

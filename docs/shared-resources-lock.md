@@ -5,9 +5,10 @@
 
 ## Ressources sous lock actif
 
-| Ressource            | Membre | Depuis | Motif |
-| -------------------- | ------ | ------ | ----- |
-| _(aucun lock actif)_ |        |        |       |
+| Ressource                           | Membre | Depuis     | Motif                                                              |
+| ----------------------------------- | ------ | ---------- | ------------------------------------------------------------------ |
+| `apps/backend/prisma/schema.prisma` | Salim  | 2026-06-14 | V05 LOT 7.1 — modèle `PlanningViewGroup` (groupes de vue planning) |
+| `packages/contracts/`               | Salim  | 2026-06-14 | V05 LOT 7.1 — schémas view-groups + niveau classe                  |
 
 ## Ressources partagées sensibles
 
