@@ -80,8 +80,11 @@ type ModalState =
 
 // V05 LOT 6 — colonne « Année » retirée (filtre année conservé dans la toolbar).
 // Colonne « Responsable » masquée pour le RP (il ne voit que ses classes).
-const cols = (showResponsable: boolean): string =>
-  `grid grid-cols-[1.7fr_120px${showResponsable ? '_180px' : ''}_190px_auto] items-center gap-3`;
+// ⚠️ Classes Tailwind en LITTÉRAL complet : la JIT ne génère pas une valeur
+// arbitraire construite dynamiquement → sinon aucun grid-template-columns,
+// la grille retombe en 1 colonne et les cellules s'empilent.
+const COLS_WITH_RESPONSABLE = 'grid grid-cols-[1.7fr_120px_180px_190px_auto] items-center gap-3';
+const COLS_NO_RESPONSABLE = 'grid grid-cols-[1.7fr_120px_190px_auto] items-center gap-3';
 
 // ── Page (inner — useSearchParams nécessite un Suspense en Next 15) ────
 function ClassesPageInner() {
@@ -91,7 +94,7 @@ function ClassesPageInner() {
   const isDirection = useIsDirection();
   // Le RP ne voit que ses classes → colonne « Responsable » redondante.
   const showResponsable = !isRp;
-  const COLS = cols(showResponsable);
+  const COLS = showResponsable ? COLS_WITH_RESPONSABLE : COLS_NO_RESPONSABLE;
 
   const [searchInput, setSearchInput] = useState('');
   const [q, setQ] = useState('');

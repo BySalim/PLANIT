@@ -42,13 +42,8 @@ function MaquetteItem({ maquette, selected, lastAnnee, onClick }: MaquetteItemPr
         selected ? 'border-l-primary bg-primary-50' : 'border-l-transparent hover:bg-bg-warm',
       )}
     >
-      {/* Ligne 1 : niveau badge */}
-      <div className="mb-1 flex items-center gap-2">
-        <span className="rounded-full bg-bg-warm px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-text-sec">
-          {maquette.niveau}
-        </span>
-      </div>
-      {/* Ligne 2 : nom */}
+      {/* Nom (le niveau est déjà porté par l'accordéon + le nom « Maquette {niveau} {sigle} »
+          → pas de badge niveau redondant ici). */}
       <div className="mb-1 truncate text-[13px] font-semibold text-text">{maquette.nom}</div>
       {/* Ligne 3 : filière + dernière année */}
       <div className="flex items-center justify-between gap-2">

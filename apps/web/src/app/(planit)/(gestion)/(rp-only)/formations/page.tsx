@@ -30,8 +30,10 @@ function SigleBadge({ sigle }: { sigle: string }) {
 
 // Colonne « Responsable » masquée pour le RP (il ne voit que ses propres
 // créations → redondant) ; affichée pour la Direction (offre école-large).
-const cols = (showResponsable: boolean): string =>
-  `grid grid-cols-[150px_70px_1fr_120px${showResponsable ? '_180px' : ''}_auto] items-center gap-3`;
+// ⚠️ Classes Tailwind en LITTÉRAL complet (la JIT n'évalue pas une valeur
+// arbitraire construite dynamiquement → sinon pas de grid-template généré).
+const COLS_WITH_RESPONSABLE = 'grid grid-cols-[150px_70px_1fr_120px_180px_auto] items-center gap-3';
+const COLS_NO_RESPONSABLE = 'grid grid-cols-[150px_70px_1fr_120px_auto] items-center gap-3';
 
 // ── Page ──────────────────────────────────────────────────────────────
 export default function FormationsPage() {
@@ -40,7 +42,7 @@ export default function FormationsPage() {
   const readOnly = useIsDirection();
   // Le RP ne voit que ses formations → la colonne « Responsable » est redondante.
   const showResponsable = !useIsRp();
-  const COLS = cols(showResponsable);
+  const COLS = showResponsable ? COLS_WITH_RESPONSABLE : COLS_NO_RESPONSABLE;
 
   const [filiereFilter, setFiliereFilter] = useState('');
   const [anneeFilter, setAnneeFilter] = useState('');
