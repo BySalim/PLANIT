@@ -52,7 +52,17 @@ export const sessionV2Schema = z.object({
   module: moduleRefSchema.nullable(),
   enseignant: enseignantRefSchema.nullable(),
   salle: salleRefSchema.nullable(),
-  classes: z.array(classeRefSchema).min(1),
+  // V05 LOT 6 (ADR-0022 §4) : une séance masquée (vue Salle, séance d'un autre
+  // RP) n'expose aucune classe → tableau potentiellement vide.
+  classes: z.array(classeRefSchema),
+
+  // V05 LOT 6 — RP créateur (ADR-0022). `masked = true` ⇒ séance d'un autre RP
+  // vue dans le référentiel Salle : seuls le créneau + `ownerRpName` sont
+  // réels, tous les détails (module/enseignant/classes/libellé/description) sont
+  // neutralisés CÔTÉ SERVEUR (jamais transmis). `ownerRpName` null hors masquage.
+  ownerRpId: z.string().nullable(),
+  ownerRpName: z.string().nullable(),
+  masked: z.boolean(),
 });
 
 export type SessionV2Dto = z.infer<typeof sessionV2Schema>;

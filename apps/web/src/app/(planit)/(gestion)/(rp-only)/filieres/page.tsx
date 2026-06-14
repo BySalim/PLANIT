@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { type FiliereDto } from '@planit/contracts';
-import { ChevronRightIcon } from '@planit/ui';
 import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast-provider';
+import { useIsDirection } from '@/hooks/use-role';
 import { useFilieresQuery } from '@/lib/queries';
 import { useDeleteFiliereMutation } from '@/lib/mutations';
 import { FiliereModal } from '@/components/rp/filieres/filiere-modal';
@@ -110,6 +110,9 @@ type ModalState =
 // ── Page ─────────────────────────────────────────────────────────────
 export default function FilieresPage() {
   const toast = useToast();
+  // V05 LOT 6 — la Direction lit l'offre de son école mais ne crée/édite pas
+  // (ADR-0020 §7 : référentiels en lecture seule pour la Direction).
+  const readOnly = useIsDirection();
 
   const { data: filieres, isLoading, isError } = useFilieresQuery();
   const deleteMutation = useDeleteFiliereMutation();
@@ -137,13 +140,15 @@ export default function FilieresPage() {
       {/* Toolbar */}
       <div className="mb-5 flex items-center justify-between">
         <div>{/* filtre à venir */}</div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setModal({ open: true, mode: 'create' })}
-        >
-          + Nouvelle filière
-        </Button>
+        {readOnly ? null : (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setModal({ open: true, mode: 'create' })}
+          >
+            + Nouvelle filière
+          </Button>
+        )}
       </div>
 
       {/* Content */}
@@ -155,14 +160,18 @@ export default function FilieresPage() {
         </div>
       ) : !filieres || filieres.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16">
-          <p className="text-sm text-text-muted">Aucune filière créée.</p>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setModal({ open: true, mode: 'create' })}
-          >
-            Créer une filière
-          </Button>
+          <p className="text-sm text-text-muted">
+            {readOnly ? 'Aucune filière dans votre école.' : 'Aucune filière créée.'}
+          </p>
+          {readOnly ? null : (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setModal({ open: true, mode: 'create' })}
+            >
+              Créer une filière
+            </Button>
+          )}
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border-soft bg-surface shadow-sm">
@@ -208,39 +217,32 @@ export default function FilieresPage() {
                 <GradeBadge grade={filiere.grade} />
               </div>
 
-              {/* Actions */}
+              {/* Actions — masquées pour la Direction (lecture seule, ADR-0020 §7) */}
               <div className="flex items-center justify-end gap-1">
-                {/* Formations (placeholder — V03) */}
-                <button
-                  type="button"
-                  disabled
-                  title="Formations (bientôt disponible)"
-                  className="flex h-8 cursor-not-allowed items-center gap-1 rounded-lg border border-border px-3 text-[12px] font-medium text-text-muted opacity-60"
-                >
-                  Formations
-                  <ChevronRightIcon size={12} color="currentColor" />
-                </button>
+                {readOnly ? null : (
+                  <>
+                    {/* Éditer */}
+                    <button
+                      type="button"
+                      title="Modifier la filière"
+                      onClick={() => setModal({ open: true, mode: 'edit', initial: filiere })}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-text"
+                    >
+                      <PencilIcon />
+                    </button>
 
-                {/* Éditer */}
-                <button
-                  type="button"
-                  title="Modifier la filière"
-                  onClick={() => setModal({ open: true, mode: 'edit', initial: filiere })}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg hover:text-text"
-                >
-                  <PencilIcon />
-                </button>
-
-                {/* Supprimer */}
-                <button
-                  type="button"
-                  title="Supprimer la filière"
-                  onClick={() => void handleDelete(filiere)}
-                  disabled={deleteMutation.isPending}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-err-100 hover:text-err disabled:opacity-50"
-                >
-                  <TrashIcon />
-                </button>
+                    {/* Supprimer */}
+                    <button
+                      type="button"
+                      title="Supprimer la filière"
+                      onClick={() => void handleDelete(filiere)}
+                      disabled={deleteMutation.isPending}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-err-100 hover:text-err disabled:opacity-50"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}

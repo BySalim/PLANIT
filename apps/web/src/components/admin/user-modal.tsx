@@ -20,8 +20,8 @@ import { roleLabel, useRole } from '@/hooks/use-role';
 import { useEcolesQuery } from '@/lib/admin-queries';
 import { useCreateUserMutation, useUpdateUserMutation } from '@/lib/admin-mutations';
 
+// DIRECTION absent : un compte Direction se crée à la création d'une école.
 const BASE_ROLES: readonly Role[] = [
-  'DIRECTION',
   'RESPONSABLE_PROGRAMME',
   'ASSISTANT_PROGRAMME',
   'ENSEIGNANT',

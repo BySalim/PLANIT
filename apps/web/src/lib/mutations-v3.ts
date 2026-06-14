@@ -11,11 +11,14 @@ import {
   type SuiviModuleDto,
   type UpdateClasseV3Dto,
   type UpdateMaquetteModuleDto,
+  type CreateSalleDto,
+  type SalleDto,
   classeV3Schema,
   formationSchema,
   inscriptionSchema,
   maquetteModuleSchema,
   suiviModuleSchema,
+  salleSchema,
 } from '@planit/contracts';
 import { useFlash } from '@planit/ui';
 import { apiDelete, apiPatch, apiPost, apiPut } from './api';
@@ -245,6 +248,40 @@ export function useRouvrirSuiviMutation() {
     },
     onError: (err) => {
       flash.push('error', `Action impossible : ${err.message}`);
+    },
+  });
+}
+
+// ── Salles subjectives (V05 LOT 6 / ADR-0022 §5) — RP créateur ────────
+// Un RP crée/supprime SES salles subjectives (privées). Invalide la liste
+// salles (academicKeys) consommée par la vue Salles RP.
+
+export function useCreateSubjectiveSalleMutation() {
+  const invalidate = useInvalidateAcademic();
+  const flash = useFlash();
+  return useMutation<SalleDto, Error, CreateSalleDto>({
+    mutationFn: (dto) => apiPost('/salles', salleSchema, { ...dto, isSubjective: true }),
+    onSuccess: () => {
+      invalidate();
+      flash.push('success', 'Salle subjective créée');
+    },
+    onError: (err) => {
+      flash.push('error', `Création impossible : ${err.message}`);
+    },
+  });
+}
+
+export function useDeleteSubjectiveSalleMutation() {
+  const invalidate = useInvalidateAcademic();
+  const flash = useFlash();
+  return useMutation<void, Error, { id: string }>({
+    mutationFn: ({ id }) => apiDelete(`/salles/${id}`),
+    onSuccess: () => {
+      invalidate();
+      flash.push('success', 'Salle subjective supprimée');
+    },
+    onError: (err) => {
+      flash.push('error', `Suppression impossible : ${err.message}`);
     },
   });
 }

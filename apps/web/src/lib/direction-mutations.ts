@@ -12,7 +12,13 @@ import {
   type UpdateSalleDto,
 } from '@planit/contracts';
 import { apiPost, apiPut, apiPatch } from './api';
-import { personnelKeys, anneesDirectionKeys, sallesDirectionKeys } from './direction-queries';
+import {
+  personnelKeys,
+  anneesDirectionKeys,
+  sallesDirectionKeys,
+  acClassesKeys,
+  acClasseIdsSchema,
+} from './direction-queries';
 
 // ── Personnel ─────────────────────────────────────────────────────────────────
 
@@ -96,6 +102,19 @@ export function useUpdateSalleMutation() {
     mutationFn: ({ id, dto }) => apiPut(`/salles/${id}`, salleSchema, dto),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: sallesDirectionKeys.all });
+    },
+  });
+}
+
+// ── Assignation AC ↔ classes (V05 LOT 6 / ADR-0022 §7) ──────────────────────────
+
+export function useSetAcClassesMutation() {
+  const qc = useQueryClient();
+  return useMutation<{ classeIds: string[] }, Error, { acId: string; classeIds: string[] }>({
+    mutationFn: ({ acId, classeIds }) =>
+      apiPut(`/ac/${acId}/classes`, acClasseIdsSchema, { classeIds }),
+    onSuccess: (_data, { acId }) => {
+      void qc.invalidateQueries({ queryKey: acClassesKeys.byAc(acId) });
     },
   });
 }

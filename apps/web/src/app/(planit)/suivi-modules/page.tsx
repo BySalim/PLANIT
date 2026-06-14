@@ -34,7 +34,10 @@ function SuiviByRole() {
   if (state.status !== 'authenticated') return null;
   const { role } = state.user;
 
-  if (role === 'RESPONSABLE_PROGRAMME' || role === 'ASSISTANT_PROGRAMME') {
+  // V05 LOT 6 — la Direction consomme la vue de gestion en lecture seule (les
+  // actions Terminer/Rouvrir/bulk sont gated sur `isRP` dans RpSuiviView). Avant,
+  // DIRECTION tombait dans la vue Étudiant → erreur (pas d'inscription).
+  if (role === 'RESPONSABLE_PROGRAMME' || role === 'ASSISTANT_PROGRAMME' || role === 'DIRECTION') {
     return <RpSuiviView />;
   }
   if (role === 'ENSEIGNANT') {

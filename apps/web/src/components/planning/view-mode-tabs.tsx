@@ -16,12 +16,14 @@ interface TabConfig {
   hint?: string;
 }
 
-// V1: only "Classique" is implemented. Other modes will land in Vague 02 (TD-011).
+// V05 LOT 6 (ADR-0022 §4) — référentiel planning : « Mon espace » (séances du RP)
+// ou par Classe / Salle / Enseignant. La vue Salle montre l'occupation de l'école
+// (séances des autres RP masquées).
 const TABS: TabConfig[] = [
-  { id: 'classique', label: 'Classique', enabled: true },
-  { id: 'classe', label: 'Classe', enabled: false, hint: 'Disponible Vague 02' },
-  { id: 'salle', label: 'Salle', enabled: false, hint: 'Disponible Vague 02' },
-  { id: 'prof', label: 'Prof', enabled: false, hint: 'Disponible Vague 02' },
+  { id: 'classique', label: 'Mon espace', enabled: true },
+  { id: 'classe', label: 'Classe', enabled: true },
+  { id: 'salle', label: 'Salle', enabled: true },
+  { id: 'prof', label: 'Enseignant', enabled: true },
 ];
 
 export function ViewModeTabs({ active, onChange }: ViewModeTabsProps) {

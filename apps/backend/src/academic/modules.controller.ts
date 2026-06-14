@@ -3,6 +3,8 @@ import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { Throttle } from '@nestjs/throttler';
 import { updateModuleSchema } from '@planit/contracts';
 import type { ModuleV2Dto, UpdateModuleDto } from '@planit/contracts';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { ModulesService } from './modules.service';
@@ -23,8 +25,9 @@ export class ModulesController {
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateModuleSchema)) dto: UpdateModuleDto,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<ModuleV2Dto> {
-    return this.modules.update(id, dto);
+    return this.modules.update(id, dto, user);
   }
 
   @Delete(':id')
@@ -33,7 +36,7 @@ export class ModulesController {
   @ApiResponse({ status: 204, description: 'Module supprimé' })
   @ApiResponse({ status: 404, description: 'Module introuvable' })
   @ApiResponse({ status: 409, description: 'Module utilisé par des séances' })
-  async remove(@Param('id') id: string): Promise<void> {
-    await this.modules.remove(id);
+  async remove(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload): Promise<void> {
+    await this.modules.remove(id, user);
   }
 }

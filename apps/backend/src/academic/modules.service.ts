@@ -1,15 +1,20 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { CreateModuleDto, ModuleV2Dto, UpdateModuleDto } from '@planit/contracts';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
+import { isRp } from '../common/rp-scope';
 
 @Injectable()
 export class ModulesService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** B.8 — création d'un module sous une UE parente (`ueId` injecté depuis l'URL). */
-  async create(ueId: string, dto: CreateModuleDto): Promise<ModuleV2Dto> {
-    const ue = await this.prisma.uE.findUnique({ where: { id: ueId } });
+  async create(ueId: string, dto: CreateModuleDto, user: CurrentUserPayload): Promise<ModuleV2Dto> {
+    // V05 LOT 6 (ADR-0022) — l'UE parente doit appartenir au RP créateur.
+    const ue = await this.prisma.uE.findFirst({
+      where: { id: ueId, ...(isRp(user.role) ? { ownerRpId: user.id } : {}) },
+    });
     if (!ue) throw new NotFoundException(`UE ${ueId} introuvable`);
 
     try {
@@ -19,6 +24,8 @@ export class ModulesService {
           libelle: dto.libelle,
           color: dto.color,
           ueId,
+          // V05 LOT 6 — module personnel au RP créateur (= propriétaire de l'UE).
+          ownerRpId: isRp(user.role) ? user.id : null,
           // V01 mirror — `name` est conservé pour compat. Cleanup TD-029.
           name: dto.libelle,
         },
@@ -32,9 +39,8 @@ export class ModulesService {
     }
   }
 
-  async update(id: string, dto: UpdateModuleDto): Promise<ModuleV2Dto> {
-    const exists = await this.prisma.module.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException(`Module ${id} introuvable`);
+  async update(id: string, dto: UpdateModuleDto, user: CurrentUserPayload): Promise<ModuleV2Dto> {
+    await this.assertModuleOwned(id, user);
 
     const data: Prisma.ModuleUpdateInput = {};
     if (dto.code !== undefined) data.code = dto.code;
@@ -57,9 +63,8 @@ export class ModulesService {
   }
 
   /** B.8 — refus 409 si utilisé par des séances (V01 OR V02 schémas hybrides). */
-  async remove(id: string): Promise<void> {
-    const exists = await this.prisma.module.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException(`Module ${id} introuvable`);
+  async remove(id: string, user: CurrentUserPayload): Promise<void> {
+    await this.assertModuleOwned(id, user);
 
     const seancesCount = await this.prisma.seance.count({ where: { moduleId: id } });
     if (seancesCount > 0) {
@@ -69,6 +74,18 @@ export class ModulesService {
     }
 
     await this.prisma.module.delete({ where: { id } });
+  }
+
+  /**
+   * V05 LOT 6 (ADR-0022) — lève 404 si le module n'est pas dans le périmètre du
+   * RP (`ownerRpId = self`). Ne divulgue pas l'existence hors périmètre.
+   */
+  private async assertModuleOwned(id: string, user: CurrentUserPayload): Promise<void> {
+    const found = await this.prisma.module.findFirst({
+      where: { id, ...(isRp(user.role) ? { ownerRpId: user.id } : {}) },
+      select: { id: true },
+    });
+    if (!found) throw new NotFoundException(`Module ${id} introuvable`);
   }
 }
 

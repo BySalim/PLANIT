@@ -26,7 +26,8 @@ export function useCreateEcoleMutation() {
   const invalidate = useInvalidate();
   return useMutation<EcoleDto, Error, CreateEcoleDto>({
     mutationFn: (body) => apiPost('/ecoles', ecoleSchema, body),
-    onSuccess: () => invalidate([ecoleKeys.all, journalKeys.all]),
+    // Crée aussi le compte Direction → rafraîchir la liste des utilisateurs.
+    onSuccess: () => invalidate([ecoleKeys.all, utilisateurKeys.all, journalKeys.all]),
   });
 }
 
@@ -43,21 +44,6 @@ export function useArchiveEcoleMutation() {
   return useMutation<EcoleDto, Error, string>({
     mutationFn: (id) => apiPatch(`/ecoles/${id}/archive`, ecoleSchema),
     onSuccess: () => invalidate([ecoleKeys.all, journalKeys.all]),
-  });
-}
-
-export interface CreateDirectionBody {
-  email: string;
-  fullName: string;
-  password: string;
-}
-
-export function useCreateDirectionMutation() {
-  const invalidate = useInvalidate();
-  return useMutation<UserAdminDto, Error, { ecoleId: string; body: CreateDirectionBody }>({
-    mutationFn: ({ ecoleId, body }) =>
-      apiPost(`/ecoles/${ecoleId}/direction`, userAdminSchema, body),
-    onSuccess: () => invalidate([ecoleKeys.all, utilisateurKeys.all, journalKeys.all]),
   });
 }
 

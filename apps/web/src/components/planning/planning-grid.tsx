@@ -1047,7 +1047,7 @@ export function PlanningGrid({
                       ? Math.max(28, (rp.endHour - rp.startHour) * HOUR_HEIGHT - 4)
                       : p.height;
                     const barColor = paletteForSessionV2(
-                      p.session.module?.id ?? null,
+                      p.session.module?.color ?? null,
                       p.session.type,
                     ).bar;
                     return (

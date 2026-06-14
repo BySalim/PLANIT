@@ -1,14 +1,11 @@
 import type { SessionType, SessionTypeV2 } from '@planit/contracts';
 
 /**
- * 6 teintes module — source : PLANIT-IA/rp/shared/tokens-ext.js (window.PALETTES).
- * red et purple sont **réservés** :
- *   red    → catégorie "evaluation" (EXAM, RATTRAP, DEVOIR)
- *   purple → catégorie "evenement"  (EVENT)
- * Aucun module ne doit donc se voir attribuer red ou purple.
+ * Palette d'une séance.
+ *   cours      → couleur RÉELLE du module (héritée, jamais hashée)
+ *   evaluation → rouge (réservé)
+ *   evenement  → violet (réservé)
  */
-export type ModuleColor = 'brown' | 'blue' | 'green' | 'red' | 'orange' | 'purple';
-
 export interface ModulePaletteEntry {
   bar: string;
   bg: string;
@@ -16,32 +13,41 @@ export interface ModulePaletteEntry {
   text: string;
 }
 
-export const MODULE_PALETTES: Record<ModuleColor, ModulePaletteEntry> = {
-  brown: { bar: '#6B2D0E', bg: '#FCF7F4', border: '#E8C9B0', text: '#5A2509' },
-  blue: { bar: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', text: '#1E40AF' },
-  green: { bar: '#16A34A', bg: '#F0FDF4', border: '#BBF7D0', text: '#15803D' },
-  red: { bar: '#DC2626', bg: '#FEE2E2', border: '#FCA5A5', text: '#7F1D1D' },
-  orange: { bar: '#E8620A', bg: '#FFF7ED', border: '#FED7AA', text: '#9A3412' },
-  purple: { bar: '#7C3AED', bg: '#EDE9FE', border: '#C4B5FD', text: '#5B21B6' },
+/** Teinte réservée évaluation (rouge) / événement (violet). */
+const EVALUATION_PALETTE: ModulePaletteEntry = {
+  bar: '#DC2626',
+  bg: '#FEE2E2',
+  border: '#FCA5A5',
+  text: '#7F1D1D',
+};
+const EVENEMENT_PALETTE: ModulePaletteEntry = {
+  bar: '#7C3AED',
+  bg: '#EDE9FE',
+  border: '#C4B5FD',
+  text: '#5B21B6',
 };
 
-const ASSIGNABLE_COLORS: ModuleColor[] = ['brown', 'blue', 'green', 'orange'];
-
-function stableHash(input: string): number {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
+/** Couleur neutre si un module n'a pas (encore) de couleur. */
+const FALLBACK_COLOR = '#64748B';
 
 /**
- * Couleur stable assignée à un module à partir de son id. V1 utilise un hash
- * déterministe en attendant que le contrat expose `module.color` (TD-015).
+ * Dérive une palette à partir de la couleur réelle (hex) d'un module : barre
+ * pleine, fond clair **opaque**, texte à la couleur du module. Le fond est
+ * mélangé au blanc (et non un alpha) — une carte de séance est posée sur la
+ * grille, un fond translucide laisserait les lignes d'heures transparaître.
  */
-export function colorForModule(moduleId: string): ModuleColor {
-  const idx = stableHash(moduleId) % ASSIGNABLE_COLORS.length;
-  return ASSIGNABLE_COLORS[idx]!;
+function mixWithWhite(hex: string, ratio: number): string {
+  const h = (hex || FALLBACK_COLOR).replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const mix = (ch: number) => Math.round(ch * ratio + 255 * (1 - ratio));
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+}
+
+export function paletteFromHex(hex: string): ModulePaletteEntry {
+  const c = hex || FALLBACK_COLOR;
+  return { bar: c, bg: mixWithWhite(c, 0.1), border: mixWithWhite(c, 0.32), text: c };
 }
 
 export type SessionCategory = 'cours' | 'evaluation' | 'evenement';
@@ -52,35 +58,33 @@ export function categoryForType(type: SessionType): SessionCategory {
   return 'cours';
 }
 
-/**
- * Renvoie la palette à appliquer sur une séance :
- * - catégorie evaluation → palette red
- * - catégorie evenement  → palette purple
- * - sinon → palette du module
- */
-export function paletteForSession(moduleId: string, type: SessionType): ModulePaletteEntry {
-  const cat = categoryForType(type);
-  if (cat === 'evaluation') return MODULE_PALETTES.red;
-  if (cat === 'evenement') return MODULE_PALETTES.purple;
-  return MODULE_PALETTES[colorForModule(moduleId)];
-}
-
-// ── V2 — types top-level COURS / EVALUATION / EVENEMENT ────────────────
-// Le module est nullable côté V2 (EVENEMENT n'en a pas) — on fallback sur
-// un id stable pour ne pas casser le hash.
-
 export function categoryForTypeV2(type: SessionTypeV2): SessionCategory {
   if (type === 'EVALUATION') return 'evaluation';
   if (type === 'EVENEMENT') return 'evenement';
   return 'cours';
 }
 
+/**
+ * Palette à appliquer sur une séance V01 : cours → couleur du module,
+ * évaluation → rouge, événement → violet.
+ */
+export function paletteForSession(
+  moduleColor: string | null | undefined,
+  type: SessionType,
+): ModulePaletteEntry {
+  const cat = categoryForType(type);
+  if (cat === 'evaluation') return EVALUATION_PALETTE;
+  if (cat === 'evenement') return EVENEMENT_PALETTE;
+  return paletteFromHex(moduleColor ?? FALLBACK_COLOR);
+}
+
+/** Idem V02 (types top-level COURS / EVALUATION / EVENEMENT). */
 export function paletteForSessionV2(
-  moduleId: string | null | undefined,
+  moduleColor: string | null | undefined,
   type: SessionTypeV2,
 ): ModulePaletteEntry {
   const cat = categoryForTypeV2(type);
-  if (cat === 'evaluation') return MODULE_PALETTES.red;
-  if (cat === 'evenement') return MODULE_PALETTES.purple;
-  return MODULE_PALETTES[colorForModule(moduleId ?? 'no-module')];
+  if (cat === 'evaluation') return EVALUATION_PALETTE;
+  if (cat === 'evenement') return EVENEMENT_PALETTE;
+  return paletteFromHex(moduleColor ?? FALLBACK_COLOR);
 }

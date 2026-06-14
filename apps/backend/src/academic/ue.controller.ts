@@ -9,6 +9,8 @@ import type {
   UEDto,
   UpdateUEDto,
 } from '@planit/contracts';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { ModulesService } from './modules.service';
@@ -52,16 +54,19 @@ export class UeController {
   })
   @ApiOperation({ summary: 'Liste des UE (lite par défaut)' })
   @ApiResponse({ status: 200, description: 'Liste UE' })
-  list(@Query(new ZodValidationPipe(listQuerySchema)) query: ListQuery): Promise<UEDto[]> {
-    return this.ues.list(query.withModules === true ? { withModules: true } : undefined);
+  list(
+    @Query(new ZodValidationPipe(listQuerySchema)) query: ListQuery,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<UEDto[]> {
+    return this.ues.list(user, query.withModules === true ? { withModules: true } : undefined);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Détail UE (avec modules nested)' })
   @ApiResponse({ status: 200, description: 'UE trouvée' })
   @ApiResponse({ status: 404, description: 'UE introuvable' })
-  findOne(@Param('id') id: string): Promise<UEDto> {
-    return this.ues.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload): Promise<UEDto> {
+    return this.ues.findOne(id, user);
   }
 
   /** Lazy load des modules d'une UE pour la page UE & Modules. */
@@ -69,8 +74,11 @@ export class UeController {
   @ApiOperation({ summary: "Modules d'une UE (lazy load)" })
   @ApiResponse({ status: 200, description: 'Liste des modules' })
   @ApiResponse({ status: 404, description: 'UE introuvable' })
-  findModules(@Param('ueId') ueId: string): Promise<ModuleV2Dto[]> {
-    return this.ues.findModulesForUe(ueId);
+  findModules(
+    @Param('ueId') ueId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<ModuleV2Dto[]> {
+    return this.ues.findModulesForUe(ueId, user);
   }
 
   @Post()
@@ -79,8 +87,11 @@ export class UeController {
   @ApiOperation({ summary: 'Créer une UE' })
   @ApiResponse({ status: 201, description: 'UE créée' })
   @ApiResponse({ status: 409, description: 'Code UE déjà utilisé' })
-  create(@Body(new ZodValidationPipe(createUeSchema)) dto: CreateUEDto): Promise<UEDto> {
-    return this.ues.create(dto);
+  create(
+    @Body(new ZodValidationPipe(createUeSchema)) dto: CreateUEDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<UEDto> {
+    return this.ues.create(dto, user);
   }
 
   @Put(':id')
@@ -91,8 +102,9 @@ export class UeController {
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateUeSchema)) dto: UpdateUEDto,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<UEDto> {
-    return this.ues.update(id, dto);
+    return this.ues.update(id, dto, user);
   }
 
   @Delete(':id')
@@ -101,8 +113,8 @@ export class UeController {
   @ApiResponse({ status: 204, description: 'UE supprimée' })
   @ApiResponse({ status: 404, description: 'UE introuvable' })
   @ApiResponse({ status: 409, description: 'UE contient des modules' })
-  async remove(@Param('id') id: string): Promise<void> {
-    await this.ues.remove(id);
+  async remove(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload): Promise<void> {
+    await this.ues.remove(id, user);
   }
 
   /**
@@ -119,7 +131,8 @@ export class UeController {
   createModule(
     @Param('ueId') ueId: string,
     @Body(new ZodValidationPipe(createModuleSchema)) dto: CreateModuleDto,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<ModuleV2Dto> {
-    return this.modules.create(ueId, dto);
+    return this.modules.create(ueId, dto, user);
   }
 }

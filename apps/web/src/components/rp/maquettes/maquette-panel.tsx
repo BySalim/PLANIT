@@ -10,8 +10,8 @@ import {
 } from '@/lib/mutations-v3';
 import { useMaquetteVersionDetailQuery, useMaquetteVersionsQuery } from '@/lib/queries-v3';
 import { useUesQuery } from '@/lib/queries-v2';
-import { exportNodeToImage, exportNodeToPdf } from '@/lib/export';
-import { ExportMenu } from '@/components/ui/export-menu';
+import { exportMaquette } from '@/lib/export';
+import { ExportMenu, type ExportFormat } from '@/components/ui/export-menu';
 import { AnneesWidget } from './annees-widget';
 import { MaquetteInfosModal } from './maquette-infos-modal';
 import { SemestresView } from './semestres-view';
@@ -79,33 +79,6 @@ export function MaquettePanel({ maquette, annees }: MaquettePanelProps) {
   const semestresRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  const handleExport = useCallback(
-    async (fmt: 'png' | 'pdf') => {
-      const node = semestresRef.current;
-      if (node === null) return;
-      setIsExporting(true);
-      flash.push('success', 'Génération en cours…');
-      try {
-        const filename = `maquette-${maquette.nom.replace(/\s+/g, '-').toLowerCase()}`;
-        if (fmt === 'png') {
-          await exportNodeToImage(node, filename);
-        } else {
-          await exportNodeToPdf(node, {
-            filename,
-            title: `PLANIT · Maquette ${maquette.nom} (${maquette.niveau})`,
-            orientation: 'portrait',
-          });
-        }
-        flash.push('success', fmt === 'png' ? 'Image exportée' : 'PDF exporté');
-      } catch {
-        flash.push('error', "Erreur lors de l'export, réessayez.");
-      } finally {
-        setIsExporting(false);
-      }
-    },
-    [maquette, flash],
-  );
-
   // ── Versions
   const versionsQuery = useMaquetteVersionsQuery(maquette.id);
   const versions = useMemo(() => versionsQuery.data ?? [], [versionsQuery.data]);
@@ -120,6 +93,34 @@ export function MaquettePanel({ maquette, annees }: MaquettePanelProps) {
 
   const versionDetailQuery = useMaquetteVersionDetailQuery(effectiveVersionId);
   const versionDetail = versionDetailQuery.data ?? null;
+
+  // Libellé de l'année de la version affichée (en-tête de l'export).
+  const selectedAnneeLibelle = useMemo(() => {
+    const v = versions.find((ver) => ver.id === effectiveVersionId);
+    if (v === undefined) return undefined;
+    return annees.find((a) => a.id === v.anneeAcademiqueId)?.libelle;
+  }, [versions, effectiveVersionId, annees]);
+
+  const handleExport = useCallback(
+    async (fmt: ExportFormat) => {
+      if (versionDetail === null) return;
+      setIsExporting(true);
+      flash.push('success', 'Génération en cours…');
+      try {
+        await exportMaquette(
+          fmt,
+          { maquette, version: versionDetail, anneeLibelle: selectedAnneeLibelle },
+          semestresRef.current,
+        );
+        flash.push('success', 'Export généré');
+      } catch {
+        flash.push('error', "Erreur lors de l'export, réessayez.");
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [maquette, versionDetail, selectedAnneeLibelle, flash],
+  );
 
   // ── Mode composer
   const [isComposing, setIsComposing] = useState(false);

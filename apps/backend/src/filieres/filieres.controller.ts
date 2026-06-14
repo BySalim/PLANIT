@@ -3,7 +3,7 @@ import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { Throttle } from '@nestjs/throttler';
 import { createFiliereSchema, updateFiliereSchema } from '@planit/contracts';
 import type { CreateFiliereDto, FiliereDto, UpdateFiliereDto } from '@planit/contracts';
-import { CurrentUser, requireEcole } from '../auth/decorators/current-user.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
@@ -22,7 +22,7 @@ export class FilieresController {
   @ApiOperation({ summary: 'Liste des filières de son école' })
   @ApiResponse({ status: 200, description: 'Liste filières' })
   list(@CurrentUser() user: CurrentUserPayload): Promise<FiliereDto[]> {
-    return this.filieres.list(user.ecoleId);
+    return this.filieres.list(user);
   }
 
   @Get(':id')
@@ -45,7 +45,7 @@ export class FilieresController {
     @CurrentUser() user: CurrentUserPayload,
     @Body(new ZodValidationPipe(createFiliereSchema)) dto: CreateFiliereDto,
   ): Promise<FiliereDto> {
-    return this.filieres.create(dto, requireEcole(user));
+    return this.filieres.create(dto, user);
   }
 
   @Put(':id')

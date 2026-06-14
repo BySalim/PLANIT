@@ -13,6 +13,7 @@ import type {
 } from '@planit/contracts';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
+import { isRp } from '../common/rp-scope';
 import { AnneesService } from '../annees/annees.service';
 import { AcScopeService } from '../ac/ac-scope.service';
 
@@ -92,6 +93,11 @@ export class ClassesService {
       where.id = { in: assigned };
     }
 
+    // V05 LOT 6 (ADR-0022) — un RP ne voit que SES classes (espace de travail).
+    if (isRp(user.role)) {
+      where.ownerRpId = user.id;
+    }
+
     const rows = await this.prisma.classe.findMany({
       where,
       orderBy: { code: 'asc' },
@@ -106,6 +112,10 @@ export class ClassesService {
     }
     const row = await this.prisma.classe.findUnique({ where: { id }, include: classeInclude });
     if (!row) throw new NotFoundException(`Classe ${id} introuvable`);
+    // V05 LOT 6 (ADR-0022) — un RP n'accède qu'à SES classes (404 sinon).
+    if (isRp(user.role) && row.ownerRpId !== user.id) {
+      throw new NotFoundException(`Classe ${id} introuvable`);
+    }
     return toDto(row);
   }
 
@@ -116,6 +126,10 @@ export class ClassesService {
     }
     const classe = await this.prisma.classe.findUnique({ where: { id } });
     if (!classe) throw new NotFoundException(`Classe ${id} introuvable`);
+    // V05 LOT 6 (ADR-0022) — un RP n'accède qu'au roster de SES classes.
+    if (isRp(user.role) && classe.ownerRpId !== user.id) {
+      throw new NotFoundException(`Classe ${id} introuvable`);
+    }
 
     const inscriptions = await this.prisma.inscription.findMany({
       where: { classeId: id },
@@ -127,10 +141,12 @@ export class ClassesService {
       nomComplet: i.etudiant.fullName,
       email: i.etudiant.email,
       matricule: i.etudiant.matricule,
+      // V05 LOT 6 — id d'inscription pour permettre le retrait (RP/AC scopé).
+      inscriptionId: i.id,
     }));
   }
 
-  async create(dto: CreateClasseV3Dto): Promise<ClasseV3Dto> {
+  async create(dto: CreateClasseV3Dto, user: CurrentUserPayload): Promise<ClasseV3Dto> {
     const formation = await this.requireCurrentYearFormation(dto.formationId);
 
     try {
@@ -143,6 +159,8 @@ export class ClassesService {
           // Synchronise la FK filière legacy depuis la formation (cohérence
           // transition V01→V03, cf. TD-V03-CLASSEID).
           filiereId: formation.filiereId,
+          // V05 LOT 6 (ADR-0022) — RP créateur = propriétaire de la classe.
+          ownerRpId: isRp(user.role) ? user.id : null,
         },
         include: classeInclude,
       });
@@ -155,9 +173,13 @@ export class ClassesService {
     }
   }
 
-  async update(id: string, dto: UpdateClasseV3Dto): Promise<ClasseV3Dto> {
+  async update(id: string, dto: UpdateClasseV3Dto, user: CurrentUserPayload): Promise<ClasseV3Dto> {
     const exists = await this.prisma.classe.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException(`Classe ${id} introuvable`);
+    // V05 LOT 6 (ADR-0022) — un RP ne modifie que SES classes.
+    if (isRp(user.role) && exists.ownerRpId !== user.id) {
+      throw new NotFoundException(`Classe ${id} introuvable`);
+    }
 
     const data: Prisma.ClasseUpdateInput = {};
     if (dto.code !== undefined) data.code = dto.code;

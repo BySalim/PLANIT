@@ -285,6 +285,10 @@ export const etudiantSchema = z.object({
   nomComplet: z.string().min(1).max(120),
   email: z.string().email(),
   matricule: z.string().max(40).nullable(),
+  // V05 LOT 6 — id de l'inscription dans la classe consultée (roster d'une classe
+  // uniquement) : permet le retrait d'un étudiant (RP/AC). Absent de la liste
+  // globale Étudiants (qui n'est pas rattachée à une classe).
+  inscriptionId: cuid.optional(),
 });
 export type EtudiantDto = z.infer<typeof etudiantSchema>;
 
@@ -437,6 +441,9 @@ export const salleSchema = z.object({
   type: z.string().min(1).max(60),
   capacity: z.number().int().min(0),
   rpResponsable: z.object({ id: cuid, fullName: z.string() }).nullable(),
+  // V05 LOT 6 (ADR-0022 §5) — salle subjective : privée au RP créateur, visible
+  // de lui seul dans la liste. Sert au badge UI « Subjective ».
+  isSubjective: z.boolean(),
 });
 
 export const createSalleSchema = z.object({
@@ -444,6 +451,8 @@ export const createSalleSchema = z.object({
   type: z.string().min(1).max(60),
   capacity: z.number().int().min(0).max(10000),
   rpResponsableId: cuid.nullable().optional(),
+  // V05 LOT 6 — un RP crée une salle subjective (ownerRpId = self posé serveur).
+  isSubjective: z.boolean().optional(),
 });
 
 export const updateSalleSchema = z.object({
@@ -480,3 +489,11 @@ export const assignAcClasseSchema = z.object({
   classeId: cuid,
 });
 export type AssignAcClasseDto = z.infer<typeof assignAcClasseSchema>;
+
+// V05 LOT 6 (ADR-0022 §7) — la Direction définit l'ensemble des classes
+// assignées à un AC, à l'échelle de l'école (PUT /api/ac/:acId/classes).
+// Sémantique « set » : remplace la liste complète (multi-select UI).
+export const setAcClassesSchema = z.object({
+  classeIds: z.array(cuid),
+});
+export type SetAcClassesDto = z.infer<typeof setAcClassesSchema>;

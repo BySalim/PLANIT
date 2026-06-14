@@ -79,7 +79,7 @@ describe('planning — sessionSchema salle nullable', () => {
     lastModifiedAt: '2026-06-09T08:00:00.000Z',
     lastPublishedAt: null,
     classe: { id: 'c-1', code: 'GL3', name: 'GL3 A' },
-    module: { id: 'm-1', code: 'ALGO', name: 'Algorithmique' },
+    module: { id: 'm-1', code: 'ALGO', name: 'Algorithmique', color: '#2563EB' },
     teacher: { id: 't-1', fullName: 'M. Ba' },
   };
 
@@ -132,6 +132,7 @@ describe('academic — salle nullable rpResponsable', () => {
       type: 'Amphi',
       capacity: 120,
       rpResponsable: null,
+      isSubjective: false,
     });
     expect(parsed.rpResponsable).toBeNull();
   });

@@ -5,7 +5,13 @@ import { createPortal } from 'react-dom';
 import { ChevronDownIcon, DownloadIcon } from '@planit/ui';
 import { cn } from '@/lib/utils';
 
-export type ExportFormat = 'png' | 'pdf';
+export type ExportFormat = 'pdf' | 'xlsx' | 'png';
+
+const FORMAT_LABELS: Record<ExportFormat, string> = {
+  pdf: 'Document PDF',
+  xlsx: 'Classeur Excel',
+  png: 'Image PNG',
+};
 
 interface ExportMenuProps {
   readonly onExport: (format: ExportFormat) => void;
@@ -106,7 +112,7 @@ export function ExportMenu({ onExport, isExporting = false, align = 'right' }: E
             style={{ position: 'fixed', top: coords.top, left: coords.left, right: coords.right }}
             className="z-[60] min-w-[152px] overflow-hidden rounded-xl border border-border bg-surface shadow-lg"
           >
-            {(['png', 'pdf'] as const).map((fmt) => (
+            {(['pdf', 'xlsx', 'png'] as const).map((fmt) => (
               <button
                 key={fmt}
                 type="button"
@@ -118,7 +124,7 @@ export function ExportMenu({ onExport, isExporting = false, align = 'right' }: E
                 className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-medium text-text transition-colors hover:bg-bg-warm"
               >
                 <DownloadIcon size={13} color="currentColor" />
-                {fmt === 'png' ? 'Image PNG' : 'Document PDF'}
+                {FORMAT_LABELS[fmt]}
               </button>
             ))}
           </div>,

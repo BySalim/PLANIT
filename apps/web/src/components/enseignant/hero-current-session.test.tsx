@@ -22,7 +22,7 @@ function buildSession(overrides: Partial<SessionDto> = {}): SessionDto {
     lastModifiedAt: '2026-05-25T10:00:00.000Z',
     lastPublishedAt: '2026-05-25T10:00:00.000Z',
     classe: { id: 'classe-1', code: 'GL3-A', name: 'Génie Logiciel 3 A' },
-    module: { id: 'module-1', code: 'ALGO', name: 'Algorithmique' },
+    module: { id: 'module-1', code: 'ALGO', name: 'Algorithmique', color: '#2563EB' },
     salle: { id: 'salle-1', name: 'Amphi A' },
     teacher: { id: 'teacher-1', fullName: 'M. Oumar Ndiaye' },
     ...overrides,
@@ -70,7 +70,7 @@ describe('HeroCurrentSession — pas de séance en cours', () => {
       id: 'next',
       startAt: '2026-05-25T14:00:00.000Z',
       endAt: '2026-05-25T16:00:00.000Z',
-      module: { id: 'module-2', code: 'BDD', name: 'Bases de Données' },
+      module: { id: 'module-2', code: 'BDD', name: 'Bases de Données', color: '#16A34A' },
       salle: { id: 'salle-2', name: 'Salle 201' },
     });
 

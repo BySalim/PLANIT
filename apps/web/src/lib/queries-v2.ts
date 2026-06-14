@@ -33,6 +33,11 @@ export const planningV2Keys = {
     [...planningV2Keys.all, 'sessions', weekStart, 'teacher', teacherId] as const,
   sessionsByStudent: (weekStart: string, studentId: string) =>
     [...planningV2Keys.all, 'sessions', weekStart, 'student', studentId] as const,
+  // V05 LOT 6 — référentiel Salle (occupation école + masquage).
+  sessionsBySalle: (weekStart: string, salleId: string) =>
+    [...planningV2Keys.all, 'sessions', weekStart, 'salle', salleId] as const,
+  sessionsByClasse: (weekStart: string, classeId: string) =>
+    [...planningV2Keys.all, 'sessions', weekStart, 'classe', classeId] as const,
   stats: (weekStart: string) => [...planningV2Keys.all, 'stats', weekStart] as const,
   session: (id: string) => [...planningV2Keys.all, 'session', id] as const,
 };
@@ -54,26 +59,32 @@ const salleRefListSchema = salleRefSchema.array();
 
 export function useV2WeekSessionsQuery(
   weekStart: Date,
-  options?: { teacherId?: string; studentId?: string; classeId?: string },
+  options?: { teacherId?: string; studentId?: string; classeId?: string; salleId?: string },
 ) {
   const weekStartParam = toWeekStartParam(weekStart);
   const teacherId = options?.teacherId;
   const studentId = options?.studentId;
   const classeId = options?.classeId;
+  const salleId = options?.salleId;
   const params = new URLSearchParams({ weekStart: weekStartParam });
 
+  // V05 LOT 6 — référentiel planning : Salle (occupation école masquée),
+  // Enseignant, Classe ou « Mon espace » (défaut, isolation RP côté serveur).
   let queryKey: readonly unknown[];
-  if (studentId !== undefined) {
+  if (salleId !== undefined) {
+    params.set('salleId', salleId);
+    queryKey = planningV2Keys.sessionsBySalle(weekStartParam, salleId);
+  } else if (studentId !== undefined) {
     params.set('studentId', studentId);
     queryKey = planningV2Keys.sessionsByStudent(weekStartParam, studentId);
   } else if (teacherId !== undefined) {
     params.set('teacherId', teacherId);
     queryKey = planningV2Keys.sessionsByTeacher(weekStartParam, teacherId);
+  } else if (classeId !== undefined) {
+    params.set('classeId', classeId);
+    queryKey = planningV2Keys.sessionsByClasse(weekStartParam, classeId);
   } else {
     queryKey = planningV2Keys.sessions(weekStartParam);
-  }
-  if (classeId !== undefined) {
-    params.set('classeId', classeId);
   }
 
   return useQuery<SessionV2Dto[]>({

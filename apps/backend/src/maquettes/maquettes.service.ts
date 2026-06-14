@@ -15,7 +15,9 @@ import type {
   UpdateMaquetteModuleDto,
 } from '@planit/contracts';
 import { computeVHE, computeVHT, maquetteNom } from '@planit/utils';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
+import { isRp } from '../common/rp-scope';
 
 // `include` partagé pour charger un MaquetteModule prêt à mapper (module + UE).
 const moduleInclude = {
@@ -49,10 +51,13 @@ export class MaquettesService {
    * Liste lite : identité + filière + niveau + compteur de versions, **scopée à
    * l'école** via la filière (V05 / ADR-0019 §3). ADMIN (ecoleId null) ⇒ vide.
    */
-  async list(ecoleId: string | null): Promise<MaquetteDto[]> {
-    if (!ecoleId) return [];
+  async list(user: CurrentUserPayload): Promise<MaquetteDto[]> {
+    if (!user.ecoleId) return [];
     const rows = await this.prisma.maquette.findMany({
-      where: { filiere: { ecoleId } },
+      // Scope école + (RP) espace de travail via la filière (ADR-0022).
+      where: {
+        filiere: { ecoleId: user.ecoleId, ...(isRp(user.role) ? { ownerRpId: user.id } : {}) },
+      },
       orderBy: [{ niveau: 'asc' }, { nom: 'asc' }],
       include: {
         filiere: { include: { responsableRp: { select: { id: true, fullName: true } } } },
@@ -86,14 +91,21 @@ export class MaquettesService {
    */
   async ensureMaquetteAndVersion(
     tx: Prisma.TransactionClient,
-    args: { filiereId: string; niveau: Niveau; sigle: string; currentYearId: string },
+    args: {
+      filiereId: string;
+      niveau: Niveau;
+      sigle: string;
+      currentYearId: string;
+      // V05 LOT 6 (ADR-0022) — propriétaire de la maquette = celui de la filière.
+      ownerRpId: string | null;
+    },
   ): Promise<string> {
-    const { filiereId, niveau, sigle, currentYearId } = args;
+    const { filiereId, niveau, sigle, currentYearId, ownerRpId } = args;
 
     const maquette = await tx.maquette.upsert({
       where: { filiereId_niveau: { filiereId, niveau } },
       update: {},
-      create: { nom: maquetteNom({ niveau, sigle }), filiereId, niveau },
+      create: { nom: maquetteNom({ niveau, sigle }), filiereId, niveau, ownerRpId },
     });
 
     const existing = await tx.maquetteVersion.findUnique({
@@ -148,15 +160,17 @@ export class MaquettesService {
   }
 
   /** Détail d'une version : modules (VHE/VHT dérivés) + classes la suivant (M.6). */
-  async getVersion(vid: string): Promise<MaquetteVersionDto> {
+  async getVersion(vid: string, user: CurrentUserPayload): Promise<MaquetteVersionDto> {
     const version = await this.prisma.maquetteVersion.findUnique({
       where: { id: vid },
       include: {
         anneeAcademique: true,
+        maquette: { include: { filiere: { select: { ecoleId: true, ownerRpId: true } } } },
         modules: { include: moduleInclude, orderBy: [{ semestre: 'asc' }] },
       },
     });
     if (!version) throw new NotFoundException(`Version de maquette ${vid} introuvable`);
+    this.assertVersionAccess(user, version.maquette.filiere, vid);
 
     const classes = await this.classesFollowingVersion(vid);
 
@@ -179,9 +193,19 @@ export class MaquettesService {
 
   // ── Composer (A.4) ───────────────────────────────────────────────────
 
-  async addModule(vid: string, dto: CreateMaquetteModuleDto): Promise<MaquetteModuleDto> {
-    const version = await this.prisma.maquetteVersion.findUnique({ where: { id: vid } });
+  async addModule(
+    vid: string,
+    dto: CreateMaquetteModuleDto,
+    user: CurrentUserPayload,
+  ): Promise<MaquetteModuleDto> {
+    const version = await this.prisma.maquetteVersion.findUnique({
+      where: { id: vid },
+      include: {
+        maquette: { include: { filiere: { select: { ecoleId: true, ownerRpId: true } } } },
+      },
+    });
     if (!version) throw new NotFoundException(`Version de maquette ${vid} introuvable`);
+    this.assertVersionAccess(user, version.maquette.filiere, vid);
 
     const moduleExists = await this.prisma.module.findUnique({ where: { id: dto.moduleId } });
     if (!moduleExists) throw new BadRequestException(`Module ${dto.moduleId} introuvable`);
@@ -208,9 +232,23 @@ export class MaquettesService {
     }
   }
 
-  async updateModule(id: string, dto: UpdateMaquetteModuleDto): Promise<MaquetteModuleDto> {
-    const exists = await this.prisma.maquetteModule.findUnique({ where: { id } });
+  async updateModule(
+    id: string,
+    dto: UpdateMaquetteModuleDto,
+    user: CurrentUserPayload,
+  ): Promise<MaquetteModuleDto> {
+    const exists = await this.prisma.maquetteModule.findUnique({
+      where: { id },
+      include: {
+        maquetteVersion: {
+          include: {
+            maquette: { include: { filiere: { select: { ecoleId: true, ownerRpId: true } } } },
+          },
+        },
+      },
+    });
     if (!exists) throw new NotFoundException(`Module de maquette ${id} introuvable`);
+    this.assertVersionAccess(user, exists.maquetteVersion.maquette.filiere, id);
 
     const data: Prisma.MaquetteModuleUpdateInput = {};
     if (dto.semestre !== undefined) data.semestre = dto.semestre;
@@ -227,16 +265,26 @@ export class MaquettesService {
     return toModuleDto(row);
   }
 
-  async removeModule(id: string): Promise<void> {
-    const exists = await this.prisma.maquetteModule.findUnique({ where: { id } });
+  async removeModule(id: string, user: CurrentUserPayload): Promise<void> {
+    const exists = await this.prisma.maquetteModule.findUnique({
+      where: { id },
+      include: {
+        maquetteVersion: {
+          include: {
+            maquette: { include: { filiere: { select: { ecoleId: true, ownerRpId: true } } } },
+          },
+        },
+      },
+    });
     if (!exists) throw new NotFoundException(`Module de maquette ${id} introuvable`);
+    this.assertVersionAccess(user, exists.maquetteVersion.maquette.filiere, id);
     await this.prisma.maquetteModule.delete({ where: { id } });
   }
 
   // ── Export (A.5) ─────────────────────────────────────────────────────
 
   /** Structure complète d'une version + totaux dérivés (rendu image/PDF, LOT 7). */
-  async exportVersion(vid: string): Promise<MaquetteExportDto> {
+  async exportVersion(vid: string, user: CurrentUserPayload): Promise<MaquetteExportDto> {
     const version = await this.prisma.maquetteVersion.findUnique({
       where: { id: vid },
       include: {
@@ -251,6 +299,7 @@ export class MaquettesService {
       },
     });
     if (!version) throw new NotFoundException(`Version de maquette ${vid} introuvable`);
+    this.assertVersionAccess(user, version.maquette.filiere, vid);
 
     const modules = version.modules.map(toModuleDto);
     const classes = await this.classesFollowingVersion(vid);
@@ -290,6 +339,26 @@ export class MaquettesService {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────
+
+  /**
+   * Scope d'accès à une maquette/version (V05 / ADR-0019 §3 + ADR-0022) : la
+   * filière de la maquette doit appartenir à l'école de l'acteur **et**, pour un
+   * RP, à son espace de travail (`ownerRpId = self`). ADMIN (`ecoleId` null)
+   * n'opère pas sur le référentiel scopé. On lève **404** (pas 403) pour ne pas
+   * divulguer l'existence d'une version hors périmètre.
+   */
+  private assertVersionAccess(
+    user: CurrentUserPayload,
+    filiere: { ecoleId: string; ownerRpId: string | null },
+    vid: string,
+  ): void {
+    if (user.ecoleId === null || filiere.ecoleId !== user.ecoleId) {
+      throw new NotFoundException(`Version de maquette ${vid} introuvable`);
+    }
+    if (isRp(user.role) && filiere.ownerRpId !== user.id) {
+      throw new NotFoundException(`Version de maquette ${vid} introuvable`);
+    }
+  }
 
   /** Classes suivant une version (via leur formation). 2ᵉ colonne page Maquettes. */
   private async classesFollowingVersion(

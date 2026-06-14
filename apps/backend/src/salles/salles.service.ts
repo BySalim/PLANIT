@@ -9,6 +9,7 @@ import type { CreateSalleDto, SalleDto, UpdateSalleDto } from '@planit/contracts
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { requireEcole } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../common/prisma.service';
+import { isRp } from '../common/rp-scope';
 import { AcScopeService } from '../ac/ac-scope.service';
 
 const salleInclude = {
@@ -46,10 +47,15 @@ export class SallesService {
       const managerRpId = await this.acScope.getManagerRpId(user.id);
       // AC sans manager → aucune salle visible (périmètre vide explicite).
       where.rpResponsableId = managerRpId ?? '__none__';
+      // V05 LOT 6 — l'AC ne voit jamais les salles subjectives (privées RP).
+      where.isSubjective = false;
     } else if (user.ecoleId) {
       // RP, DIRECTION, ENSEIGNANT, ETUDIANT → scope école (V05 / ADR-0019 §3).
       // ADMIN (ecoleId null) → toutes les salles (pas de restriction).
       where.ecoleId = user.ecoleId;
+      // V05 LOT 6 (ADR-0022 §5) — salles subjectives privées : visibles du seul
+      // créateur RP. Tous les autres (dont Direction) ne voient que les non-subjectives.
+      where.OR = [{ isSubjective: false }, { isSubjective: true, ownerRpId: user.id }];
     }
 
     const rows = await this.prisma.salle.findMany({
@@ -68,6 +74,9 @@ export class SallesService {
   async create(dto: CreateSalleDto, user: CurrentUserPayload): Promise<SalleDto> {
     const ecoleId = requireEcole(user);
 
+    // V05 LOT 6 (ADR-0022 §5) — un RP crée une salle subjective (privée). Le
+    // créateur en devient propriétaire ; pas de rpResponsable (hors gestion Direction).
+    const isSubjective = dto.isSubjective === true && isRp(user.role);
     // RBAC sur rpResponsableId : seule la Direction peut assigner.
     const rpResponsableId = user.role === 'DIRECTION' ? (dto.rpResponsableId ?? null) : null;
 
@@ -79,6 +88,8 @@ export class SallesService {
           capacity: dto.capacity,
           ecoleId,
           rpResponsableId,
+          isSubjective,
+          ownerRpId: isSubjective ? user.id : null,
         },
         include: salleInclude,
       });
@@ -96,16 +107,19 @@ export class SallesService {
    * RP : refus 403 (ne peut pas assigner de responsable).
    */
   async update(id: string, dto: UpdateSalleDto, user: CurrentUserPayload): Promise<SalleDto> {
-    if (user.role !== 'DIRECTION') {
-      throw new ForbiddenException(
-        'Seule la Direction peut modifier une salle ou assigner un responsable',
-      );
-    }
-    const ecoleId = requireEcole(user);
-
     const exists = await this.prisma.salle.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException(`Salle ${id} introuvable`);
-    if (exists.ecoleId !== ecoleId) {
+
+    // V05 LOT 6 (ADR-0022 §5) — un RP peut gérer SA salle subjective (nom/type/
+    // capacité, jamais le responsable) ; toute autre modification = Direction.
+    const isOwnerSubjective =
+      exists.isSubjective && isRp(user.role) && exists.ownerRpId === user.id;
+    if (user.role !== 'DIRECTION' && !isOwnerSubjective) {
+      throw new ForbiddenException(
+        'Seule la Direction (ou le créateur pour une salle subjective) peut modifier une salle',
+      );
+    }
+    if (user.role === 'DIRECTION' && exists.ecoleId !== requireEcole(user)) {
       throw new ForbiddenException("Cette salle n'appartient pas à votre école");
     }
 
@@ -113,7 +127,8 @@ export class SallesService {
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.type !== undefined) data.type = dto.type;
     if (dto.capacity !== undefined) data.capacity = dto.capacity;
-    if (dto.rpResponsableId !== undefined) {
+    // Assignation du responsable = Direction uniquement (jamais sur une subjective).
+    if (dto.rpResponsableId !== undefined && user.role === 'DIRECTION') {
       data.rpResponsable = dto.rpResponsableId
         ? { connect: { id: dto.rpResponsableId } }
         : { disconnect: true };
@@ -129,6 +144,22 @@ export class SallesService {
       throw err;
     }
   }
+
+  /**
+   * V05 LOT 6 (ADR-0022 §5) — suppression d'une salle **subjective** par son
+   * créateur RP. Refuse 404 si la salle n'existe pas, n'est pas subjective ou
+   * n'appartient pas au RP (ne pas divulguer). Les salles normales restent
+   * gérées par la Direction (pas de suppression dure exposée).
+   */
+  async remove(id: string, user: CurrentUserPayload): Promise<void> {
+    const exists = await this.prisma.salle.findFirst({
+      where: { id, isSubjective: true, ...(isRp(user.role) ? { ownerRpId: user.id } : {}) },
+      select: { id: true },
+    });
+    if (!exists) throw new NotFoundException(`Salle ${id} introuvable`);
+    // Détache les séances qui la référencent (onDelete: SetNull sur salleId).
+    await this.prisma.salle.delete({ where: { id } });
+  }
 }
 
 function toDto(row: SalleRow): SalleDto {
@@ -140,6 +171,8 @@ function toDto(row: SalleRow): SalleDto {
     rpResponsable: row.rpResponsable
       ? { id: row.rpResponsable.id, fullName: row.rpResponsable.fullName }
       : null,
+    // V05 LOT 6 (ADR-0022 §5) — badge « subjective » côté UI.
+    isSubjective: row.isSubjective,
   };
 }
 

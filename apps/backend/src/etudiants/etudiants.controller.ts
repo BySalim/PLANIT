@@ -19,8 +19,13 @@ import { EtudiantsService } from './etudiants.service';
 export class EtudiantsController {
   constructor(private readonly etudiants: EtudiantsService) {}
 
+  // V05 LOT 3 — Direction lit les étudiants de son école (lecture seule, scope
+  // école côté service). Le `@Roles` méthode override le `@Roles` classe.
   @Get()
-  @ApiOperation({ summary: 'Recherche étudiants (nom / matricule / email ; AC scopé)' })
+  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME', 'DIRECTION')
+  @ApiOperation({
+    summary: 'Recherche étudiants (nom / matricule / email ; AC scopé, Direction école)',
+  })
   @ApiQuery({ name: 'q', required: false })
   @ApiResponse({ status: 200, description: 'Liste des étudiants' })
   list(@CurrentUser() user: CurrentUserPayload, @Query('q') q?: string): Promise<EtudiantDto[]> {
@@ -36,6 +41,7 @@ export class EtudiantsController {
   }
 
   @Get(':id')
+  @Roles('RESPONSABLE_PROGRAMME', 'ASSISTANT_PROGRAMME', 'DIRECTION')
   @ApiOperation({ summary: "Fiche étudiant + historique d'inscriptions" })
   @ApiResponse({ status: 200, description: 'Fiche étudiant' })
   @ApiResponse({ status: 403, description: 'Hors périmètre AC' })

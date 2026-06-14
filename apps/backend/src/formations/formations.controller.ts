@@ -37,7 +37,7 @@ export class FormationsController {
         ...(anneeId ? { anneeId } : {}),
         ...(filiereId ? { filiereId } : {}),
       },
-      user.ecoleId,
+      user,
     );
   }
 

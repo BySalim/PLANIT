@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { createSalleSchema, updateSalleSchema } from '@planit/contracts';
@@ -47,11 +47,12 @@ export class SallesController {
   }
 
   @Put(':id')
-  @Roles('DIRECTION')
+  // V05 LOT 6 — Direction (toute salle) + RP (sa salle subjective). Scope dans le service.
+  @Roles('DIRECTION', 'RESPONSABLE_PROGRAMME')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Modifier une salle et son responsable (Direction uniquement)' })
+  @ApiOperation({ summary: 'Modifier une salle (Direction) ou sa salle subjective (RP créateur)' })
   @ApiResponse({ status: 200, description: 'Salle mise à jour' })
-  @ApiResponse({ status: 403, description: 'Direction uniquement ou hors périmètre école' })
+  @ApiResponse({ status: 403, description: 'Hors périmètre (Direction/créateur uniquement)' })
   @ApiResponse({ status: 404, description: 'Salle introuvable' })
   update(
     @Param('id') id: string,
@@ -59,5 +60,16 @@ export class SallesController {
     @Body(new ZodValidationPipe(updateSalleSchema)) dto: UpdateSalleDto,
   ): Promise<SalleDto> {
     return this.salles.update(id, dto, user);
+  }
+
+  @Delete(':id')
+  @Roles('RESPONSABLE_PROGRAMME')
+  @HttpCode(204)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Supprimer une salle subjective (RP créateur, ADR-0022 §5)' })
+  @ApiResponse({ status: 204, description: 'Salle subjective supprimée' })
+  @ApiResponse({ status: 404, description: 'Salle introuvable ou non subjective' })
+  async remove(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload): Promise<void> {
+    await this.salles.remove(id, user);
   }
 }

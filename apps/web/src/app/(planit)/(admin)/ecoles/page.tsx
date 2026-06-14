@@ -6,7 +6,6 @@ import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast-provider';
 import { AdminTableSkeleton } from '@/components/admin/admin-table-skeleton';
-import { DirectionModal } from '@/components/admin/direction-modal';
 import { EcoleModal } from '@/components/admin/ecole-modal';
 import { useEcolesQuery } from '@/lib/admin-queries';
 import { useArchiveEcoleMutation } from '@/lib/admin-mutations';
@@ -20,7 +19,6 @@ export default function EcolesPage() {
 
   const [ecoleModalOpen, setEcoleModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EcoleDto | undefined>(undefined);
-  const [directionTarget, setDirectionTarget] = useState<EcoleDto | undefined>(undefined);
 
   function openCreate() {
     setEditTarget(undefined);
@@ -80,6 +78,9 @@ export default function EcolesPage() {
                   École
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                  Direction
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
                   Statut
                 </th>
                 <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-text-muted">
@@ -90,7 +91,7 @@ export default function EcolesPage() {
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-5 py-12 text-center text-sm text-text-muted">
+                  <td colSpan={4} className="px-5 py-12 text-center text-sm text-text-muted">
                     Aucune école. Créez-en une pour démarrer.
                   </td>
                 </tr>
@@ -102,15 +103,31 @@ export default function EcolesPage() {
                   >
                     <td className="px-5 py-3.5 font-semibold text-text">{ecole.nom}</td>
                     <td className="px-4 py-3.5">
+                      {ecole.direction ? (
+                        <div className="flex flex-col">
+                          <span className="flex items-center gap-2 font-medium text-text">
+                            {ecole.direction.fullName}
+                            {ecole.direction.statut === 'SUSPENDU' ? (
+                              <span className="inline-flex items-center rounded-md border border-err/20 bg-err-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-err">
+                                Suspendu
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="text-[12px] text-text-muted">
+                            {ecole.direction.email}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
                       <span className="inline-flex items-center rounded-md border border-ok/20 bg-ok-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-ok">
                         Active
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setDirectionTarget(ecole)}>
-                          + Direction
-                        </Button>
                         <Button variant="secondary" size="sm" onClick={() => openEdit(ecole)}>
                           Modifier
                         </Button>
@@ -137,11 +154,6 @@ export default function EcolesPage() {
         onClose={() => setEcoleModalOpen(false)}
         mode={editTarget !== undefined ? 'edit' : 'create'}
         initial={editTarget}
-      />
-      <DirectionModal
-        isOpen={directionTarget !== undefined}
-        onClose={() => setDirectionTarget(undefined)}
-        ecole={directionTarget}
       />
     </Shell>
   );

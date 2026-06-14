@@ -29,6 +29,10 @@ import { useAcScope } from '@/hooks/use-ac-scope';
 import { useSallesDirectionQuery, usePersonnelQuery } from '@/lib/direction-queries';
 import { useCreateSalleMutation, useUpdateSalleMutation } from '@/lib/direction-mutations';
 import { useSallesFullQuery } from '@/lib/queries-v3';
+import {
+  useCreateSubjectiveSalleMutation,
+  useDeleteSubjectiveSalleMutation,
+} from '@/lib/mutations-v3';
 
 // ── Vue Direction (LOT 3) ─────────────────────────────────────────────────────
 
@@ -332,61 +336,77 @@ function SallesDirectionView() {
 function SallesRpView() {
   const sallesQuery = useSallesFullQuery();
   const salles = sallesQuery.data ?? [];
-
-  if (sallesQuery.isLoading) {
-    return <SallesRpTableSkeleton />;
-  }
-  if (sallesQuery.isError) {
-    return (
-      <div className="rounded-2xl border border-err bg-err-100 px-6 py-12 text-center text-sm text-err">
-        Impossible de charger les salles.
-      </div>
-    );
-  }
-  if (salles.length === 0) {
-    return (
-      <div className="rounded-2xl border border-border-soft bg-surface px-6 py-12 text-center text-sm text-text-muted">
-        Aucune salle dans cette école.
-      </div>
-    );
-  }
+  const [subjOpen, setSubjOpen] = useState(false);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border-soft bg-surface shadow-sm">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border-soft bg-bg">
-            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-              Salle
-            </th>
-            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-              Type
-            </th>
-            <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-              Capacité
-            </th>
-            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-              Responsable
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {salles.map((salle) => (
-            <SalleRpRow key={salle.id} salle={salle} />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <SubjectiveSalleModal isOpen={subjOpen} onClose={() => setSubjOpen(false)} />
+
+      <div className="mb-4 flex items-center justify-end">
+        {/* V05 LOT 6 (ADR-0022 §5) — salle subjective : privée au RP créateur. */}
+        <Button variant="primary" size="sm" onClick={() => setSubjOpen(true)}>
+          + Salle subjective
+        </Button>
+      </div>
+
+      {sallesQuery.isLoading ? (
+        <SallesRpTableSkeleton />
+      ) : sallesQuery.isError ? (
+        <div className="rounded-2xl border border-err bg-err-100 px-6 py-12 text-center text-sm text-err">
+          Impossible de charger les salles.
+        </div>
+      ) : salles.length === 0 ? (
+        <div className="rounded-2xl border border-border-soft bg-surface px-6 py-12 text-center text-sm text-text-muted">
+          Aucune salle dans cette école.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-border-soft bg-surface shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border-soft bg-bg">
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                  Salle
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                  Type
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                  Capacité
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                  Responsable
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-text-muted" />
+              </tr>
+            </thead>
+            <tbody>
+              {salles.map((salle) => (
+                <SalleRpRow key={salle.id} salle={salle} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 }
 
 function SalleRpRow({ salle }: { salle: SalleDto }) {
+  const deleteMutation = useDeleteSubjectiveSalleMutation();
   return (
     <tr className="border-b border-border-soft last:border-b-0 transition-colors hover:bg-bg">
       <td className="px-4 py-3.5">
         <div className="flex items-center gap-2.5">
           <DoorIcon size={16} color="currentColor" />
           <span className="text-[13.5px] font-semibold text-text">{salle.name}</span>
+          {salle.isSubjective ? (
+            <span
+              className="inline-flex items-center rounded-full bg-bg-warm px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-text-sec"
+              title="Salle subjective — visible de vous seul"
+            >
+              Subjective
+            </span>
+          ) : null}
         </div>
       </td>
       <td className="px-4 py-3.5">
@@ -396,7 +416,9 @@ function SalleRpRow({ salle }: { salle: SalleDto }) {
       </td>
       <td className="px-4 py-3.5 text-right tabular-nums text-text-sec">{salle.capacity}</td>
       <td className="px-4 py-3.5">
-        {salle.rpResponsable === null ? (
+        {salle.isSubjective ? (
+          <span className="text-[12px] italic text-text-muted">privée</span>
+        ) : salle.rpResponsable === null ? (
           <span
             className="inline-flex items-center rounded-full bg-accent-100 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-accent-800"
             title="Salle commune accessible à tous les RP de l'école"
@@ -407,7 +429,129 @@ function SalleRpRow({ salle }: { salle: SalleDto }) {
           <span className="text-[12.5px] text-text">{salle.rpResponsable.fullName}</span>
         )}
       </td>
+      <td className="px-4 py-3.5 text-right">
+        {salle.isSubjective ? (
+          <button
+            type="button"
+            title="Supprimer la salle subjective"
+            onClick={() => {
+              if (window.confirm(`Supprimer la salle subjective « ${salle.name} » ?`)) {
+                deleteMutation.mutate({ id: salle.id });
+              }
+            }}
+            disabled={deleteMutation.isPending}
+            className="rounded-lg border border-border px-2.5 py-1 text-[12px] font-medium text-text-muted transition-colors hover:border-err hover:bg-err-100 hover:text-err disabled:opacity-50"
+          >
+            Supprimer
+          </button>
+        ) : null}
+      </td>
     </tr>
+  );
+}
+
+// V05 LOT 6 (ADR-0022 §5) — modale de création d'une salle subjective (RP).
+function SubjectiveSalleModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const toast = useToast();
+  const createMutation = useCreateSubjectiveSalleMutation();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<CreateSalleFormValues>({
+    resolver: zodResolver(createSalleSchema),
+    defaultValues: { name: '', type: '', capacity: 0 },
+  });
+
+  useState(() => {
+    if (isOpen) reset({ name: '', type: '', capacity: 0 });
+  });
+
+  const errs = errors as Record<string, { message?: string } | undefined>;
+
+  async function onSubmit(values: CreateSalleFormValues) {
+    try {
+      await createMutation.mutateAsync({
+        name: values.name,
+        type: values.type,
+        capacity: values.capacity,
+      });
+      toast.show('Salle subjective créée.', { variant: 'success' });
+      onClose();
+    } catch {
+      // erreur affichée via le flash de la mutation
+    }
+  }
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Créer une salle subjective"
+      size="md"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={isSubmitting}>
+            Annuler
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            type="submit"
+            form="subj-salle-form"
+            disabled={isSubmitting}
+          >
+            Créer
+          </Button>
+        </>
+      }
+    >
+      <p className="mb-4 text-[12.5px] text-text-muted">
+        Une salle subjective est privée : vous seul la voyez dans la liste. Elle vous sert à
+        planifier quand la salle réelle n&apos;est pas encore confirmée.
+      </p>
+      <form
+        id="subj-salle-form"
+        onSubmit={handleSubmit(onSubmit)}
+        className="flex flex-col gap-4"
+        noValidate
+      >
+        <FormField label="Nom de la salle" required error={errs['name']?.message}>
+          {({ id, 'aria-describedby': describedBy }) => (
+            <Input
+              id={id}
+              aria-describedby={describedBy}
+              invalid={!!errs['name']}
+              placeholder="Ex. Salle projet B"
+              {...register('name')}
+            />
+          )}
+        </FormField>
+        <FormField label="Type" required error={errs['type']?.message}>
+          {({ id, 'aria-describedby': describedBy }) => (
+            <Input
+              id={id}
+              aria-describedby={describedBy}
+              invalid={!!errs['type']}
+              placeholder="Ex. Salle TD"
+              {...register('type')}
+            />
+          )}
+        </FormField>
+        <FormField label="Capacité" required error={errs['capacity']?.message}>
+          {({ id, 'aria-describedby': describedBy }) => (
+            <Input
+              id={id}
+              type="number"
+              aria-describedby={describedBy}
+              invalid={!!errs['capacity']}
+              {...register('capacity', { valueAsNumber: true })}
+            />
+          )}
+        </FormField>
+      </form>
+    </Modal>
   );
 }
 

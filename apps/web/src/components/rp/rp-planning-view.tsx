@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { CreateSessionV2Dto, SessionV2Dto } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
 import { CreateSessionModal } from '@/components/planning/create-session-modal';
@@ -11,16 +11,14 @@ import { PlanningToolbar } from '@/components/planning/planning-toolbar';
 import { SessionDetailDrawer } from '@/components/planning/session-detail-drawer';
 import { ViewScopeToggle, type ViewScope } from '@/components/planning/view-scope-toggle';
 import type { ViewMode } from '@/components/planning/view-mode-tabs';
-import { useIsAc } from '@/hooks/use-role';
+import { useIsAc, useIsDirection } from '@/hooks/use-role';
 import { useGlobalShortcut } from '@/lib/keyboard';
 import { useCreateSessionV2Mutation, useDeleteSessionV2Mutation } from '@/lib/mutations-v2';
 import { useV2WeekSessionsQuery } from '@/lib/queries-v2';
 import { usePlanningUndoStack } from '@/lib/undo-stack';
 import { getCurrentWeekStart } from '@/lib/week';
-import { exportNodeToImage, exportNodeToPdf } from '@/lib/export';
+import { exportPlanning, type ExportFormat } from '@/lib/export';
 import { useFlash } from '@planit/ui';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
 
 // V1-D2 hardcoded demo counters (matchent les compteurs PLANIT-IA D.kpis).
 // À remplacer par des hooks dédiés en Vague 02.
@@ -40,11 +38,15 @@ interface CreateInit {
  *
  * LOT 6 G.3 — Mode AC : tout en lecture seule (pas de drag/resize/create/publish/
  * undo/redo). Le breadcrumb passe à « Mon espace » au lieu de « Espace RP ».
+ *
+ * V05 LOT 3 — La Direction consomme la même vue en lecture seule : planning de
+ * toute son école (requête sans `classeId` → scopée école côté serveur).
  */
 export function RpPlanningView() {
   const flash = useFlash();
   const isAc = useIsAc();
-  const readOnly = isAc;
+  const isDirection = useIsDirection();
+  const readOnly = isAc || isDirection;
   const [weekStart, setWeekStart] = useState<Date>(() => getCurrentWeekStart());
   const [createOpen, setCreateOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -54,38 +56,45 @@ export function RpPlanningView() {
   // LOT 7 (X.2) — ref sur le container de la grille planning (capturé en PNG/PDF).
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
+  const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('classique');
+  // V05 LOT 6 — valeur du référentiel choisi (classe/salle/enseignant). Vidée
+  // quand le mode change.
+  const [referentielId, setReferentielId] = useState('');
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    setReferentielId('');
+  }, []);
+  const [scope, setScope] = useState<ViewScope>('week');
+
+  // Mappe (mode, valeur) → filtre de requête. « Mon espace » = aucun filtre
+  // (isolation RP côté serveur). Salle = occupation école masquée (ADR-0022 §4).
+  const referentielOptions = useMemo(() => {
+    if (referentielId === '') return undefined;
+    if (viewMode === 'classe') return { classeId: referentielId };
+    if (viewMode === 'salle') return { salleId: referentielId };
+    if (viewMode === 'prof') return { teacherId: referentielId };
+    return undefined;
+  }, [viewMode, referentielId]);
+
+  const sessionsQuery = useV2WeekSessionsQuery(weekStart, referentielOptions);
+  const sessions = useMemo(() => sessionsQuery.data ?? [], [sessionsQuery.data]);
+
   const handleExport = useCallback(
-    async (fmt: 'png' | 'pdf') => {
-      const node = gridContainerRef.current;
-      if (node === null) return;
+    async (fmt: ExportFormat) => {
       setIsExporting(true);
       flash.push('success', 'Génération en cours…');
       try {
-        const weekLabel = format(weekStart, "'Semaine du' d MMMM yyyy", { locale: fr });
-        const filename = `planning-${format(weekStart, 'yyyy-MM-dd')}`;
-        if (fmt === 'png') {
-          await exportNodeToImage(node, filename);
-        } else {
-          await exportNodeToPdf(node, {
-            filename,
-            title: `PLANIT — Planning ${weekLabel}`,
-            orientation: 'landscape',
-          });
-        }
-        flash.push('success', fmt === 'png' ? 'Image exportée ✓' : 'PDF exporté ✓');
+        await exportPlanning(fmt, { sessions, weekStart }, gridContainerRef.current);
+        flash.push('success', 'Export généré');
       } catch {
-        flash.push('error', "Erreur lors de l'export — réessayez.");
+        flash.push('error', "Erreur lors de l'export, réessayez.");
       } finally {
         setIsExporting(false);
       }
     },
-    [weekStart, flash],
+    [sessions, weekStart, flash],
   );
-  const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('classique');
-  const [scope, setScope] = useState<ViewScope>('week');
-  const sessionsQuery = useV2WeekSessionsQuery(weekStart);
-  const sessions = sessionsQuery.data ?? [];
 
   // I.6 — pile undo/redo locale à la page (V2-D11). Vidée au publish.
   const undoStack = usePlanningUndoStack();
@@ -152,7 +161,9 @@ export function RpPlanningView() {
           weekStart={weekStart}
           onWeekChange={setWeekStart}
           viewMode={viewMode}
-          onViewModeChange={setViewMode}
+          onViewModeChange={handleViewModeChange}
+          referentielId={referentielId}
+          onReferentielChange={setReferentielId}
           onCreateSession={() => setCreateOpen(true)}
           canUndo={undoStack.canUndo}
           canRedo={undoStack.canRedo}

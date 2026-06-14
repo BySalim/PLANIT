@@ -22,10 +22,13 @@ function buildSession(overrides: Partial<SessionV2Dto> = {}): SessionV2Dto {
     isPublished: true,
     lastModifiedAt: '2026-05-25T10:00:00.000Z',
     lastPublishedAt: '2026-05-25T10:00:00.000Z',
-    module: { id: 'module-1', code: 'ALGO', name: 'Algorithmique' },
+    module: { id: 'module-1', code: 'ALGO', name: 'Algorithmique', color: '#2563EB' },
     enseignant: { id: 'teacher-1', nomComplet: 'M. Oumar Ndiaye' },
     salle: { id: 'salle-1', name: 'Amphi A' },
     classes: [{ id: 'classe-1', code: 'GL3-A', name: 'Génie Logiciel 3 A' }],
+    ownerRpId: 'rp-1',
+    ownerRpName: 'Mme Aminata Diallo',
+    masked: false,
     ...overrides,
   };
 }
@@ -108,5 +111,32 @@ describe('SessionCard', () => {
     );
     const marker = container.querySelector('[title="Modifications non publiées"]');
     expect(marker).toBeNull();
+  });
+
+  // V05 LOT 6 (ADR-0022 §4) — carte masquée en vue Salle (séance d'un autre RP).
+  describe('masquée (vue Salle)', () => {
+    const masked = buildSession({
+      masked: true,
+      ownerRpName: 'Mme Aminata Diallo',
+      module: null,
+      enseignant: null,
+      classes: [],
+      libelle: '',
+      description: null,
+    });
+
+    it("affiche 'Occupé' + le nom du RP propriétaire, sans détail", () => {
+      render(<SessionCard session={masked} />);
+      expect(screen.getByText('Occupé')).toBeInTheDocument();
+      expect(screen.getByText('Mme Aminata Diallo')).toBeInTheDocument();
+      // Aucun détail identifiant ne fuit (module/classe/enseignant).
+      expect(screen.queryByText('Algorithmique')).not.toBeInTheDocument();
+      expect(screen.queryByText('GL3-A')).not.toBeInTheDocument();
+    });
+
+    it("n'est pas interactive (pas de bouton, pas de drag)", () => {
+      render(<SessionCard session={masked} />);
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    });
   });
 });

@@ -34,7 +34,12 @@ export function toSessionDto(seance: SeanceWithRelations): SessionDto {
     lastModifiedAt: seance.lastModifiedAt.toISOString(),
     lastPublishedAt: seance.lastPublishedAt ? seance.lastPublishedAt.toISOString() : null,
     classe: { id: seance.classe.id, code: seance.classe.code, name: seance.classe.name },
-    module: { id: seance.module.id, code: seance.module.code, name: seance.module.name },
+    module: {
+      id: seance.module.id,
+      code: seance.module.code,
+      name: seance.module.name,
+      color: seance.module.color,
+    },
     salle: seance.salle ? { id: seance.salle.id, name: seance.salle.name } : null,
     teacher: { id: seance.teacher.id, fullName: seance.teacher.fullName },
   };

@@ -29,7 +29,7 @@ export class MaquettesController {
   @ApiOperation({ summary: 'Liste des maquettes de son école (niveau + filière + versions)' })
   @ApiResponse({ status: 200, description: 'Liste des maquettes' })
   list(@CurrentUser() user: CurrentUserPayload): Promise<MaquetteDto[]> {
-    return this.maquettes.list(user.ecoleId);
+    return this.maquettes.list(user);
   }
 
   @Get(':id')

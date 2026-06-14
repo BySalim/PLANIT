@@ -12,11 +12,19 @@ import type {
   SessionV2Dto,
   UpdateSessionV2Dto,
 } from '@planit/contracts';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
+import { AcScopeService } from '../ac/ac-scope.service';
 import { PrismaService } from '../common/prisma.service';
+import { isRp } from '../common/rp-scope';
 import { SettingsService } from '../settings/settings.service';
 import { WsGateway } from '../ws/ws.gateway';
 import { computeSnapshot, isDirty } from './dirty-detection';
-import { mapV2ToV01Type, seanceV2Include, toSessionV2Dto } from './seance-v2.mapper';
+import {
+  mapV2ToV01Type,
+  seanceV2Include,
+  toMaskedSessionV2Dto,
+  toSessionV2Dto,
+} from './seance-v2.mapper';
 import type { SeanceV2WithRelations } from './seance-v2.mapper';
 
 /** Query parameters parsed at the controller level. */
@@ -25,6 +33,9 @@ export interface WeekV2Query {
   classeId?: string;
   teacherId?: string; // enseignantId V02
   studentId?: string; // → resolved to classeId via user
+  // V05 LOT 6 (ADR-0022 §4) — référentiel Salle : occupation école de la salle,
+  // séances des autres RP renvoyées masquées.
+  salleId?: string;
   take?: number;
   skip?: number;
 }
@@ -42,12 +53,16 @@ export class SeanceV2Service {
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
     private readonly ws: WsGateway,
+    private readonly acScope: AcScopeService,
   ) {}
 
   // ── Reads ──────────────────────────────────────────────────────────
 
-  async findWeek(query: WeekV2Query): Promise<SessionV2Dto[]> {
-    const where = await this.buildWeekWhere(query);
+  async findWeek(query: WeekV2Query, user: CurrentUserPayload): Promise<SessionV2Dto[]> {
+    // Scope multi-école (V05) : un ADMIN/SUPER_ADMIN (`ecoleId` null) ne consulte
+    // pas le planning scopé → liste vide (aligné sur `classes.service`).
+    if (user.ecoleId === null) return [];
+    const where = await this.buildWeekWhere(query, user);
     const rows = await this.prisma.seance.findMany({
       where,
       include: seanceV2Include,
@@ -55,17 +70,40 @@ export class SeanceV2Service {
       ...(query.take !== undefined ? { take: query.take } : {}),
       ...(query.skip !== undefined ? { skip: query.skip } : {}),
     });
-    return rows.filter(hasV2Shape).map(toSessionV2Dto);
+    const v2rows = rows.filter(hasV2Shape);
+
+    // V05 LOT 6 (ADR-0022 §4) — référentiel Salle : occupation école visible mais
+    // les séances d'un AUTRE RP sont masquées (créneau + nom du RP seulement).
+    // Le masquage est appliqué CÔTÉ SERVEUR (les détails ne sont jamais sérialisés).
+    if (query.salleId && isRp(user.role)) {
+      return v2rows.map((r) =>
+        r.ownerRpId === user.id ? toSessionV2Dto(r) : toMaskedSessionV2Dto(r),
+      );
+    }
+    return v2rows.map(toSessionV2Dto);
   }
 
-  async stats(query: WeekV2Query): Promise<{
+  async stats(
+    query: WeekV2Query,
+    user: CurrentUserPayload,
+  ): Promise<{
     total: number;
     published: number;
     pending: number;
     byType: Record<SessionTypeV2, number>;
     bySousType: Record<string, number>;
   }> {
-    const where = await this.buildWeekWhere(query);
+    // Scope multi-école (V05) : ADMIN (`ecoleId` null) → compteurs à zéro.
+    if (user.ecoleId === null) {
+      return {
+        total: 0,
+        published: 0,
+        pending: 0,
+        byType: { COURS: 0, EVALUATION: 0, EVENEMENT: 0 },
+        bySousType: { CM: 0, TD: 0, TP: 0, EXAMEN: 0, RATTRAPAGE: 0, DEVOIR: 0 },
+      };
+    }
+    const where = await this.buildWeekWhere(query, user);
     const rows = await this.prisma.seance.findMany({
       where,
       select: { typeV2: true, sousType: true, isPublished: true },
@@ -98,11 +136,28 @@ export class SeanceV2Service {
     };
   }
 
-  async findOne(id: string): Promise<SessionV2Dto> {
-    const row = await this.prisma.seance.findUnique({
-      where: { id },
-      include: seanceV2Include,
-    });
+  /**
+   * Détail d'une séance V02. `ecoleId` est fourni par le contrôleur pour durcir
+   * le scope (pattern LOT 9) : la séance doit appartenir à l'école de l'acteur,
+   * sinon 404 (on ne divulgue pas l'existence d'une séance hors périmètre).
+   * Les appels internes (post-création/maj) l'omettent → aucun contrôle de scope.
+   */
+  async findOne(id: string, user?: CurrentUserPayload): Promise<SessionV2Dto> {
+    const where: Prisma.SeanceWhereInput = { id };
+    if (user !== undefined) {
+      // ADMIN (`ecoleId` null) → aucune séance ne lui appartient.
+      if (user.ecoleId === null) throw new NotFoundException(`Séance ${id} introuvable`);
+      const classeFilter = this.ecoleClasseFilter(user.ecoleId);
+      // V05 LOT 6 — un AC ne voit que ses classes assignées ; sinon 404.
+      if (this.acScope.isAc(user.role)) {
+        const assigned = await this.acScope.getAssignedClasseIds(user.id);
+        classeFilter.classeId = { in: assigned.length > 0 ? assigned : [NO_CLASSE] };
+      }
+      where.seanceClasses = { some: classeFilter };
+      // V05 LOT 6 (ADR-0022) — un RP ne voit le détail que de SES séances.
+      if (isRp(user.role)) where.ownerRpId = user.id;
+    }
+    const row = await this.prisma.seance.findFirst({ where, include: seanceV2Include });
     if (!row) throw new NotFoundException(`Séance ${id} introuvable`);
     if (!row.typeV2) {
       throw new NotFoundException(
@@ -178,6 +233,8 @@ export class SeanceV2Service {
           moduleId,
           salleId: dto.salleId ?? null,
           teacherId: teacherIdV01 ?? createdByUserId,
+          // V05 LOT 6 (ADR-0022) — RP créateur = propriétaire de la séance.
+          ownerRpId: createdByUserId,
           // Shared
           startAt,
           endAt,
@@ -434,7 +491,11 @@ export class SeanceV2Service {
     }
   }
 
-  private async buildWeekWhere(query: WeekV2Query): Promise<Prisma.SeanceWhereInput> {
+  private async buildWeekWhere(
+    query: WeekV2Query,
+    user: CurrentUserPayload,
+  ): Promise<Prisma.SeanceWhereInput> {
+    const ecoleId = user.ecoleId as string; // findWeek/stats gardent le cas null
     const weekStart = new Date(`${query.weekStart}T00:00:00.000Z`);
     const weekEnd = new Date(weekStart);
     weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
@@ -444,22 +505,63 @@ export class SeanceV2Service {
       typeV2: { not: null }, // V02 endpoints only expose V02-shaped rows
     };
 
-    if (query.classeId) {
-      where.seanceClasses = { some: { classeId: query.classeId } };
+    // V05 LOT 6 (ADR-0022 §4) — Référentiel SALLE = exception unique à
+    // l'isolation : un RP voit l'occupation COMPLÈTE de la salle (toute l'école,
+    // tous RP) pour éviter les collisions. Pas de filtre owner ici ; le masquage
+    // des séances d'autrui est appliqué après mapping (cf. findWeek).
+    if (query.salleId) {
+      where.salleId = query.salleId;
+      where.seanceClasses = { some: this.ecoleClasseFilter(ecoleId) };
+      return where;
     }
-    if (query.teacherId) {
-      where.enseignantId = query.teacherId;
-    }
-    if (query.studentId) {
+
+    // Scope multi-école (V05) : une séance n'est visible que si l'une de ses
+    // classes appartient à l'école de l'acteur. On compose ce filtre AND avec
+    // les filtres `classeId`/`studentId` existants sur la **même** jointure.
+    const classeFilter = this.ecoleClasseFilter(ecoleId);
+
+    // V05 LOT 6 — un AC ne voit que le planning de ses classes assignées.
+    if (this.acScope.isAc(user.role)) {
+      const assigned = await this.acScope.getAssignedClasseIds(user.id);
+      classeFilter.classeId =
+        query.classeId && assigned.includes(query.classeId)
+          ? query.classeId
+          : { in: assigned.length > 0 ? assigned : [NO_CLASSE] };
+    } else if (query.classeId) {
+      classeFilter.classeId = query.classeId;
+    } else if (query.studentId) {
       const student = await this.prisma.user.findUnique({
         where: { id: query.studentId },
         select: { classeId: true },
       });
-      where.seanceClasses = {
-        some: { classeId: student?.classeId ?? NO_CLASSE },
-      };
+      classeFilter.classeId = student?.classeId ?? NO_CLASSE;
+    }
+    where.seanceClasses = { some: classeFilter };
+
+    if (query.teacherId) {
+      where.enseignantId = query.teacherId;
+    }
+
+    // V05 LOT 6 (ADR-0022) — isolation : un RP ne voit que SES séances (hors
+    // référentiel Salle traité ci-dessus). Direction/Admin : aucun filtre owner.
+    if (isRp(user.role)) {
+      where.ownerRpId = user.id;
     }
     return where;
+  }
+
+  /**
+   * Filtre de jointure `SeanceClasse` restreignant aux classes d'une école.
+   * Une classe est rattachée à l'école via sa **formation** (V03) ou via la FK
+   * **filière** directe (legacy V01) — d'où le `OR`. Réutilisé par
+   * `buildWeekWhere` (liste/stats) et `findOne` (détail).
+   */
+  private ecoleClasseFilter(ecoleId: string): Prisma.SeanceClasseWhereInput {
+    return {
+      classe: {
+        OR: [{ formation: { filiere: { ecoleId } } }, { filiere: { ecoleId } }],
+      },
+    };
   }
 
   /**

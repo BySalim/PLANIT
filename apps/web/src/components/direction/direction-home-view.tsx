@@ -1,6 +1,8 @@
 'use client';
 
-// Vue home Direction (V05 LOT 3) — KPIs école + liens rapides.
+// Dashboard Direction (V05 LOT 3) — KPIs école + liens rapides. Rendu dans le
+// `<main>` déjà margé d'un `Shell` (page `/tableau-de-bord`) : pas de padding
+// propre ici, sinon double marge.
 // Données live via TanStack Query ; état interactif → 'use client' requis.
 
 import Link from 'next/link';
@@ -70,7 +72,7 @@ export function DirectionHomeView() {
   const sallesCount = (sallesQuery.data ?? []).length;
 
   return (
-    <div className="flex flex-col gap-8 px-6 py-8">
+    <div className="flex flex-col gap-8">
       {/* Greeting */}
       <div>
         <h1 className="font-display text-2xl font-semibold text-text">Bonjour, {fullName}</h1>
