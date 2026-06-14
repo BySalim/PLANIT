@@ -19,6 +19,7 @@ vi.mock('@/contexts/auth-context', () => ({
 
 vi.mock('@/hooks/use-role', () => ({
   useIsRp: () => true,
+  useIsDirection: () => false,
 }));
 
 import * as q1 from '@/lib/queries';
