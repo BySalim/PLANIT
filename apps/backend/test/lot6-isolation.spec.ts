@@ -157,6 +157,23 @@ describe('Planning — masquage en référentiel Salle (ADR-0022 §4)', () => {
       expect(s.masked).toBe(false);
     }
   });
+
+  // V05 LOT 7 — vue byroom (scope=ecole) : occupation école entière masquée.
+  it('RP2 en scope=ecole voit l’occupation école avec les séances de RP1 masquées', async () => {
+    const rp2 = await loginByEmail(app, RP2_EMAIL);
+    const res = await api()
+      .get(`/api/v2/sessions?weekStart=${monday}&scope=ecole`)
+      .set('Cookie', rp2.cookieHeader)
+      .expect(200);
+    expect(res.body.length).toBeGreaterThan(0);
+    // Toutes les séances (toutes de RP1 au seed) sont masquées pour RP2.
+    for (const s of res.body as Array<Record<string, unknown>>) {
+      expect(s.masked).toBe(true);
+      expect(s.module).toBeNull();
+      expect(s.classes).toEqual([]);
+      expect(s.enseignant).toBeNull();
+    }
+  });
 });
 
 // ── Salles subjectives ───────────────────────────────────────────────────────

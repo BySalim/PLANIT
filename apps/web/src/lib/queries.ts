@@ -15,7 +15,7 @@ import {
   z,
 } from '@planit/contracts';
 import { useAuth } from '@/contexts/auth-context';
-import { useIsRp } from '@/hooks/use-role';
+import { useIsDirection, useIsRp } from '@/hooks/use-role';
 import { apiGet } from './api';
 import { toWeekStartParam } from './week';
 
@@ -164,14 +164,16 @@ export const filiereKeys = {
   list: () => [...filiereKeys.all, 'list'] as const,
 };
 
-// `/api/filieres` est RP-only (offre de formation, groupe (rp-only)). Le seul
-// point d'entrée atteignable par un AC est le filtre filière de la page
-// Classes — gaté `isRp` pour éviter un 403 parasite. (fix LOT 6.)
+// `/api/filieres` (offre de formation, groupe (rp-only)) est lisible par le RP
+// (ses filières) ET la Direction (offre de son école, lecture seule, V05 LOT 3).
+// Gaté `isRp || isDirection` : l'AC reste exclu (le seul point d'entrée AC est le
+// filtre filière de la page Classes) pour éviter un 403 parasite. (fix LOT 6.)
 export function useFilieresQuery() {
   const isRp = useIsRp();
+  const isDirection = useIsDirection();
   return useQuery<FiliereDto[]>({
     queryKey: filiereKeys.list(),
     queryFn: () => apiGet('/filieres', filiereListSchema),
-    enabled: isRp,
+    enabled: isRp || isDirection,
   });
 }

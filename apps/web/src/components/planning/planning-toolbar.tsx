@@ -3,7 +3,8 @@
 import { ChevronDownIcon, DownloadIcon, PlusIcon } from '@planit/ui';
 import { cn } from '@/lib/utils';
 import { ExportMenu, type ExportFormat } from '@/components/ui/export-menu';
-import { ReferentielValuePicker } from './referentiel-value-picker';
+import { DaySelect } from './day-select';
+import { ReferentielCombobox, type ReferentielDim } from './referentiel-combobox';
 import { ViewModeTabs, type ViewMode } from './view-mode-tabs';
 import { WeekNavigator } from './week-navigator';
 
@@ -13,9 +14,13 @@ interface PlanningToolbarProps {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onCreateSession: () => void;
-  // V05 LOT 6 — référentiel planning (mode via ViewModeTabs + valeur contextuelle).
-  referentielId: string;
-  onReferentielChange: (id: string) => void;
+  // V05 LOT 7 — vue Classique : référentiel (dimension + valeur) via combobox.
+  classicDim: ReferentielDim;
+  classicId: string;
+  onClassicChange: (dim: ReferentielDim, id: string) => void;
+  // V05 LOT 7 — vues by-X (classe/salle/prof) : jour affiché.
+  activeDay: number;
+  onDayChange: (day: number) => void;
   // I.6 — undo/redo wiring (V2-D11). Pile vidée au publish.
   canUndo?: boolean | undefined;
   canRedo?: boolean | undefined;
@@ -124,8 +129,11 @@ export function PlanningToolbar({
   viewMode,
   onViewModeChange,
   onCreateSession,
-  referentielId,
-  onReferentielChange,
+  classicDim,
+  classicId,
+  onClassicChange,
+  activeDay,
+  onDayChange,
   canUndo = false,
   canRedo = false,
   onUndo,
@@ -147,23 +155,25 @@ export function PlanningToolbar({
         </>
       )}
       <WeekNavigator weekStart={weekStart} onChange={onWeekChange} />
-      {/* V05 LOT 6 — référentiel (Mon espace / Classe / Salle / Enseignant) : RP. */}
+      {/* V05 LOT 7.1 (réf. PLANIT-IA) — sélecteur de référentiel À GAUCHE (juste
+          après la nav semaine). Classique → combobox (classe/salle/prof) ;
+          by-X → sélecteur de jour. */}
       {readOnly ? null : (
         <>
           <ToolbarSeparator />
-          <ViewModeTabs active={viewMode} onChange={onViewModeChange} />
-          <ReferentielValuePicker
-            mode={viewMode}
-            value={referentielId}
-            onChange={onReferentielChange}
-          />
+          {viewMode === 'classique' ? (
+            <ReferentielCombobox dim={classicDim} value={classicId} onChange={onClassicChange} />
+          ) : (
+            <DaySelect weekStart={weekStart} activeDay={activeDay} onChange={onDayChange} />
+          )}
         </>
       )}
 
       {/* Spacer pushes the right cluster to the edge */}
       <div className="min-w-2 flex-1" />
 
-      {/* Right : export + (new session si RP) */}
+      {/* Right : switcher de type de vue (avant Export) + export + (new session si RP) */}
+      {readOnly ? null : <ViewModeTabs active={viewMode} onChange={onViewModeChange} />}
       {onExport === undefined ? (
         <ExportDisabled />
       ) : (

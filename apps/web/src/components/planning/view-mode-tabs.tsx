@@ -20,7 +20,7 @@ interface TabConfig {
 // ou par Classe / Salle / Enseignant. La vue Salle montre l'occupation de l'école
 // (séances des autres RP masquées).
 const TABS: TabConfig[] = [
-  { id: 'classique', label: 'Mon espace', enabled: true },
+  { id: 'classique', label: 'Classique', enabled: true },
   { id: 'classe', label: 'Classe', enabled: true },
   { id: 'salle', label: 'Salle', enabled: true },
   { id: 'prof', label: 'Enseignant', enabled: true },

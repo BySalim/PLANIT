@@ -19,6 +19,8 @@ const weekQuerySchema = z.object({
   studentId: z.string().min(1).optional(),
   // V05 LOT 6 (ADR-0022 §4) — référentiel Salle (occupation école + masquage).
   salleId: z.string().min(1).optional(),
+  // V05 LOT 7 — vue byroom : occupation de toute l'école (masquée).
+  scope: z.literal('ecole').optional(),
   take: z.coerce.number().int().min(1).max(500).default(100),
   skip: z.coerce.number().int().min(0).default(0),
 });

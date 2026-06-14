@@ -36,6 +36,9 @@ export interface WeekV2Query {
   // V05 LOT 6 (ADR-0022 §4) — référentiel Salle : occupation école de la salle,
   // séances des autres RP renvoyées masquées.
   salleId?: string;
+  // V05 LOT 7 — vue « par salle » (byroom) : occupation de TOUTE l'école
+  // (toutes salles), séances des autres RP masquées. Exception à l'isolation.
+  scope?: 'ecole';
   take?: number;
   skip?: number;
 }
@@ -72,10 +75,10 @@ export class SeanceV2Service {
     });
     const v2rows = rows.filter(hasV2Shape);
 
-    // V05 LOT 6 (ADR-0022 §4) — référentiel Salle : occupation école visible mais
-    // les séances d'un AUTRE RP sont masquées (créneau + nom du RP seulement).
-    // Le masquage est appliqué CÔTÉ SERVEUR (les détails ne sont jamais sérialisés).
-    if (query.salleId && isRp(user.role)) {
+    // V05 LOT 6/7 (ADR-0022 §4) — occupation école visible (référentiel Salle OU
+    // vue byroom `scope=ecole`) mais les séances d'un AUTRE RP sont masquées
+    // (créneau + nom du RP). Masquage CÔTÉ SERVEUR (détails jamais sérialisés).
+    if ((query.salleId || query.scope === 'ecole') && isRp(user.role)) {
       return v2rows.map((r) =>
         r.ownerRpId === user.id ? toSessionV2Dto(r) : toMaskedSessionV2Dto(r),
       );
@@ -511,6 +514,13 @@ export class SeanceV2Service {
     // des séances d'autrui est appliqué après mapping (cf. findWeek).
     if (query.salleId) {
       where.salleId = query.salleId;
+      where.seanceClasses = { some: this.ecoleClasseFilter(ecoleId) };
+      return where;
+    }
+
+    // V05 LOT 7 — vue byroom : occupation de toute l'école (toutes salles).
+    // Même exception à l'isolation ; masquage des séances d'autrui après mapping.
+    if (query.scope === 'ecole') {
       where.seanceClasses = { some: this.ecoleClasseFilter(ecoleId) };
       return where;
     }

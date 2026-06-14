@@ -7,6 +7,8 @@ import {
   type CreatePersonnelDto,
   type UpdatePersonnelDto,
   type AnneeAcademiqueDto,
+  type CreateAnneeAcademiqueDto,
+  type UpdateAnneeAcademiqueDto,
   type SalleDto,
   type CreateSalleDto,
   type UpdateSalleDto,
@@ -63,6 +65,27 @@ export function useReactiverPersonnelMutation() {
 }
 
 // ── Années (Direction) ────────────────────────────────────────────────────────
+
+// V05 LOT 7 — la Direction crée/modifie les années de son école (V5-D4).
+export function useCreateAnneeMutation() {
+  const qc = useQueryClient();
+  return useMutation<AnneeAcademiqueDto, Error, CreateAnneeAcademiqueDto>({
+    mutationFn: (dto) => apiPost('/annees', anneeAcademiqueSchema, dto),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: anneesDirectionKeys.all });
+    },
+  });
+}
+
+export function useUpdateAnneeMutation() {
+  const qc = useQueryClient();
+  return useMutation<AnneeAcademiqueDto, Error, { id: string; dto: UpdateAnneeAcademiqueDto }>({
+    mutationFn: ({ id, dto }) => apiPut(`/annees/${id}`, anneeAcademiqueSchema, dto),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: anneesDirectionKeys.all });
+    },
+  });
+}
 
 export function useDebuterAnneeMutation() {
   const qc = useQueryClient();

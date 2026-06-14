@@ -23,6 +23,7 @@ import { FormationsModule } from './formations/formations.module';
 import { HealthModule } from './health/health.module';
 import { InscriptionsModule } from './inscriptions/inscriptions.module';
 import { MaquettesModule } from './maquettes/maquettes.module';
+import { PlanningViewGroupsModule } from './planning-view-groups/planning-view-groups.module';
 import { SeanceModule } from './seance/seance.module';
 import { SuiviModulesModule } from './suivi-modules/suivi-modules.module';
 import { SeanceV2Module } from './seance-v2/seance-v2.module';
@@ -75,6 +76,8 @@ const DEFAULT_LIMIT = isTest ? 10_000 : 100;
     UtilisateursModule,
     // V05 LOT 2 — Direction scope école : personnel, audit, transitions année, salles
     DirectionModule,
+    // V05 LOT 7.1 — groupes de vue planning (presets custom des vues by-X)
+    PlanningViewGroupsModule,
   ],
   providers: [
     // Ordre important : throttler → auth → RBAC.

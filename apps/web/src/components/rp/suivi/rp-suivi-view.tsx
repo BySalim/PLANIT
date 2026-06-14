@@ -253,9 +253,12 @@ function SuiviTable({
             <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Statut
             </th>
-            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-              Responsable
-            </th>
+            {/* Responsable masqué pour le RP (canEdit) : il ne voit que ses modules. */}
+            {canEdit ? null : (
+              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                Responsable
+              </th>
+            )}
             <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Prévu
             </th>
@@ -365,9 +368,12 @@ function SuiviRow({
       <td className="px-4 py-3.5">
         <StatutPill statut={suivi.statut} />
       </td>
-      <td className="px-4 py-3.5">
-        <ResponsableCell responsable={suivi.responsable} />
-      </td>
+      {/* Responsable masqué pour le RP (canEdit) : il ne voit que ses modules. */}
+      {canEdit ? null : (
+        <td className="px-4 py-3.5">
+          <ResponsableCell responsable={suivi.responsable} />
+        </td>
+      )}
       <td className="px-4 py-3.5 text-right tabular-nums text-text-sec">
         {formatHours(suivi.heuresPrevues)}
       </td>

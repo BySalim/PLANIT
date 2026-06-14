@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { niveauSchema } from '../academic/index';
 
 export const sessionTypeSchema = z.enum(['CM', 'TD', 'TP', 'EXAM', 'RATTRAP', 'DEVOIR', 'EVENT']);
 
@@ -12,6 +13,10 @@ export const classeRefSchema = z.object({
   id: z.string(),
   code: z.string(),
   name: z.string(),
+  // V05 LOT 7.1 — niveau (L1…M2) hérité de la formation, surfacé pour le
+  // sélecteur de référentiel et les en-têtes de colonnes by-class. Optionnel :
+  // les classes embarquées dans une séance ne le portent pas.
+  niveau: niveauSchema.nullable().optional(),
 });
 
 export const moduleRefSchema = z.object({

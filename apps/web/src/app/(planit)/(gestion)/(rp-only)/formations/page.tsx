@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronRightIcon } from '@planit/ui';
 import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
-import { useIsDirection } from '@/hooks/use-role';
+import { useIsDirection, useIsRp } from '@/hooks/use-role';
 import { useFilieresQuery } from '@/lib/queries';
 import { useAnneesQuery, useFormationsQuery } from '@/lib/queries-v3';
 import { FormationModal } from '@/components/rp/formations/formation-modal';
@@ -28,13 +28,21 @@ function SigleBadge({ sigle }: { sigle: string }) {
   );
 }
 
-const COLS = 'grid grid-cols-[150px_70px_1fr_120px_180px_auto] items-center gap-3';
+// Colonne « Responsable » masquée pour le RP (il ne voit que ses propres
+// créations → redondant) ; affichée pour la Direction (offre école-large).
+// ⚠️ Classes Tailwind en LITTÉRAL complet (la JIT n'évalue pas une valeur
+// arbitraire construite dynamiquement → sinon pas de grid-template généré).
+const COLS_WITH_RESPONSABLE = 'grid grid-cols-[150px_70px_1fr_120px_180px_auto] items-center gap-3';
+const COLS_NO_RESPONSABLE = 'grid grid-cols-[150px_70px_1fr_120px_auto] items-center gap-3';
 
 // ── Page ──────────────────────────────────────────────────────────────
 export default function FormationsPage() {
   const router = useRouter();
   // V05 LOT 6 — Direction en lecture seule sur l'offre de formation (ADR-0020 §7).
   const readOnly = useIsDirection();
+  // Le RP ne voit que ses formations → la colonne « Responsable » est redondante.
+  const showResponsable = !useIsRp();
+  const COLS = showResponsable ? COLS_WITH_RESPONSABLE : COLS_NO_RESPONSABLE;
 
   const [filiereFilter, setFiliereFilter] = useState('');
   const [anneeFilter, setAnneeFilter] = useState('');
@@ -143,9 +151,11 @@ export default function FormationsPage() {
             <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Année
             </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-              Responsable
-            </span>
+            {showResponsable ? (
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                Responsable
+              </span>
+            ) : null}
             <span className="w-[290px]" />
           </div>
 
@@ -169,8 +179,8 @@ export default function FormationsPage() {
                 {f.anneeLibelle ?? '—'}
               </span>
 
-              {/* Responsable (V05 LOT 4.3) */}
-              <ResponsableCell responsable={f.responsable ?? null} />
+              {/* Responsable (V05 LOT 4.3) — masqué pour le RP */}
+              {showResponsable ? <ResponsableCell responsable={f.responsable ?? null} /> : null}
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-1.5">

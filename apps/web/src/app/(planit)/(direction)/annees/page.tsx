@@ -4,12 +4,19 @@
 // Pilotage du cycle de vie des années : PLANIFIEE → EN_COURS → CLOTUREE.
 // État interactif (mutations, confirm) → 'use client'.
 
+import { useState } from 'react';
 import { type AnneeAcademiqueDto, type AnneeEtat } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast-provider';
+import { AnneeModal } from '@/components/direction/annee-modal';
 import { useAnneesDirectionQuery } from '@/lib/direction-queries';
 import { useDebuterAnneeMutation, useCloturerAnneeMutation } from '@/lib/direction-mutations';
+
+type ModalState =
+  | { open: false }
+  | { open: true; mode: 'create' }
+  | { open: true; mode: 'edit'; initial: AnneeAcademiqueDto };
 
 type EtatBadgeProps = {
   etat: AnneeEtat;
@@ -56,9 +63,10 @@ function formatDate(isoStr: string): string {
 type AnneeRowProps = {
   annee: AnneeAcademiqueDto;
   hasEnCours: boolean;
+  onEdit: (annee: AnneeAcademiqueDto) => void;
 };
 
-function AnneeRow({ annee, hasEnCours }: AnneeRowProps) {
+function AnneeRow({ annee, hasEnCours, onEdit }: AnneeRowProps) {
   const toast = useToast();
   const debuterMutation = useDebuterAnneeMutation();
   const cloturerMutation = useCloturerAnneeMutation();
@@ -102,28 +110,36 @@ function AnneeRow({ annee, hasEnCours }: AnneeRowProps) {
       <td className="px-5 py-3.5">
         <EtatBadge etat={annee.etat} />
       </td>
-      <td className="px-5 py-3.5 text-right">
-        {annee.etat === 'PLANIFIEE' ? (
-          <span title={hasEnCours ? 'Une année est déjà en cours' : undefined}>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => void handleDebuter()}
-              disabled={debuterDisabled}
-            >
-              Débuter
+      <td className="px-5 py-3.5">
+        <div className="flex items-center justify-end gap-2">
+          {/* V05 LOT 7 — édition libellé/dates (sauf année clôturée). */}
+          {annee.etat !== 'CLOTUREE' ? (
+            <Button variant="ghost" size="sm" onClick={() => onEdit(annee)}>
+              Modifier
             </Button>
-          </span>
-        ) : annee.etat === 'EN_COURS' ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => void handleCloturer()}
-            disabled={cloturerMutation.isPending}
-          >
-            Clôturer
-          </Button>
-        ) : null}
+          ) : null}
+          {annee.etat === 'PLANIFIEE' ? (
+            <span title={hasEnCours ? 'Une année est déjà en cours' : undefined}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => void handleDebuter()}
+                disabled={debuterDisabled}
+              >
+                Débuter
+              </Button>
+            </span>
+          ) : annee.etat === 'EN_COURS' ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void handleCloturer()}
+              disabled={cloturerMutation.isPending}
+            >
+              Clôturer
+            </Button>
+          ) : null}
+        </div>
       </td>
     </tr>
   );
@@ -133,6 +149,7 @@ function AnneeRow({ annee, hasEnCours }: AnneeRowProps) {
 // eslint-disable-next-line no-restricted-syntax
 export default function AnneesPage() {
   const anneesQuery = useAnneesDirectionQuery();
+  const [modal, setModal] = useState<ModalState>({ open: false });
 
   const sorted = [...(anneesQuery.data ?? [])].sort((a, b) => {
     // EN_COURS en premier, puis PLANIFIEE, puis CLOTUREE/SUSPENDUE par date fin desc
@@ -156,6 +173,23 @@ export default function AnneesPage() {
       activeNavId="annees"
       surface
     >
+      <div className="mb-4 flex items-center justify-end">
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => setModal({ open: true, mode: 'create' })}
+        >
+          + Planifier une année
+        </Button>
+      </div>
+
+      <AnneeModal
+        isOpen={modal.open}
+        onClose={() => setModal({ open: false })}
+        mode={modal.open ? modal.mode : 'create'}
+        initial={modal.open && modal.mode === 'edit' ? modal.initial : undefined}
+      />
+
       {anneesQuery.isLoading ? (
         <div className="overflow-hidden rounded-2xl border border-border-soft bg-surface shadow-sm">
           <div className="border-b border-border-soft bg-bg px-5 py-2.5">
@@ -205,7 +239,12 @@ export default function AnneesPage() {
               </thead>
               <tbody>
                 {sorted.map((annee) => (
-                  <AnneeRow key={annee.id} annee={annee} hasEnCours={hasEnCours} />
+                  <AnneeRow
+                    key={annee.id}
+                    annee={annee}
+                    hasEnCours={hasEnCours}
+                    onEdit={(a) => setModal({ open: true, mode: 'edit', initial: a })}
+                  />
                 ))}
               </tbody>
             </table>
