@@ -311,6 +311,15 @@ Subagents (à invoquer **on-demand uniquement**, pas systématiquement — chaqu
 - **Année académique gérée par la Direction** : `POST`/`PUT /annees` ouverts à `DIRECTION` **en plus** de `RESPONSABLE_PROGRAMME` (pas de substitution). `update` **durci au scope école** (`ecoleId = requireEcole(user)`) — un acteur n'édite que les années de son école. UI = [annee-modal.tsx](apps/web/src/components/direction/annee-modal.tsx) (libellé + dates ; `etat` reste piloté par débuter/clôturer). Règle « 1 EN_COURS / école » inchangée (index partiel Postgres).
 - **Multi-classes en byclass (D-E)** : une séance multi-classes s'affiche dans **chaque** colonne de ses classes ; un drop cross-colonne **remplace** l'ensemble par la classe cible (simplification assumée, `TD-V05-LOT7-MULTICLASSE-DROP`).
 
+## Patterns émergés Vague 05 — LOT 7.1 (fidélité PLANIT-IA toolbar/niveau + groupes de vue)
+
+> Capitalisation du LOT 7.1 (retours TL après aperçu navigateur). Acquis : tout nouveau code planning suit ces conventions.
+
+- **Ordre de la toolbar planning (réf. PLANIT-IA `WeekToolbar`)** : sélecteur de **référentiel à gauche** (combobox en vue Classique, `DaySelect` en vue by-X), juste après la nav semaine ; **switcher de type de vue à droite** (`ViewModeTabs` Classique/Classe/Salle/Enseignant) juste avant « Exporter ». Spacer `flex-1` entre les deux. Ne pas remettre les onglets à gauche.
+- **Niveau de classe surfacé** : `niveau` (L1…M2, hérité de la formation) est ajouté à `classeRefSchema` en **optionnel/nullable** — déjà envoyé par `GET /classes`, il était droppé au parse front. Affiché en badge dans le `referentiel-combobox` (bouton + liste) et sous l'en-tête des colonnes by-class (`ByEntityColumn.badge`). Une classe embarquée dans une séance ne porte pas de niveau (d'où l'optionnel).
+- **Groupes de vue planning (réf. PLANIT-IA `SubViewBar` + `CustomViewPopover`)** : barre au-dessus des vues by-X (RP, `!readOnly`). Un **groupe de vue = sous-ensemble ordonné de références** (colonnes). Deux types : **presets** dérivés client des colonnes via `ByEntityColumn.group` (niveau pour classe, spécialité pour prof — pas de preset Salle, `SalleRef` sans type, `TD-V05-LOT7-SALLE-PRESET`) → filtrent par `group` ; **vues custom** créées via popover (nom + recherche + **sélection réordonnable par drag HTML5 natif**) → filtrent **et ordonnent** par `refIds`. Le « drag des colonnes » = la liste réordonnable du popover (les en-têtes de grille ne sont pas draggables, comme dans le prototype).
+- **Persistance des groupes de vue = backend partagé** (décision TL, pas localStorage) : modèle `PlanningViewGroup` (`userId`, `view` enum `CLASSE/SALLE/PROF`, `name`, `refIds[]`), **privé à son créateur** (CRUD scopé `userId`, 404 si non-propriétaire — jamais de fuite cross-utilisateur). Endpoints `/api/planning/view-groups` (RP/AC/Direction). L'API expose la dimension en **minuscule** (`classe/salle/prof`, alignée sur `ReferentielDim`) ; le service mappe sur l'enum Prisma. Le `state subView` (`{kind:'preset'|'custom', …}`) du `rp-planning-view` pilote `displayedColumns` ; réinitialisé au changement d'onglet by-X.
+
 ---
 
 ## Sécurité — règles dès jour 1
