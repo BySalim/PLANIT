@@ -79,7 +79,9 @@ type ModalState =
   | { open: true; mode: 'edit'; initial: ClasseV3Dto };
 
 // V05 LOT 6 — colonne « Année » retirée (filtre année conservé dans la toolbar).
-const COLS = 'grid grid-cols-[1.7fr_120px_180px_190px_auto] items-center gap-3';
+// Colonne « Responsable » masquée pour le RP (il ne voit que ses classes).
+const cols = (showResponsable: boolean): string =>
+  `grid grid-cols-[1.7fr_120px${showResponsable ? '_180px' : ''}_190px_auto] items-center gap-3`;
 
 // ── Page (inner — useSearchParams nécessite un Suspense en Next 15) ────
 function ClassesPageInner() {
@@ -87,6 +89,9 @@ function ClassesPageInner() {
   const searchParams = useSearchParams();
   const isRp = useIsRp();
   const isDirection = useIsDirection();
+  // Le RP ne voit que ses classes → colonne « Responsable » redondante.
+  const showResponsable = !isRp;
+  const COLS = cols(showResponsable);
 
   const [searchInput, setSearchInput] = useState('');
   const [q, setQ] = useState('');
@@ -223,9 +228,11 @@ function ClassesPageInner() {
             <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Double diplôme
             </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-              Responsable
-            </span>
+            {showResponsable ? (
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                Responsable
+              </span>
+            ) : null}
             <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
               Places
             </span>
@@ -261,8 +268,8 @@ function ClassesPageInner() {
                 )}
               </div>
 
-              {/* Responsable (V05 LOT 4.3) */}
-              <ResponsableCell responsable={c.responsable ?? null} />
+              {/* Responsable (V05 LOT 4.3) — masqué pour le RP */}
+              {showResponsable ? <ResponsableCell responsable={c.responsable ?? null} /> : null}
 
               {/* Places */}
               <PlacesBar inscrits={c.places.inscrits} capaciteMax={c.places.capaciteMax} />

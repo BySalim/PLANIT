@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { AnneeAcademiqueDto, MaquetteDto } from '@planit/contracts';
+import { useIsRp } from '@/hooks/use-role';
 import { cn } from '@/lib/utils';
 
 // ── Niveaux ordonnés ──────────────────────────────────────────────────
@@ -29,6 +30,8 @@ interface MaquetteItemProps {
 
 function MaquetteItem({ maquette, selected, lastAnnee, onClick }: MaquetteItemProps) {
   const meta = lastAnnee ? etatMeta(lastAnnee.etat) : null;
+  // Le RP ne voit que ses maquettes → le responsable (lui-même) est redondant.
+  const showResponsable = !useIsRp();
 
   return (
     <button
@@ -62,8 +65,8 @@ function MaquetteItem({ maquette, selected, lastAnnee, onClick }: MaquetteItemPr
             <path d="M6 12v5c3 3 9 3 12 0v-5" />
           </svg>
           {maquette.filiere?.sigle ?? ''}
-          {/* V05 LOT 4.3 — Responsable (V5-D5) */}
-          {maquette.responsable ? (
+          {/* V05 LOT 4.3 — Responsable (V5-D5) — masqué pour le RP */}
+          {showResponsable && maquette.responsable ? (
             <span
               className="ml-1 truncate"
               title={`Responsable : ${maquette.responsable.fullName}`}
