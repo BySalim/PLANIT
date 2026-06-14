@@ -638,3 +638,50 @@ describe('GET /api/etudiants — Direction scope école', () => {
     expect(idsA.size).toBeGreaterThan(0);
   });
 });
+
+// V05 LOT 7 — la Direction crée/modifie les années de son école (RBAC ouvert).
+describe('POST/PUT /api/annees (Direction, V05 LOT 7)', () => {
+  it('la Direction planifie une nouvelle année (201, PLANIFIEE)', async () => {
+    const session = await directionA();
+    const res = await api().post('/api/annees').set('Cookie', session.cookieHeader).send({
+      libelle: '2030-2031',
+      debut: '2030-09-01T00:00:00.000Z',
+      fin: '2031-06-30T00:00:00.000Z',
+      etat: 'PLANIFIEE',
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.etat).toBe('PLANIFIEE');
+    expect(res.body.libelle).toBe('2030-2031');
+  });
+
+  it("la Direction modifie le libellé d'une année de son école (200)", async () => {
+    const session = await directionA();
+    const annee = await prisma.anneeAcademique.create({
+      data: {
+        id: 'test-annee-edit',
+        libelle: '2031-2032',
+        debut: new Date('2031-09-01'),
+        fin: new Date('2032-06-30'),
+        etat: 'PLANIFIEE',
+        ecoleId: 'ecole_ism',
+      },
+    });
+    const res = await api()
+      .put(`/api/annees/${annee.id}`)
+      .set('Cookie', session.cookieHeader)
+      .send({ libelle: '2031-2032 (rév.)' });
+    expect(res.status).toBe(200);
+    expect(res.body.libelle).toBe('2031-2032 (rév.)');
+  });
+
+  it("la Direction B ne modifie pas une année de l'école A (404)", async () => {
+    const sessionB = await directionB();
+    const anneeA = await prisma.anneeAcademique.findFirst({ where: { ecoleId: 'ecole_ism' } });
+    if (!anneeA) throw new Error('Aucune année école A');
+    await api()
+      .put(`/api/annees/${anneeA.id}`)
+      .set('Cookie', sessionB.cookieHeader)
+      .send({ libelle: 'Piratage' })
+      .expect(404);
+  });
+});

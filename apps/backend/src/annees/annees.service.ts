@@ -145,9 +145,15 @@ export class AnneesService {
     return toDto(updated);
   }
 
-  async update(id: string, dto: UpdateAnneeAcademiqueDto): Promise<AnneeAcademiqueDto> {
+  async update(
+    id: string,
+    dto: UpdateAnneeAcademiqueDto,
+    ecoleId: string,
+  ): Promise<AnneeAcademiqueDto> {
     const exists = await this.prisma.anneeAcademique.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException(`Année ${id} introuvable`);
+    // V05 LOT 7 — scope école : on ne modifie pas l'année d'une autre école.
+    if (exists.ecoleId !== ecoleId) throw new NotFoundException(`Année ${id} introuvable`);
 
     if (dto.etat === 'EN_COURS' && exists.etat !== 'EN_COURS') {
       // Garde scopée à l'école de l'année (l'unicité EN_COURS est par école).

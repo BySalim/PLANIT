@@ -43,10 +43,12 @@ export class AnneesController {
   }
 
   @Post()
-  @Roles('RESPONSABLE_PROGRAMME')
+  // V05 LOT 7 — la Direction gère le cycle de vie de l'année (V5-D4). Le RP
+  // conserve l'accès (rétro-compat ; aucun flux RP UI ne l'utilise aujourd'hui).
+  @Roles('RESPONSABLE_PROGRAMME', 'DIRECTION')
   @HttpCode(201)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Créer une année académique (RP, rattachée à son école)' })
+  @ApiOperation({ summary: 'Créer une année académique (RP/Direction, rattachée à son école)' })
   @ApiResponse({ status: 201, description: 'Année créée' })
   @ApiResponse({ status: 403, description: 'Acteur sans école de rattachement' })
   @ApiResponse({ status: 409, description: 'Libellé déjà utilisé ou une année est déjà EN_COURS' })
@@ -58,17 +60,18 @@ export class AnneesController {
   }
 
   @Put(':id')
-  @Roles('RESPONSABLE_PROGRAMME')
+  @Roles('RESPONSABLE_PROGRAMME', 'DIRECTION')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Mettre à jour une année académique (RP)' })
+  @ApiOperation({ summary: 'Mettre à jour une année académique (RP/Direction, scopé école)' })
   @ApiResponse({ status: 200, description: 'Année mise à jour' })
-  @ApiResponse({ status: 404, description: 'Année introuvable' })
+  @ApiResponse({ status: 404, description: 'Année introuvable ou hors périmètre' })
   @ApiResponse({ status: 409, description: 'Libellé déjà utilisé ou une année est déjà EN_COURS' })
   update(
     @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
     @Body(new ZodValidationPipe(updateAnneeAcademiqueSchema)) dto: UpdateAnneeAcademiqueDto,
   ): Promise<AnneeAcademiqueDto> {
-    return this.annees.update(id, dto);
+    return this.annees.update(id, dto, requireEcole(user));
   }
 
   /** Transition PLANIFIEE → EN_COURS (LOT 2 / V5-D2). */
