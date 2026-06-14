@@ -59,19 +59,30 @@ const salleRefListSchema = salleRefSchema.array();
 
 export function useV2WeekSessionsQuery(
   weekStart: Date,
-  options?: { teacherId?: string; studentId?: string; classeId?: string; salleId?: string },
+  options?: {
+    teacherId?: string;
+    studentId?: string;
+    classeId?: string;
+    salleId?: string;
+    scope?: 'ecole';
+  },
 ) {
   const weekStartParam = toWeekStartParam(weekStart);
   const teacherId = options?.teacherId;
   const studentId = options?.studentId;
   const classeId = options?.classeId;
   const salleId = options?.salleId;
+  const scope = options?.scope;
   const params = new URLSearchParams({ weekStart: weekStartParam });
 
-  // V05 LOT 6 — référentiel planning : Salle (occupation école masquée),
-  // Enseignant, Classe ou « Mon espace » (défaut, isolation RP côté serveur).
+  // V05 LOT 6/7 — référentiel planning : Salle (occupation école masquée),
+  // Enseignant, Classe, « Mon espace » (défaut, isolation RP), ou occupation
+  // école entière (`scope=ecole`, vue byroom).
   let queryKey: readonly unknown[];
-  if (salleId !== undefined) {
+  if (scope === 'ecole') {
+    params.set('scope', 'ecole');
+    queryKey = [...planningV2Keys.all, 'sessions', weekStartParam, 'ecole'] as const;
+  } else if (salleId !== undefined) {
     params.set('salleId', salleId);
     queryKey = planningV2Keys.sessionsBySalle(weekStartParam, salleId);
   } else if (studentId !== undefined) {

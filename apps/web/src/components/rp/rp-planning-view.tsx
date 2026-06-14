@@ -1,27 +1,36 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { addDays } from 'date-fns';
 import type { CreateSessionV2Dto, SessionV2Dto } from '@planit/contracts';
 import { Shell } from '@/components/layout/shell';
 import { CreateSessionModal } from '@/components/planning/create-session-modal';
 import { PlanningFooter } from '@/components/planning/stats-bar';
 import { PlanningGrid } from '@/components/planning/planning-grid';
+import {
+  PlanningGridByEntity,
+  type ByEntityColumn,
+} from '@/components/planning/planning-grid-by-entity';
 import { PlanningGridSkeleton } from '@/components/planning/planning-grid-skeleton';
 import { PlanningToolbar } from '@/components/planning/planning-toolbar';
+import type { ReferentielDim } from '@/components/planning/referentiel-combobox';
 import { SessionDetailDrawer } from '@/components/planning/session-detail-drawer';
 import { ViewScopeToggle, type ViewScope } from '@/components/planning/view-scope-toggle';
 import type { ViewMode } from '@/components/planning/view-mode-tabs';
 import { useIsAc, useIsDirection } from '@/hooks/use-role';
 import { useGlobalShortcut } from '@/lib/keyboard';
 import { useCreateSessionV2Mutation, useDeleteSessionV2Mutation } from '@/lib/mutations-v2';
-import { useV2WeekSessionsQuery } from '@/lib/queries-v2';
+import {
+  useV2WeekSessionsQuery,
+  useClassesQuery,
+  useSallesQuery,
+  useEnseignantsQuery,
+} from '@/lib/queries-v2';
 import { usePlanningUndoStack } from '@/lib/undo-stack';
 import { getCurrentWeekStart } from '@/lib/week';
 import { exportPlanning, type ExportFormat } from '@/lib/export';
 import { useFlash } from '@planit/ui';
 
-// V1-D2 hardcoded demo counters (matchent les compteurs PLANIT-IA D.kpis).
-// À remplacer par des hooks dédiés en Vague 02.
 const DEMO_CONFLICTS = 3;
 const DEMO_PENDING_DEMANDS = 5;
 const DEMO_UNREAD_NOTIFS = 3;
@@ -30,17 +39,22 @@ interface CreateInit {
   readonly date: Date;
   readonly startTime: string;
   readonly endTime: string;
+  // V05 LOT 7 — préremplissage depuis les vues by-X.
+  readonly classeIds?: readonly string[];
+  readonly salleId?: string;
+  readonly enseignantId?: string;
+}
+
+/** Index du jour courant (Lun=0 … Dim=6) pour le défaut des vues by-X. */
+function todayDayIndex(): number {
+  const js = new Date().getDay();
+  return js === 0 ? 6 : js - 1;
 }
 
 /**
- * Vue planning RP/AC — rendue par le home role-aware (`/`) quand l'acteur connecté
- * est RESPONSABLE_PROGRAMME ou ASSISTANT_PROGRAMME. (Anciennement la page `/rp`.)
- *
- * LOT 6 G.3 — Mode AC : tout en lecture seule (pas de drag/resize/create/publish/
- * undo/redo). Le breadcrumb passe à « Mon espace » au lieu de « Espace RP ».
- *
- * V05 LOT 3 — La Direction consomme la même vue en lecture seule : planning de
- * toute son école (requête sans `classeId` → scopée école côté serveur).
+ * Vue planning RP/AC/Direction. RP : onglets Classique (un référentiel, semaine)
+ * et Classe/Salle/Enseignant (vues mono-jour multi-colonnes éditables, réf.
+ * PLANIT-IA). AC/Direction : lecture seule (semaine scopée serveur).
  */
 export function RpPlanningView() {
   const flash = useFlash();
@@ -50,35 +64,68 @@ export function RpPlanningView() {
   const [weekStart, setWeekStart] = useState<Date>(() => getCurrentWeekStart());
   const [createOpen, setCreateOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  // I.1 / I.2 — pré-remplissage de la modale depuis un clic/drag sur slot vide.
   const [createInit, setCreateInit] = useState<CreateInit | null>(null);
-
-  // LOT 7 (X.2) — ref sur le container de la grille planning (capturé en PNG/PDF).
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('classique');
-  // V05 LOT 6 — valeur du référentiel choisi (classe/salle/enseignant). Vidée
-  // quand le mode change.
-  const [referentielId, setReferentielId] = useState('');
-  const handleViewModeChange = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-    setReferentielId('');
-  }, []);
+  // V05 LOT 7 — vue Classique : dimension + valeur du référentiel sélectionné.
+  const [classicDim, setClassicDim] = useState<ReferentielDim>('classe');
+  const [classicId, setClassicId] = useState('');
+  // Vues by-X : jour affiché.
+  const [activeDay, setActiveDay] = useState<number>(() => todayDayIndex());
   const [scope, setScope] = useState<ViewScope>('week');
 
-  // Mappe (mode, valeur) → filtre de requête. « Mon espace » = aucun filtre
-  // (isolation RP côté serveur). Salle = occupation école masquée (ADR-0022 §4).
-  const referentielOptions = useMemo(() => {
-    if (referentielId === '') return undefined;
-    if (viewMode === 'classe') return { classeId: referentielId };
-    if (viewMode === 'salle') return { salleId: referentielId };
-    if (viewMode === 'prof') return { teacherId: referentielId };
-    return undefined;
-  }, [viewMode, referentielId]);
+  const handleViewModeChange = useCallback((mode: ViewMode) => setViewMode(mode), []);
+  const handleClassicChange = useCallback((dim: ReferentielDim, id: string) => {
+    setClassicDim(dim);
+    setClassicId(id);
+  }, []);
 
-  const sessionsQuery = useV2WeekSessionsQuery(weekStart, referentielOptions);
+  // Référentiels (RP) : colonnes des vues by-X + options du combobox Classique.
+  const classesQuery = useClassesQuery();
+  const sallesQuery = useSallesQuery();
+  const enseignantsQuery = useEnseignantsQuery();
+
+  // Défaut Classique : 1ʳᵉ classe possédée dès que la liste arrive.
+  useEffect(() => {
+    if (classicId === '' && classicDim === 'classe' && (classesQuery.data?.length ?? 0) > 0) {
+      setClassicId(classesQuery.data![0]!.id);
+    }
+  }, [classicId, classicDim, classesQuery.data]);
+
+  // Filtre de requête selon la vue (cf. backend : owner/école/masquage).
+  const queryOptions = useMemo(() => {
+    if (viewMode === 'classique') {
+      if (classicId === '') return undefined;
+      if (classicDim === 'classe') return { classeId: classicId };
+      if (classicDim === 'salle') return { salleId: classicId };
+      return { teacherId: classicId };
+    }
+    if (viewMode === 'salle') return { scope: 'ecole' as const };
+    return undefined; // classe / prof : ma semaine (owner), groupée côté grille
+  }, [viewMode, classicDim, classicId]);
+
+  const sessionsQuery = useV2WeekSessionsQuery(weekStart, queryOptions);
   const sessions = useMemo(() => sessionsQuery.data ?? [], [sessionsQuery.data]);
+
+  // Colonnes des vues by-X selon la dimension de l'onglet.
+  const byEntityColumns = useMemo<ByEntityColumn[]>(() => {
+    if (viewMode === 'classe') {
+      return (classesQuery.data ?? []).map((c) => ({ id: c.id, label: c.code, sub: c.name }));
+    }
+    if (viewMode === 'salle') {
+      return (sallesQuery.data ?? []).map((s) => ({ id: s.id, label: s.name }));
+    }
+    if (viewMode === 'prof') {
+      return (enseignantsQuery.data ?? []).map((t) => ({
+        id: t.id,
+        label: t.nomComplet,
+        sub: t.specialite,
+      }));
+    }
+    return [];
+  }, [viewMode, classesQuery.data, sallesQuery.data, enseignantsQuery.data]);
 
   const handleExport = useCallback(
     async (fmt: ExportFormat) => {
@@ -96,22 +143,13 @@ export function RpPlanningView() {
     [sessions, weekStart, flash],
   );
 
-  // I.6 — pile undo/redo locale à la page (V2-D11). Vidée au publish.
   const undoStack = usePlanningUndoStack();
   useGlobalShortcut('z', { ctrl: true, shift: false }, undoStack.undo);
   useGlobalShortcut('z', { ctrl: true, shift: true }, undoStack.redo);
 
-  // LOT 4 V2 — mutations pour push une entrée undo après une création.
   const { mutateAsync: createSession } = useCreateSessionV2Mutation();
   const { mutateAsync: deleteSession } = useDeleteSessionV2Mutation();
 
-  /**
-   * Push une entrée undo après chaque création :
-   *  - undo = supprime la séance créée (DELETE /api/v2/sessions/:id)
-   *  - redo = recrée la séance avec le payload original
-   * La nouvelle séance créée par redo a un id différent ; on suit le dernier
-   * id connu via une ref locale (`currentIdRef`) capturée dans la closure.
-   */
   const pushCreateUndo = (created: SessionV2Dto, original: CreateSessionV2Dto) => {
     const currentIdRef = { id: created.id };
     undoStack.push({
@@ -126,12 +164,8 @@ export function RpPlanningView() {
     });
   };
 
-  // Double-clic sur une séance → ouverture du drawer de détail.
-  const handleSessionOpen = (session: SessionV2Dto) => {
-    setDetailSessionId(session.id);
-  };
+  const handleSessionOpen = (session: SessionV2Dto) => setDetailSessionId(session.id);
 
-  // I.1 / I.2 — ouvre la modale avec la plage cliquée/glissée.
   const handleCreateAtSlot = (init: CreateInit) => {
     setCreateInit(init);
     setCreateOpen(true);
@@ -140,6 +174,8 @@ export function RpPlanningView() {
     setCreateOpen(false);
     setCreateInit(null);
   };
+
+  const isClassique = viewMode === 'classique';
 
   return (
     <Shell
@@ -154,16 +190,17 @@ export function RpPlanningView() {
       pendingDemands={readOnly ? 0 : DEMO_PENDING_DEMANDS}
       unreadNotifs={readOnly ? 0 : DEMO_UNREAD_NOTIFS}
     >
-      {/* Pleine page : barres figées, grille scrollable au centre (calqué PLANIT-IA/rp). */}
       <div className="flex h-full flex-col">
-        {/* Toolbar : undo/redo + week nav + class selector | view modes + export + new */}
         <PlanningToolbar
           weekStart={weekStart}
           onWeekChange={setWeekStart}
           viewMode={viewMode}
           onViewModeChange={handleViewModeChange}
-          referentielId={referentielId}
-          onReferentielChange={setReferentielId}
+          classicDim={classicDim}
+          classicId={classicId}
+          onClassicChange={handleClassicChange}
+          activeDay={activeDay}
+          onDayChange={setActiveDay}
           onCreateSession={() => setCreateOpen(true)}
           canUndo={undoStack.canUndo}
           canRedo={undoStack.canRedo}
@@ -174,15 +211,14 @@ export function RpPlanningView() {
           readOnly={readOnly}
         />
 
-        {/* Day/Week toggle + session counter */}
-        <ViewScopeToggle scope={scope} onChange={setScope} sessionCount={sessions.length} />
+        {isClassique ? (
+          <ViewScopeToggle scope={scope} onChange={setScope} sessionCount={sessions.length} />
+        ) : null}
 
-        {/* Planning grid — fills remaining height, scrolls internally */}
-        {/* ref LOT 7 (X.2) : capturé par exportNodeToImage/exportNodeToPdf */}
         <div ref={gridContainerRef} className="min-h-0 flex-1">
           {sessionsQuery.isLoading ? (
             <PlanningGridSkeleton />
-          ) : (
+          ) : isClassique ? (
             <PlanningGrid
               weekStart={weekStart}
               sessions={sessions}
@@ -193,15 +229,36 @@ export function RpPlanningView() {
               readOnly={readOnly}
               {...(readOnly
                 ? {}
+                : { onPushUndo: undoStack.push, onCreateAtSlot: handleCreateAtSlot })}
+            />
+          ) : (
+            <PlanningGridByEntity
+              dimension={viewMode as ReferentielDim}
+              day={addDays(weekStart, activeDay)}
+              columns={byEntityColumns}
+              sessions={sessions}
+              isLoading={false}
+              onSessionOpen={handleSessionOpen}
+              readOnly={readOnly}
+              {...(readOnly
+                ? {}
                 : {
-                    onPushUndo: undoStack.push,
-                    onCreateAtSlot: handleCreateAtSlot,
+                    onCreateAtSlot: (init) =>
+                      handleCreateAtSlot({
+                        date: init.date,
+                        startTime: init.startTime,
+                        endTime: init.endTime,
+                        ...(init.prefill.classeId ? { classeIds: [init.prefill.classeId] } : {}),
+                        ...(init.prefill.salleId ? { salleId: init.prefill.salleId } : {}),
+                        ...(init.prefill.enseignantId
+                          ? { enseignantId: init.prefill.enseignantId }
+                          : {}),
+                      }),
                   })}
             />
           )}
         </div>
 
-        {/* Footer with stats + actions */}
         <PlanningFooter
           sessions={sessions}
           isLoading={sessionsQuery.isLoading}
@@ -211,7 +268,6 @@ export function RpPlanningView() {
         />
       </div>
 
-      {/* Modale de création : inutile en lecture seule (AC). */}
       {readOnly ? null : (
         <CreateSessionModal
           isOpen={createOpen}
@@ -223,6 +279,9 @@ export function RpPlanningView() {
                   date: createInit.date,
                   startTime: createInit.startTime,
                   endTime: createInit.endTime,
+                  ...(createInit.classeIds ? { classeIds: createInit.classeIds } : {}),
+                  ...(createInit.salleId ? { salleId: createInit.salleId } : {}),
+                  ...(createInit.enseignantId ? { enseignantId: createInit.enseignantId } : {}),
                 },
               }
             : {})}

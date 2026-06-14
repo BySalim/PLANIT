@@ -49,6 +49,9 @@ interface CreateSessionModalProps {
     readonly startTime?: string;
     readonly endTime?: string;
     readonly classeIds?: readonly string[];
+    // V05 LOT 7 — préremplissage depuis les vues by-X (salle/enseignant).
+    readonly salleId?: string;
+    readonly enseignantId?: string;
   };
   /**
    * LOT 4 V2 — callback invoqué après création réussie. Le parent (page RP)
@@ -185,10 +188,10 @@ function makeDefaults(initial?: CreateSessionModalProps['initialValues']): FormV
     type: initial?.type ?? 'COURS',
     sousType: '',
     moduleId: '',
-    enseignantId: '',
+    enseignantId: initial?.enseignantId ?? '',
     intervenantNom: '',
     description: '',
-    salleId: '',
+    salleId: initial?.salleId ?? '',
     classeIds: initial?.classeIds ? [...initial.classeIds] : [],
     date: defaultDateString(initial?.date),
     startTime: initial?.startTime ?? '10:00',
