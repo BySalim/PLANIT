@@ -15,9 +15,15 @@ import { PlanningGridSkeleton } from '@/components/planning/planning-grid-skelet
 import { PlanningToolbar } from '@/components/planning/planning-toolbar';
 import type { ReferentielDim } from '@/components/planning/referentiel-combobox';
 import { SessionDetailDrawer } from '@/components/planning/session-detail-drawer';
+import { SubViewBar, type SubView } from '@/components/planning/sub-view-bar';
 import { ViewScopeToggle, type ViewScope } from '@/components/planning/view-scope-toggle';
 import type { ViewMode } from '@/components/planning/view-mode-tabs';
 import { useIsAc, useIsDirection } from '@/hooks/use-role';
+import {
+  useCreateViewGroupMutation,
+  useDeleteViewGroupMutation,
+  usePlanningViewGroupsQuery,
+} from '@/lib/planning-view-groups';
 import { useGlobalShortcut } from '@/lib/keyboard';
 import { useCreateSessionV2Mutation, useDeleteSessionV2Mutation } from '@/lib/mutations-v2';
 import {
@@ -75,8 +81,14 @@ export function RpPlanningView() {
   // Vues by-X : jour affiché.
   const [activeDay, setActiveDay] = useState<number>(() => todayDayIndex());
   const [scope, setScope] = useState<ViewScope>('week');
+  // V05 LOT 7.1 — groupe de vue sélectionné (preset ou vue custom) sur la vue by-X.
+  const [subView, setSubView] = useState<SubView | null>(null);
 
-  const handleViewModeChange = useCallback((mode: ViewMode) => setViewMode(mode), []);
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    // Le groupe de vue dépend de la dimension : on le réinitialise au changement.
+    setSubView(null);
+  }, []);
   const handleClassicChange = useCallback((dim: ReferentielDim, id: string) => {
     setClassicDim(dim);
     setClassicId(id);
@@ -112,25 +124,64 @@ export function RpPlanningView() {
   // Colonnes des vues by-X selon la dimension de l'onglet.
   const byEntityColumns = useMemo<ByEntityColumn[]>(() => {
     if (viewMode === 'classe') {
+      // `group` = niveau → presets par niveau dans la SubViewBar.
       return (classesQuery.data ?? []).map((c) => ({
         id: c.id,
         label: c.code,
         sub: c.name,
-        ...(c.niveau ? { badge: c.niveau } : {}),
+        ...(c.niveau ? { badge: c.niveau, group: c.niveau } : {}),
       }));
     }
     if (viewMode === 'salle') {
       return (sallesQuery.data ?? []).map((s) => ({ id: s.id, label: s.name }));
     }
     if (viewMode === 'prof') {
+      // `group` = spécialité → presets par spécialité dans la SubViewBar.
       return (enseignantsQuery.data ?? []).map((t) => ({
         id: t.id,
         label: t.nomComplet,
         sub: t.specialite,
+        ...(t.specialite ? { group: t.specialite } : {}),
       }));
     }
     return [];
   }, [viewMode, classesQuery.data, sallesQuery.data, enseignantsQuery.data]);
+
+  // V05 LOT 7.1 — groupes de vue (presets + vues custom) pour la dimension by-X.
+  const byXDim: ReferentielDim = viewMode === 'classique' ? 'classe' : viewMode;
+  const viewGroupsEnabled = viewMode !== 'classique' && !readOnly;
+  const viewGroupsQuery = usePlanningViewGroupsQuery(byXDim, viewGroupsEnabled);
+  const savedViews = useMemo(() => viewGroupsQuery.data ?? [], [viewGroupsQuery.data]);
+  const createViewGroup = useCreateViewGroupMutation();
+  const deleteViewGroup = useDeleteViewGroupMutation(byXDim);
+
+  // Colonnes effectivement affichées = byEntityColumns filtrées/ordonnées par le
+  // groupe de vue sélectionné (preset → filtre par `group` ; custom → ordre refIds).
+  const displayedColumns = useMemo<ByEntityColumn[]>(() => {
+    if (!subView) return byEntityColumns;
+    if (subView.kind === 'preset') {
+      return byEntityColumns.filter((c) => c.group === subView.key);
+    }
+    const sv = savedViews.find((v) => v.id === subView.id);
+    if (!sv) return byEntityColumns;
+    const byId = new Map(byEntityColumns.map((c) => [c.id, c]));
+    return sv.refIds.map((id) => byId.get(id)).filter((c): c is ByEntityColumn => c !== undefined);
+  }, [subView, byEntityColumns, savedViews]);
+
+  const handleCreateViewGroup = useCallback(
+    (name: string, refIds: string[]) => {
+      createViewGroup.mutate(
+        { view: byXDim, name, refIds },
+        { onSuccess: (created) => setSubView({ kind: 'custom', id: created.id }) },
+      );
+    },
+    [createViewGroup, byXDim],
+  );
+
+  const handleDeleteViewGroup = useCallback(
+    (id: string) => deleteViewGroup.mutate({ id }),
+    [deleteViewGroup],
+  );
 
   const handleExport = useCallback(
     async (fmt: ExportFormat) => {
@@ -220,6 +271,18 @@ export function RpPlanningView() {
           <ViewScopeToggle scope={scope} onChange={setScope} sessionCount={sessions.length} />
         ) : null}
 
+        {/* V05 LOT 7.1 — groupes de vue (presets + vues custom) sur les vues by-X (RP). */}
+        {!isClassique && !readOnly ? (
+          <SubViewBar
+            allCols={byEntityColumns}
+            subView={subView}
+            onSubView={setSubView}
+            savedViews={savedViews}
+            onCreate={handleCreateViewGroup}
+            onDelete={handleDeleteViewGroup}
+          />
+        ) : null}
+
         <div ref={gridContainerRef} className="min-h-0 flex-1">
           {sessionsQuery.isLoading ? (
             <PlanningGridSkeleton />
@@ -240,7 +303,7 @@ export function RpPlanningView() {
             <PlanningGridByEntity
               dimension={viewMode as ReferentielDim}
               day={addDays(weekStart, activeDay)}
-              columns={byEntityColumns}
+              columns={displayedColumns}
               sessions={sessions}
               isLoading={false}
               onSessionOpen={handleSessionOpen}

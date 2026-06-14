@@ -23,6 +23,9 @@ export interface ByEntityColumn {
   sub?: string | undefined;
   // V05 LOT 7.1 — badge (niveau de classe L1…M2), affiché dans l'en-tête.
   badge?: string | undefined;
+  // V05 LOT 7.1 — clé de regroupement pour les presets de la SubViewBar
+  // (ex. niveau pour les classes, spécialité pour les enseignants).
+  group?: string | undefined;
 }
 
 interface PlanningGridByEntityProps {
