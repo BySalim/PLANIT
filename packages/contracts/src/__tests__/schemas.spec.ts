@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   createAnneeAcademiqueSchema,
+  createPlanningViewGroupSchema,
   createSessionV2Schema,
   createUeSchema,
   inscriptionRequestSchema,
   loginSchema,
+  planningViewGroupQuerySchema,
   roleSchema,
   salleSchema,
   sessionSchema,
   suiviModuleQuerySchema,
   ueSchema,
+  updatePersonnelSchema,
+  updatePlanningViewGroupSchema,
 } from '../index';
 
 // Contracts are mostly declarative Zod schemas — these tests exercise the
@@ -228,5 +232,47 @@ describe('createSessionV2Schema — discriminated union on type', () => {
         enseignantId: 'e1',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('planning — view-groups (V05 LOT 7.1)', () => {
+  it('createPlanningViewGroupSchema accepts a valid group and rejects empty name / refIds', () => {
+    expect(
+      createPlanningViewGroupSchema.safeParse({ view: 'classe', name: 'Mes L3', refIds: ['c1'] })
+        .success,
+    ).toBe(true);
+    expect(
+      createPlanningViewGroupSchema.safeParse({ view: 'classe', name: '   ', refIds: ['c1'] })
+        .success,
+    ).toBe(false);
+    expect(
+      createPlanningViewGroupSchema.safeParse({ view: 'salle', name: 'X', refIds: [] }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an unknown view dimension', () => {
+    expect(
+      createPlanningViewGroupSchema.safeParse({ view: 'enseignant', name: 'X', refIds: ['e1'] })
+        .success,
+    ).toBe(false);
+  });
+
+  it('updatePlanningViewGroupSchema requires at least one field (refine branch)', () => {
+    expect(updatePlanningViewGroupSchema.safeParse({ name: 'Renommée' }).success).toBe(true);
+    expect(updatePlanningViewGroupSchema.safeParse({ refIds: ['c1', 'c2'] }).success).toBe(true);
+    expect(updatePlanningViewGroupSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('planningViewGroupQuerySchema validates the view enum', () => {
+    expect(planningViewGroupQuerySchema.safeParse({ view: 'prof' }).success).toBe(true);
+    expect(planningViewGroupQuerySchema.safeParse({ view: 'bogus' }).success).toBe(false);
+  });
+});
+
+describe('admin — updatePersonnelSchema refine', () => {
+  it('accepts a single field and rejects an empty payload (refine branch)', () => {
+    expect(updatePersonnelSchema.safeParse({ fullName: 'Awa Sow' }).success).toBe(true);
+    expect(updatePersonnelSchema.safeParse({ email: 'a@b.com' }).success).toBe(true);
+    expect(updatePersonnelSchema.safeParse({}).success).toBe(false);
   });
 });
