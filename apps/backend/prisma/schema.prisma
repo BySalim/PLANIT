@@ -218,6 +218,10 @@ model User {
   // V05 — actions tracées au journal d'audit (ADR-0020).
   auditLogs AuditLog[] @relation("AuditActor")
 
+  // V05 LOT 7.1 — groupes de vue planning (presets custom) sauvegardés par cet
+  // utilisateur (privés au créateur). onDelete: Cascade (préférence UI).
+  planningViewGroups PlanningViewGroup[]
+
   @@index([managerRpId])
   @@index([ecoleId])
   @@map("users")
@@ -740,4 +744,29 @@ model AssistantClasse {
   @@id([acId, classeId])
   @@index([classeId])
   @@map("assistant_classes")
+}
+
+// V05 LOT 7.1 — groupe de vue planning : sous-ensemble ordonné de références
+// (classes/salles/enseignants) qui définit les colonnes d'une vue by-X.
+// Privé à son créateur (`userId`). `refIds` = ids ordonnés des références.
+model PlanningViewGroup {
+  id     String           @id @default(cuid())
+  userId String
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  view   PlanningViewKind
+  name   String
+  refIds String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, view])
+  @@map("planning_view_groups")
+}
+
+// Dimension d'une vue by-X à laquelle s'applique un groupe de vue.
+enum PlanningViewKind {
+  CLASSE
+  SALLE
+  PROF
 }

@@ -3,6 +3,7 @@ export * from './auth';
 export * from './planning';
 export * from './planning/planning-v2';
 export * from './planning/comparable';
+export * from './planning/view-groups';
 export * from './entities';
 export * from './academic';
 export * from './admin';
